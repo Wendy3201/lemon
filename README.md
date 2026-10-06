@@ -212,3 +212,9 @@ same.
 
 The code and artwork are original and MIT licensed — see `LICENSE`. Fonts and
 notes on inspiration are in `CREDITS.md`.
+
+
+#note to self
+git add .
+git commit -m "Updated site content"
+git push origin main
