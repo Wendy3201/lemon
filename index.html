@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Pip Survivors — Lemon</title>
+    <meta
+      name="description"
+      content="Pip Survivors: steer a lemon through swarms of garden pests, pick upgrades, forge better gear and grow your power. Plays in the browser, nothing to download."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#F7D94C" />
+    <link rel="icon" href="assets/icons/lemon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- ------------------------------------------------------------ menus -->
+    <div class="app" id="app">
+      <header class="topbar">
+        <div class="brand">
+          <svg class="brand__mark" viewBox="0 0 48 48" aria-hidden="true">
+            <ellipse cx="24" cy="27" rx="17" ry="14" fill="#F7D94C" stroke="#E0B93C" stroke-width="2" />
+            <ellipse cx="18" cy="22" rx="5" ry="3" fill="#FFF4B8" opacity=".8" />
+            <path d="M24 13c0-5 4-8 9-8-1 5-4 8-9 8z" fill="#8FAE65" />
+          </svg>
+          <span class="brand__text">
+            <span class="brand__name">PIP SURVIVORS</span>
+            <span class="brand__tag">a Lemon game</span>
+          </span>
+        </div>
+        <div class="topbar__stats">
+          <span class="pill pill--power" id="top-power" title="Power: how strong your lemon is"></span>
+          <span class="pill" id="top-gold" title="Gold: for levels and talents"></span>
+          <span class="pill" id="top-gems" title="Gems: for chests"></span>
+          <button class="btn btn--icon" id="open-settings" type="button" data-act="settings" aria-label="Settings"></button>
+        </div>
+      </header>
+
+      <main class="screen" id="screen" tabindex="-1"></main>
+
+      <nav class="tabbar" id="tabbar" aria-label="Main">
+        <button class="tab" type="button" data-act="tab" data-tab="shop"><span>Shop</span></button>
+        <button class="tab" type="button" data-act="tab" data-tab="gear"><span>Equipment</span></button>
+        <button class="tab tab--main" type="button" data-act="tab" data-tab="battle"><span>Battle</span></button>
+        <button class="tab" type="button" data-act="tab" data-tab="talents"><span>Talents</span></button>
+        <button class="tab" type="button" data-act="tab" data-tab="quests"><span>Quests</span></button>
+      </nav>
+    </div>
+
+    <!-- ----------------------------------------------------------- battle -->
+    <section class="battle" id="battle" hidden aria-label="Battle"></section>
+
+    <dialog class="modal" id="modal" aria-labelledby="modal-title"></dialog>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <noscript><p class="noscript">Pip Survivors needs JavaScript to run.</p></noscript>
+
+    <!-- ---------------------------------------------------------- scripts -->
+    <script src="js/core.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/icons.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/battle.js"></script>
+    <script src="js/enemies.js"></script>
+    <script src="js/weapons.js"></script>
+    <script src="js/outfit.js"></script>
+    <script src="js/upgrades.js"></script>
+    <script src="js/hud.js"></script>
+    <script src="js/ui.js"></script>
+    <script>
+      PS.ui.init();
+    </script>
+  </body>
+</html>
