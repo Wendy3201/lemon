@@ -177,6 +177,10 @@ Most tweaks are one line in `js/data.js`.
 - **A new upgrade card:** add it to `UPGRADES` in `js/upgrades.js`.
 - **The password on the `?` button** is `SECRET_PASSWORD` in `js/ui.js`. It is
   checked in the browser, so anyone who reads the file can see it.
+  Behind it is a dev menu for testing: give or remove any item, set gold and
+  gems to an exact figure, and start **Swarm mode**, an endless battle with no
+  boss and a swarm that keeps growing, with pests as tough as the chapter you
+  pick. Swarm mode never touches your save.
 
 ---
 

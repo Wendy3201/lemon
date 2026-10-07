@@ -66,7 +66,8 @@
     window.addEventListener("resize", resize);
   };
 
-  B.start = function (chapterNumber) {
+  /** mode "swarm" is the dev menu's endless sandbox: no boss, nothing is saved. */
+  B.start = function (chapterNumber, mode) {
     var ch = PS.chapter(chapterNumber);
     var stats = PS.state.calc();
     var p = makePlayer(stats);
@@ -74,7 +75,7 @@
     calm = PS.reducedMotion();
     R = B.run = {
       ch: ch, zone: PS.ZONES[ch.zone], weaponId: stats.weapon, weapon: B.WEAPONS[stats.weapon],
-      src: stats.weapon, dmgBy: {},
+      src: stats.weapon, dmgBy: {}, mode: mode === "swarm" ? "swarm" : "normal",
       t: 0, dur: ch.duration, phase: "swarm", over: 0, done: false,
       p: p,
       enemies: [], shots: [], zones: [], ebullets: [], drops: [], sparks: [], texts: [], fx: [], timers: [],
@@ -478,15 +479,21 @@
   function finish() {
     if (R.done) return;
     R.done = true;
-    var result = PS.state.finishRun({
-      chapter: R.ch.n,
-      won: R.phase === "won",
-      time: R.t,
-      kills: R.kills,
-      level: R.p.level,
-      coins: R.coins,
-      boss: R.reachedBoss
-    });
+    var result;
+    if (R.mode === "swarm") {
+      // a sandbox run: no rewards, no progress, nothing written to the save
+      result = { swarm: true, chapter: R.ch.n, won: false, time: R.t, kills: R.kills, level: R.p.level, items: [], gold: 0, gems: 0, unlocked: 0 };
+    } else {
+      result = PS.state.finishRun({
+        chapter: R.ch.n,
+        won: R.phase === "won",
+        time: R.t,
+        kills: R.kills,
+        level: R.p.level,
+        coins: R.coins,
+        boss: R.reachedBoss
+      });
+    }
     result.dealt = R.dealt;
     PS.emit("battle:end", result);
   }

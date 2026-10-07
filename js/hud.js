@@ -240,7 +240,7 @@
       setText("hpText", el.hpText, PS.fmt(Math.ceil(Math.max(0, p.hp))) + " / " + PS.fmt(Math.round(p.maxHp)));
       setWidth("xp", el.xp, p.xp / p.need);
       setText("lvl", el.lvl, "Lv " + p.level);
-      setText("time", el.time, R.phase === "swarm" ? PS.clock(Math.ceil(R.dur - R.t)) : "BOSS");
+      setText("time", el.time, R.mode === "swarm" ? PS.clock(R.t) : R.phase === "swarm" ? PS.clock(Math.ceil(R.dur - R.t)) : "BOSS");
       setText("kills", el.killsText, PS.fmt(R.kills));
       setText("coins", el.coinsText, PS.fmt(R.coins));
 

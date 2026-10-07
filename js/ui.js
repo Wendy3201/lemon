@@ -861,6 +861,10 @@
           '<button class="btn btn--sm" type="button" data-act="dev-set" data-key="dev-set">Give a full set (all 6 slots) at this rarity</button>' +
         "</div>" +
         '<div class="dev__give">' +
+          '<label>Swarm mode: pests as tough as chapter<input id="dev-swarm-ch" type="number" min="1" max="' + PS.BAL.CHAPTERS + '" step="1" value="' + S.chapter + '" /></label>' +
+          '<button class="btn btn--sm btn--primary" type="button" data-act="dev-swarm" data-key="dev-swarm">Start swarm mode</button>' +
+        "</div>" +
+        '<div class="dev__give">' +
           '<label>Gold<input id="dev-gold" type="number" min="0" step="1" value="' + S.gold + '" /></label>' +
           '<label>Gems<input id="dev-gems" type="number" min="0" step="1" value="' + S.gems + '" /></label>' +
           '<button class="btn btn--sm" type="button" data-act="dev-money" data-key="dev-money">Set</button>' +
@@ -929,13 +933,14 @@
 
   /* ------------------------------------------------------------- battles */
 
-  function startBattle(chapter) {
+  function startBattle(chapter, mode) {
     closeModal();
     view.results = null;
     el.results.hidden = true;
     el.app.hidden = true;
     el.battle.hidden = false;
-    PS.B.start(chapter);
+    PS.B.start(chapter, mode);
+    if (mode === "swarm") PS.B.toast("Swarm mode! Survive as long as you can.", 4);
   }
 
   function leaveBattle() {
@@ -949,8 +954,32 @@
     render();
   }
 
+  function showSwarmResults(result) {
+    var ch = PS.chapter(result.chapter);
+    el.results.innerHTML =
+      '<div class="panel results results--loss">' +
+        '<p class="kicker">Swarm mode · pests as tough as chapter ' + ch.n + "</p>" +
+        "<h2>Swarmed!</h2>" +
+        '<p class="results__sub">You held out for ' + PS.clock(result.time) + ". Nothing from this run is saved.</p>" +
+        '<dl class="facts facts--tight">' +
+          "<div><dt>Time</dt><dd>" + PS.clock(result.time) + "</dd></div>" +
+          "<div><dt>Squashed</dt><dd>" + fmt(result.kills) + "</dd></div>" +
+          "<div><dt>Level</dt><dd>" + result.level + "</dd></div>" +
+          "<div><dt>Damage</dt><dd>" + fmt(result.dealt || 0) + "</dd></div>" +
+        "</dl>" +
+        '<div class="modal__actions">' +
+          '<button class="btn" type="button" data-act="again" data-key="again">Go again</button>' +
+          '<button class="btn btn--primary" type="button" data-act="home" data-key="home">Back to camp</button>' +
+        "</div>" +
+      "</div>";
+    el.results.hidden = false;
+    var button = $('[data-key="home"]', el.results);
+    if (button) button.focus();
+  }
+
   function showResults(result) {
     view.results = result;
+    if (result.swarm) return showSwarmResults(result);
     var ch = PS.chapter(result.chapter);
     var title = result.won ? (result.finished ? "The grove is saved!" : "Chapter cleared!") : result.progress >= 1 ? "So close…" : "Overrun!";
     var sub = result.won
@@ -1044,8 +1073,9 @@
     fight: function () { startBattle(st.get().chapter); },
     again: function () {
       var chapter = view.results.chapter;
+      var mode = view.results.swarm ? "swarm" : undefined;
       PS.B.stop();
-      startBattle(chapter);
+      startBattle(chapter, mode);
     },
     home: function () { leaveBattle(); },
 
@@ -1213,6 +1243,10 @@
     "dev-remove": function (node) {
       var item = st.item(Number(node.getAttribute("data-u")));
       if (item && st.take(item.u)) toast("Removed " + fullName(item));
+    },
+    "dev-swarm": function () {
+      var chapter = Math.max(1, Math.min(PS.BAL.CHAPTERS, Math.round(Number($("#dev-swarm-ch").value) || 1)));
+      startBattle(chapter, "swarm");
     },
     "dev-money": function () {
       st.setMoney(Number($("#dev-gold").value), Number($("#dev-gems").value));

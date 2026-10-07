@@ -101,12 +101,47 @@
     return PS.weighted(kinds, weights);
   }
 
+  /* The dev menu's endless mode: no boss, no end. The swarm thickens for the
+     first four minutes and then simply keeps coming, with a ring of pests
+     every twenty seconds and an elite every forty. */
+  function swarmDirector(dt) {
+    var R = B.run;
+    var u = Math.min(1, R.t / 240);
+    if (R.spawnIn <= 0) {
+      if (R.enemies.length < 120 + 200 * u) {
+        var pack = 2 + Math.floor(6 * u);
+        var angle = Math.random() * TAU;
+        while (pack--) atRing(pickKind(0.15 + 0.85 * u), angle + PS.rand(-0.6, 0.6));
+      }
+      R.spawnIn = PS.lerp(0.4, 0.06, u);
+    }
+    R.swarmClock = (R.swarmClock || 0) + dt;
+    if (R.swarmClock >= 20) {
+      R.swarmClock -= 20;
+      R.swarmRings = (R.swarmRings || 0) + 1;
+      var count = 24 + Math.min(24, R.swarmRings * 2);
+      var start = Math.random() * TAU;
+      for (var i = 0; i < count; i++) atRing(R.swarmRings % 2 ? "dart" : "grunt", start + (i / count) * TAU);
+      if (R.swarmRings % 2 === 0) {
+        var elite = atRing(Math.random() < 0.5 ? "charger" : "brute", Math.random() * TAU);
+        elite.elite = true;
+        elite.r *= 1.55;
+        elite.hp = elite.maxHp = elite.hp * 4;
+        elite.hurt *= 1.5;
+        elite.xp *= 10;
+        elite.mass *= 3;
+      }
+      B.toast("A ring of pests closes in!");
+    }
+  }
+
   B.director = function (dt) {
     var R = B.run;
     // the battle can be decided earlier in the same tick (the lemon's own
     // attack felling the boss): nothing more may spawn after that
     if (R.phase !== "swarm" && R.phase !== "boss") return;
     R.spawnIn -= dt;
+    if (R.mode === "swarm") return swarmDirector(dt);
 
     if (R.phase === "boss") {
       if (R.spawnIn <= 0) {
