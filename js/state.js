@@ -669,6 +669,21 @@
     };
   }
 
+  /* Swarm mode (the dev menu's endless battle) pays gold only: 1.2 times what a
+     normal chapter run pays, in proportion to how long you lasted (lasting a
+     chapter's length earns 1.2 chapter-clears), and the coins you picked up. */
+  var SWARM_PAY = 1.2;
+
+  function paySwarm(chapter, time, coins) {
+    var ch = PS.chapter(chapter);
+    var base = ch.gold * Math.max(0, time) / ch.duration + (coins || 0);
+    var gold = Math.round(base * SWARM_PAY * (1 + calc().gold));
+    S.gold += gold;
+    S.stats.earned += gold;
+    commit();
+    return gold;
+  }
+
   /* ---------------------------------------------------------------- shop */
 
   function chestCost(kind, count) {
@@ -883,6 +898,7 @@
     // quests
     quests: quests,
     claimQuest: claimQuest,
+    paySwarm: paySwarm,
     badges: badges,
     // dev menu
     give: function (id, rarity) {

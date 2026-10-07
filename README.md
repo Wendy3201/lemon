@@ -180,7 +180,8 @@ Most tweaks are one line in `js/data.js`.
   Behind it is a dev menu for testing: give or remove any item, set gold and
   gems to an exact figure, and start **Swarm mode**, an endless battle with no
   boss and a swarm that keeps growing, with pests as tough as the chapter you
-  pick. Swarm mode never touches your save.
+  pick. It pays gold (1.2 times what a normal run of that chapter pays, scaled by how
+  long you last) and keeps nothing else: no gear, progress or records.
 
 ---
 

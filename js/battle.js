@@ -481,8 +481,11 @@
     R.done = true;
     var result;
     if (R.mode === "swarm") {
-      // a sandbox run: no rewards, no progress, nothing written to the save
-      result = { swarm: true, chapter: R.ch.n, won: false, time: R.t, kills: R.kills, level: R.p.level, items: [], gold: 0, gems: 0, unlocked: 0 };
+      // a sandbox run: gold only, no gear, no progress, no records
+      result = {
+        swarm: true, chapter: R.ch.n, won: false, time: R.t, kills: R.kills, level: R.p.level, items: [], gems: 0, unlocked: 0,
+        gold: PS.state.paySwarm(R.ch.n, R.t, R.coins)
+      };
     } else {
       result = PS.state.finishRun({
         chapter: R.ch.n,

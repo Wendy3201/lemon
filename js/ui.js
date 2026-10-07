@@ -864,6 +864,7 @@
           '<label>Swarm mode: pests as tough as chapter<input id="dev-swarm-ch" type="number" min="1" max="' + PS.BAL.CHAPTERS + '" step="1" value="' + S.chapter + '" /></label>' +
           '<button class="btn btn--sm btn--primary" type="button" data-act="dev-swarm" data-key="dev-swarm">Start swarm mode</button>' +
         "</div>" +
+        '<p class="hint">Endless, no boss. Pays 1.2× the usual gold for the chapter you pick.</p>' +
         '<div class="dev__give">' +
           '<label>Gold<input id="dev-gold" type="number" min="0" step="1" value="' + S.gold + '" /></label>' +
           '<label>Gems<input id="dev-gems" type="number" min="0" step="1" value="' + S.gems + '" /></label>' +
@@ -960,13 +961,14 @@
       '<div class="panel results results--loss">' +
         '<p class="kicker">Swarm mode · pests as tough as chapter ' + ch.n + "</p>" +
         "<h2>Swarmed!</h2>" +
-        '<p class="results__sub">You held out for ' + PS.clock(result.time) + ". Nothing from this run is saved.</p>" +
+        '<p class="results__sub">You held out for ' + PS.clock(result.time) + ". Swarm mode pays 1.2× the usual gold; nothing else is kept.</p>" +
         '<dl class="facts facts--tight">' +
           "<div><dt>Time</dt><dd>" + PS.clock(result.time) + "</dd></div>" +
           "<div><dt>Squashed</dt><dd>" + fmt(result.kills) + "</dd></div>" +
           "<div><dt>Level</dt><dd>" + result.level + "</dd></div>" +
           "<div><dt>Damage</dt><dd>" + fmt(result.dealt || 0) + "</dd></div>" +
         "</dl>" +
+        '<p class="loot__money">' + price("gold", result.gold) + "</p>" +
         '<div class="modal__actions">' +
           '<button class="btn" type="button" data-act="again" data-key="again">Go again</button>' +
           '<button class="btn btn--primary" type="button" data-act="home" data-key="home">Back to camp</button>' +
