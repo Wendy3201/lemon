@@ -48,6 +48,9 @@ GitHub Pages, Netlify or any web host. Nothing needs compiling.
   clear the chapter and open the next one.
 - `Esc` or `P` pauses. Losing still pays some gold, and gear too if you got
   halfway.
+- The **damage meter** in the top-left ranks what is doing the damage (your
+  weapon, each upgrade's ability, burning, death blasts, thorns) with each
+  one's share of the total. The chart button, or `Tab`, shows or hides it.
 
 ### Between battles
 

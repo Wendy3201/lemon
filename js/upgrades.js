@@ -206,6 +206,7 @@
 
     level = up.orbit || 0;
     if (level) {
+      R.src = "orbit";
       for (i = 0; i < enemies.length; i++) {
         e = enemies[i];
         if (e.dead) continue;
@@ -242,10 +243,12 @@
           var d2 = dx * dx + dy * dy;
           if (mist && d2 < (mistR + e.r) * (mistR + e.r)) {
             chill(e, 0.2 + 0.04 * mist);
+            R.src = "mist";
             B.hit(e, base * (0.25 + 0.08 * mist) * 0.25, DOT);
           }
           if (d2 < (gearR + e.r) * (gearR + e.r)) {
             if (fx.auraChill) chill(e, fx.auraChill);
+            R.src = "aura";
             if (fx.auraBurn) B.hit(e, base * fx.auraBurn * 0.25, DOT);
           }
         }
@@ -254,6 +257,7 @@
 
     level = up.bolt || 0;
     if (level) {
+      R.src = "bolt";
       T.bolt = (T.bolt === undefined ? 1 : T.bolt) - dt;
       if (T.bolt <= 0) {
         T.bolt = Math.max(0.9, 2.6 - 0.35 * level);
@@ -268,6 +272,7 @@
 
     level = up.bomb || 0;
     if (level) {
+      R.src = "bomb";
       T.bomb = (T.bomb === undefined ? 1.5 : T.bomb) - dt;
       if (T.bomb <= 0) {
         e = B.cluster(300, 80);
@@ -282,6 +287,7 @@
 
     level = (up.trail || 0) + (fx.trail ? 2 : 0);
     if (level && p.moving) {
+      R.src = "trail";
       T.trail = (T.trail || 0) - dt;
       if (T.trail <= 0) {
         T.trail = 0.22;
@@ -291,6 +297,7 @@
 
     level = up.swarm || 0;
     if (level) {
+      R.src = "swarm";
       T.swarm = (T.swarm === undefined ? 1 : T.swarm) - dt;
       if (T.swarm <= 0) {
         T.swarm = 1.6;

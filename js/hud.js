@@ -21,6 +21,7 @@
       '<div class="hud__xp"><i></i></div>' +
       '<div class="hud__top">' +
         '<button class="hud__btn" type="button" data-hud="pause" aria-label="Pause">' + PS.icon("pause") + "</button>" +
+        '<button class="hud__btn" type="button" data-hud="meter" aria-label="Damage meter" aria-pressed="true" title="Damage meter (Tab)">' + PS.icon("chart") + "</button>" +
         '<div class="hud__hp" role="img" aria-label="Health"><i class="hud__hp-fill"></i><i class="hud__hp-shield"></i><span></span></div>' +
         '<span class="hud__pill hud__lvl"></span>' +
         '<span class="hud__gap"></span>' +
@@ -28,6 +29,7 @@
         '<span class="hud__pill hud__kills"></span>' +
         '<span class="hud__pill hud__coins"></span>' +
       '</div>' +
+      '<div class="hud__meter" aria-label="Damage by source" hidden></div>' +
       '<div class="hud__boss" hidden><span></span><div><i></i></div></div>' +
       '<div class="hud__toast" role="status" aria-live="polite"></div>' +
       '<div class="hud__build"></div>' +
@@ -84,6 +86,77 @@
     }).join("");
   }
 
+  /* ------------------------------------------------------- damage meter */
+  /* Who is doing the damage: the weapon, each upgrade's ability, burning,
+     death explosions and thorns, ranked, with each one's share of the total. */
+
+  var SOURCES = {
+    orbit: ["Orbit Peel", "orbit", "#E0B93C"],
+    bolt: ["Lightning Seed", "bolt", "#8EC5FF"],
+    bomb: ["Juice Bomb", "bomb", "#FFB84A"],
+    mist: ["Cold Mist", "mist", "#9AD7FF"],
+    trail: ["Zest Trail", "trail", "#F26B2A"],
+    burst: ["Thorn Burst", "burst", "#8FAE65"],
+    swarm: ["Pip Swarm", "swarm", "#9BE08A"],
+    burn: ["Burning", "burn", "#F26B2A"],
+    boom: ["Death blasts", "boom", "#F7D94C"],
+    thorns: ["Thorns", "armor", "#8FAE65"],
+    aura: ["Gear aura", "sun", "#FFD166"],
+    gear: ["Gear blasts", "revive", "#FFE66D"]
+  };
+  var MAX_ROWS = 7;
+  var meterOpen = false;
+
+  function share(fraction) {
+    return fraction < 0.1 ? (fraction * 100).toFixed(1) + "%" : Math.round(fraction * 100) + "%";
+  }
+
+  /** The ranked list as markup. Returns "" until something has been hit. */
+  function meterRows(R) {
+    var rows = [];
+    var total = 0;
+    Object.keys(R.dmgBy).forEach(function (key) {
+      var dmg = R.dmgBy[key];
+      if (!(dmg > 0)) return;
+      total += dmg;
+      if (key === R.weaponId) {
+        rows.push({ name: PS.ITEMS[key].name, icon: PS.itemIcon(key), color: "#F7D94C", dmg: dmg, weapon: true });
+      } else {
+        var s = SOURCES[key] || [key, "xp", "#CDBF9C"];
+        rows.push({ name: s[0], icon: PS.icon(s[1]), color: s[2], dmg: dmg });
+      }
+    });
+    if (!rows.length) return "";
+    rows.sort(function (a, b) { return b.dmg - a.dmg; });
+    if (rows.length > MAX_ROWS) {
+      var rest = rows.splice(MAX_ROWS - 1);
+      var sum = rest.reduce(function (acc, r) { return acc + r.dmg; }, 0);
+      rows.push({ name: "Others (" + rest.length + ")", icon: PS.icon("count"), color: "#9AA1A9", dmg: sum });
+    }
+    var top = rows[0].dmg;
+    var seconds = Math.max(1, R.t);
+    return (
+      '<div class="meter__head"><b>Damage</b><span>' + PS.fmt(total) + " · " + PS.fmt(total / seconds) + "/s</span></div>" +
+      rows.map(function (r) {
+        return (
+          '<div class="meter__row' + (r.weapon ? " is-weapon" : "") + '" style="--w:' + ((r.dmg / top) * 100).toFixed(1) + "%;--c:" + r.color + '">' +
+            '<span class="meter__ico">' + r.icon + "</span>" +
+            '<span class="meter__name">' + PS.esc(r.name) + "</span>" +
+            '<span class="meter__num">' + PS.fmt(r.dmg) + "</span>" +
+            '<span class="meter__pct">' + share(r.dmg / total) + "</span>" +
+          "</div>"
+        );
+      }).join("")
+    );
+  }
+
+  function applyMeter() {
+    el.meter.hidden = !meterOpen;
+    el.hud.classList.toggle("has-meter", meterOpen);
+    el.meterBtn.setAttribute("aria-pressed", String(meterOpen));
+    shown.meter = null;
+  }
+
   function onClick(e) {
     var pick = e.target.closest("[data-pick]");
     if (pick) {
@@ -96,6 +169,7 @@
     var action = control.getAttribute("data-hud");
     if (action === "pause") B.pause();
     else if (action === "resume") B.resume();
+    else if (action === "meter") B.hud.toggleMeter();
     else if (action === "reroll") B.reroll();
     else if (action === "quit") {
       if (quitArmed) {
@@ -111,6 +185,8 @@
     mount: function (root) {
       root.insertAdjacentHTML("beforeend", MARKUP);
       el.hud = root.querySelector(".hud");
+      el.meter = root.querySelector(".hud__meter");
+      el.meterBtn = root.querySelector('[data-hud="meter"]');
       el.xp = root.querySelector(".hud__xp i");
       el.hpFill = root.querySelector(".hud__hp-fill");
       el.hpShield = root.querySelector(".hud__hp-shield");
@@ -141,6 +217,8 @@
 
     begin: function (R) {
       shown = {};
+      meterOpen = PS.store.get("lemon:meter", window.innerWidth >= 900) === true;
+      applyMeter();
       el.hud.hidden = false;
       el.choose.hidden = true;
       el.pause.hidden = true;
@@ -166,6 +244,15 @@
       setText("kills", el.killsText, PS.fmt(R.kills));
       setText("coins", el.coinsText, PS.fmt(R.coins));
 
+      if (meterOpen) {
+        var tick = Math.floor(R.t * 4);
+        if (shown.meterTick !== tick) {
+          shown.meterTick = tick;
+          var html = meterRows(R) || '<div class="meter__head"><b>Damage</b><span>nothing yet</span></div>';
+          setHtml("meter", el.meter, html, html);
+        }
+      }
+
       var boss = R.boss && !R.boss.dead ? R.boss : null;
       if (shown.boss !== Boolean(boss)) {
         shown.boss = Boolean(boss);
@@ -180,6 +267,13 @@
         if (toast) el.toast.textContent = toast;
         el.toast.classList.toggle("is-on", Boolean(toast));
       }
+    },
+
+    toggleMeter: function () {
+      meterOpen = !meterOpen;
+      PS.store.set("lemon:meter", meterOpen);
+      applyMeter();
+      if (B.run) B.hud.update(B.run);
     },
 
     build: function (R) {

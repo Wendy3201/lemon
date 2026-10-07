@@ -74,6 +74,7 @@
     calm = PS.reducedMotion();
     R = B.run = {
       ch: ch, zone: PS.ZONES[ch.zone], weaponId: stats.weapon, weapon: B.WEAPONS[stats.weapon],
+      src: stats.weapon, dmgBy: {},
       t: 0, dur: ch.duration, phase: "swarm", over: 0, done: false,
       p: p,
       enemies: [], shots: [], zones: [], ebullets: [], drops: [], sparks: [], texts: [], fx: [], timers: [],
@@ -150,6 +151,7 @@
     }
     R.t += dt;
     R.procs = 0;
+    R.src = R.weaponId;
     updatePlayer(dt);
     B.director(dt);
     updateEnemies(dt);
@@ -158,6 +160,7 @@
     updateEnemyShots(dt);
     B.updateAbilities(dt);
     runTimers(dt);
+    R.src = R.weaponId;
     updateDrops(dt, false);
     updateFx(dt);
     sweep();
@@ -165,8 +168,19 @@
     if ((R.phase === "swarm" || R.phase === "boss") && R.p.xp >= R.p.need) levelUp();
   };
 
+  /* Every point of damage is credited to a source (the weapon, an upgrade,
+     burning...) for the damage meter. R.src is the source in force right now;
+     anything that acts later (shots, zones, timers) remembers it. */
+  B.as = function (src, fn) {
+    var before = R.src;
+    R.src = src;
+    var result = fn();
+    R.src = before;
+    return result;
+  };
+
   B.later = function (delay, fn) {
-    R.timers.push({ t: delay, fn: fn });
+    R.timers.push({ t: delay, fn: fn, src: R.src });
   };
 
   function runTimers(dt) {
@@ -175,6 +189,7 @@
       timer.t -= dt;
       if (timer.t <= 0) {
         R.timers.splice(i, 1);
+        R.src = timer.src;
         timer.fn();
       }
     }
@@ -356,7 +371,7 @@
       p.barrier -= soaked;
       dmg -= soaked;
       if (p.barrier <= 0 && p.fx.barrierNova) {
-        B.blast(p.x, p.y, 120 * B.area(), B.dmg() * 2.5, { knock: 450, color: "#FFE66D" });
+        B.as("gear", function () { B.blast(p.x, p.y, 120 * B.area(), B.dmg() * 2.5, { knock: 450, color: "#FFE66D" }); });
       }
     }
     if (dmg <= 0) return;
@@ -367,7 +382,7 @@
     var burst = (p.up.burst || 0) + (p.fx.thornBurst ? 2 : 0);
     if (burst && p.burstCd <= 0) {
       p.burstCd = Math.max(1.5, 4.2 - 0.45 * burst);
-      B.blast(p.x, p.y, 100 * B.area(), B.dmg() * (1.6 + 0.45 * burst), { knock: 420, color: "#8FAE65" });
+      B.as("burst", function () { B.blast(p.x, p.y, 100 * B.area(), B.dmg() * (1.6 + 0.45 * burst), { knock: 420, color: "#8FAE65" }); });
     }
 
     if (p.hp <= 0) {
@@ -375,7 +390,7 @@
         p.revives--;
         p.hp = p.maxHp * 0.5;
         p.invuln = 2;
-        B.blast(p.x, p.y, 150, p.fx.reviveNova ? B.dmg() * 8 : 0, { knock: 600, color: "#FFF4B8" });
+        B.as("gear", function () { B.blast(p.x, p.y, 150, p.fx.reviveNova ? B.dmg() * 8 : 0, { knock: 600, color: "#FFF4B8" }); });
         PS.sfx.play("revive");
         B.text(p.x, p.y - 26, "Second wind!", "#FFE66D", 16);
         B.toast("Back on your feet!");
@@ -595,6 +610,8 @@
     // a boss tires: the longer the fight drags on, the more each hit hurts it,
     // so a weak build gets a long fight rather than an endless one
     if (e.boss) dmg *= 1 + (e.age / 25) * (e.age / 25);
+    var done = Math.min(dmg, Math.max(0, e.hp));
+    R.dmgBy[R.src] = (R.dmgBy[R.src] || 0) + done;
     e.hp -= dmg;
     R.dealt += dmg;
 
@@ -641,19 +658,19 @@
       var area = B.area();
       if (fx.boom) {
         R.procs++;
-        B.later(0.07, function () { B.blast(x, y, 52 * area, base * fx.boom, { color: "#F7D94C", quiet: true }); });
+        B.as("boom", function () { B.later(0.07, function () { B.blast(x, y, 52 * area, base * fx.boom, { color: "#F7D94C", quiet: true }); }); });
       }
       if (fx.burnBoom && e.burnT > 0) {
         R.procs++;
-        B.later(0.07, function () { B.blast(x, y, 58 * area, base * fx.burnBoom, { color: "#F26B2A", quiet: true }); });
+        B.as("boom", function () { B.later(0.07, function () { B.blast(x, y, 58 * area, base * fx.burnBoom, { color: "#F26B2A", quiet: true }); }); });
       }
       if (fx.shatter && e.chillT > 0) {
         R.procs++;
-        B.later(0.07, function () { B.blast(x, y, 60 * area, base * fx.shatter, { color: "#7FD4F5", quiet: true }); });
+        B.as("boom", function () { B.later(0.07, function () { B.blast(x, y, 60 * area, base * fx.shatter, { color: "#7FD4F5", quiet: true }); }); });
       }
       if (R.weaponId === "storm" && fx.q && e.shockT > 0) {
         R.procs++;
-        B.later(0.07, function () { B.chain(x, y, null, base * 0.6, 3, 140 * area); });
+        B.as(R.weaponId, function () { B.later(0.07, function () { B.chain(x, y, null, base * 0.6, 3, 140 * area); }); });
       }
     }
     if (fx.leech) {
@@ -807,6 +824,7 @@
       rang: o.rang || null,
       onHit: o.onHit || null,
       onEnd: o.onEnd || null,
+      src: R.src,
       spin: o.spin || 0,
       rot: 0
     };
@@ -827,6 +845,7 @@
     var enemies = R.enemies;
     for (var i = R.shots.length - 1; i >= 0; i--) {
       var s = R.shots[i];
+      R.src = s.src;
       var spent = false;
 
       if (s.rang) {
@@ -908,6 +927,7 @@
         R.shots.splice(i, 1);
       }
     }
+    R.src = R.weaponId;
   }
 
   /* --------------------------------------------------------------- zones */
@@ -917,6 +937,7 @@
   B.addZone = function (zone) {
     zone.t = 0;
     zone.acc = 0;
+    zone.src = R.src;
     R.zones.push(zone);
     return zone;
   };
@@ -926,6 +947,7 @@
     var enemies = R.enemies;
     for (var i = R.zones.length - 1; i >= 0; i--) {
       var z = R.zones[i];
+      R.src = z.src || R.weaponId;
       z.t += dt;
       z.acc += dt;
       var dx;
@@ -976,6 +998,7 @@
         if (z.onEnd) z.onEnd(z);
       }
     }
+    R.src = R.weaponId;
   }
 
   function updateEnemyShots(dt) {
@@ -1028,7 +1051,7 @@
       if (e.shockT > 0) e.shockT -= dt;
       if (e.burnT > 0) {
         e.burnT -= dt;
-        B.hit(e, e.burnDps * dt, DOT);
+        B.as("burn", function () { B.hit(e, e.burnDps * dt, DOT); });
         if (e.dead) continue;
       }
 
@@ -1049,7 +1072,7 @@
 
       if (d < e.r + p.r) {
         if (e.hurt) B.hurt(e.hurt * dt);
-        if (thorns) B.hit(e, thorns, DOT);
+        if (thorns) B.as("thorns", function () { B.hit(e, thorns, DOT); });
         if (e.dead) continue;
       }
 
@@ -1665,6 +1688,11 @@
   function bindInput() {
     window.addEventListener("keydown", function (e) {
       if (!R || R.done) return;
+      if (e.key === "Tab") {
+        e.preventDefault();
+        B.hud.toggleMeter();
+        return;
+      }
       if (MOVE_CODES[e.code]) {
         keys[e.code] = true;
         e.preventDefault();
