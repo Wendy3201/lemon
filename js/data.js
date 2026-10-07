@@ -555,10 +555,10 @@
   /* ----------------------------------------------------------------- shop */
 
   PS.CHESTS = {
-    crate: { key: "crate", name: "Seed Crate", cost: 60, shift: 0, minR: 0, s: 0.03, ss: 0,
+    crate: { key: "crate", name: "Seed Crate", cost: 60, shift: 0, minR: 0, s: 0.005, ss: 0,
       text: "One piece of gear, about as good as what the next chapter drops." },
-    gilded: { key: "gilded", name: "Gilded Chest", cost: 240, shift: 1, minR: 1, s: 0.14, ss: 0.02, pityS: 10, pitySS: 40,
-      text: "One piece of gear a whole rarity better, with a real chance of S and SS grade." }
+    gilded: { key: "gilded", name: "Gilded Chest", cost: 240, shift: 1, minR: 1, s: 0.02, ss: 0.001,
+      text: "One piece of gear a whole rarity better, with a small chance of S and SS grade." }
   };
   PS.CHEST_BULK = { count: 10, discount: 0.9 };
   PS.DROP_GRADE = { s: 0.04, sFrom: 3, ss: 0.004, ssFrom: 10 };

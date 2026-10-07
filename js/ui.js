@@ -502,8 +502,8 @@
       var share = w / total;
       if (share >= 0.005) out += '<span class="odds r' + r + '">' + PS.RARITY[r].name + " " + (share >= 0.1 ? Math.round(share * 100) : (share * 100).toFixed(1)) + "%</span>";
     });
-    if (chest.s) out += '<span class="odds g-S">S-grade ' + Math.round(chest.s * 100) + "%</span>";
-    if (chest.ss) out += '<span class="odds g-SS">SS-grade ' + Math.round(chest.ss * 100) + "%</span>";
+    if (chest.s) out += '<span class="odds g-S">S-grade ' + PS.pct(chest.s) + "</span>";
+    if (chest.ss) out += '<span class="odds g-SS">SS-grade ' + PS.pct(chest.ss) + "</span>";
     return out;
   }
 
