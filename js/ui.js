@@ -527,9 +527,9 @@
           "<p>" + chest.text + "</p>" +
           '<div class="oddsrow">' + oddsChips(chest) + "</div>" + pity +
           '<div class="chest__buy">' +
-            '<button class="btn btn--primary" type="button" data-act="chest" data-kind="' + kind + '" data-count="1" data-key="chest-' + kind + '-1"' + (S.gems >= one ? "" : " disabled") + ">Open " + price("gems", one) + "</button>" +
-            '<button class="btn" type="button" data-act="chest" data-kind="' + kind + '" data-count="' + PS.CHEST_BULK.count + '" data-key="chest-' + kind + '-10"' + (S.gems >= ten ? "" : " disabled") + ">Open " + PS.CHEST_BULK.count + " " + price("gems", ten) + "</button>" +
-            '<button class="btn" type="button" data-act="chest" data-kind="' + kind + '" data-count="' + PS.CHEST_BULK.big + '" data-key="chest-' + kind + '-100"' + (S.gems >= hundred ? "" : " disabled") + ">Open " + PS.CHEST_BULK.big + " " + price("gems", hundred) + "</button>" +
+            '<button class="btn btn--primary" type="button" data-act="chest" data-kind="' + kind + '" data-count="1" data-key="chest-' + kind + '-1"' + (S.gold >= one ? "" : " disabled") + ">Open " + price("gold", one) + "</button>" +
+            '<button class="btn" type="button" data-act="chest" data-kind="' + kind + '" data-count="' + PS.CHEST_BULK.count + '" data-key="chest-' + kind + '-10"' + (S.gold >= ten ? "" : " disabled") + ">Open " + PS.CHEST_BULK.count + " " + price("gold", ten) + "</button>" +
+            '<button class="btn" type="button" data-act="chest" data-kind="' + kind + '" data-count="' + PS.CHEST_BULK.big + '" data-key="chest-' + kind + '-100"' + (S.gold >= hundred ? "" : " disabled") + ">Open " + PS.CHEST_BULK.big + " " + price("gold", hundred) + "</button>" +
           "</div>" +
         "</div>" +
       "</div>"
@@ -560,7 +560,7 @@
 
         '<h2 class="section">Chests</h2>' +
         '<div class="chests">' + chestCard("crate") + chestCard("gilded") + "</div>" +
-        '<p class="hint">Chests get better as you clear chapters. Right now they are tuned to chapter ' + st.frontier() + ".</p>" +
+        '<p class="hint">Chests get better, and cost more, as you clear chapters. Right now they are tuned to chapter ' + st.frontier() + ".</p>" +
 
         '<h2 class="section">Today\'s deals <small>' + PS.icon("clock") + '<span data-countdown="deals">' + PS.countdown(untilMidnight()) + "</span></small></h2>" +
         '<div class="deals">' + deals.map(function (deal) {
@@ -683,7 +683,7 @@
     return out;
   }
 
-  function itemModal(u) {
+  function itemModal(u, modal) {
     var item = st.item(u);
     if (!item) return null;
     var def = st.def(item);
@@ -695,6 +695,7 @@
     var delta = worn ? 0 : st.powerDelta(item);
     var info = st.upgradeInfo(def.slot);
     var grade = PS.GRADE[def.grade].label;
+    var value = st.sellValue(item);
 
     return (
       '<div class="itemsheet r' + item.r + '">' +
@@ -718,7 +719,12 @@
               (def.slot === "weapon" ? "" : '<button class="btn btn--sm" type="button" data-act="unequip" data-slot="' + def.slot + '">Take off</button>')
             : '<button class="btn btn--primary" type="button" data-act="equip" data-u="' + item.u + '" data-key="m-equip" autofocus>Equip</button>') +
           (item.r < PS.MAX_RARITY ? '<button class="btn btn--sm" type="button" data-act="forge-this" data-u="' + item.u + '">' + PS.icon("forge") + "Forge</button>" : "") +
+          (value && !worn
+            ? '<button class="btn btn--sm' + (modal.sellArmed ? " btn--danger" : "") + '" type="button" data-act="sell" data-u="' + item.u + '" data-key="m-sell"' + (modal.sellArmed ? ' data-armed="1"' : "") + ">" +
+              (modal.sellArmed ? "Yes, sell it " : "Sell ") + price("gold", value) + "</button>"
+            : "") +
         "</div>" +
+        (value && worn ? '<p class="hint">Worth ' + fmt(value) + " gold. Take it off to sell it.</p>" : "") +
         (worn && !info.ok && info.reason ? '<p class="hint">' + (info.reason === "Needs a higher rarity" ? "This slot is at the level cap for " + PS.RARITY[item.r].name + " gear. Forge the item to raise it." : info.reason + ".") + "</p>" : "") +
       "</div>"
     );
@@ -762,7 +768,7 @@
           );
         }).join("") + "</div>" +
         '<div class="modal__actions">' +
-          (modal.again ? '<button class="btn" type="button" data-act="chest" data-kind="' + modal.again.kind + '" data-count="' + modal.again.count + '"' + (st.get().gems >= st.chestCost(modal.again.kind, modal.again.count) ? "" : " disabled") + ">Open again " + price("gems", st.chestCost(modal.again.kind, modal.again.count)) + "</button>" : "") +
+          (modal.again ? '<button class="btn" type="button" data-act="chest" data-kind="' + modal.again.kind + '" data-count="' + modal.again.count + '"' + (st.get().gold >= st.chestCost(modal.again.kind, modal.again.count) ? "" : " disabled") + ">Open again " + price("gold", st.chestCost(modal.again.kind, modal.again.count)) + "</button>" : "") +
           '<button class="btn btn--primary" type="button" data-act="close" data-key="m-ok" autofocus>Nice</button>' +
         "</div>" +
       "</div>"
@@ -919,7 +925,7 @@
   function renderModal() {
     var modal = view.modal;
     var html = null;
-    if (modal.type === "item") html = itemModal(modal.u);
+    if (modal.type === "item") html = itemModal(modal.u, modal);
     else if (modal.type === "loot") html = lootModal(modal);
     else if (modal.type === "settings") html = settingsModal(modal);
     else if (modal.type === "secret") html = modal.open ? devMenu() : secretModal(modal);
@@ -1246,6 +1252,23 @@
       var item = st.item(Number(node.getAttribute("data-u")));
       if (item && st.take(item.u)) toast("Removed " + fullName(item));
     },
+    sell: function (node) {
+      var item = st.item(Number(node.getAttribute("data-u")));
+      if (!item) return;
+      // worth thousands, so it asks once more before it goes
+      if (!view.modal.sellArmed) {
+        view.modal.sellArmed = true;
+        PS.sfx.play("deny");
+        renderModal();
+        return;
+      }
+      var name = fullName(item);
+      var gold = st.sell(item.u);
+      if (!gold) return;
+      closeModal();
+      PS.sfx.play("coin");
+      toast("Sold " + name + " for " + fmt(gold) + " gold");
+    },
     "dev-swarm": function () {
       var chapter = Math.max(1, Math.min(PS.BAL.CHAPTERS, Math.round(Number($("#dev-swarm-ch").value) || 1)));
       startBattle(chapter, "swarm");
@@ -1260,7 +1283,7 @@
   var SOUND = {
     tab: "tab", fight: "start", again: "start", equip: "equip", "equip-best": "equip", "dev-give": "equip", "dev-set": "equip",
     upgrade: "upgrade", "upgrade-max": "upgrade", talent: "talent", quest: "coin", deal: "coin", gold: "coin",
-    gift: null, chest: null, "forge-go": null, "quick-go": null, sound: null
+    gift: null, chest: null, sell: null, "forge-go": null, "quick-go": null, sound: null
   };
 
   function upgraded(slot, text) {

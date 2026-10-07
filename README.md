@@ -58,7 +58,7 @@ GitHub Pages, Netlify or any web host. Nothing needs compiling.
 | --- | --- |
 | **Battle** | Pick a chapter and fight. Shows your Power against the chapter's recommended Power. |
 | **Equipment** | Six slots: weapon, ring, amulet, helmet, armour, boots. Level slots up with gold, swap gear, and open the **Forge**. |
-| **Shop** | A free gift every four hours, chests bought with gems, four deals that change each day, and gold for gems. |
+| **Shop** | A free gift every four hours, chests bought with gold (the price rises as you clear chapters), four deals that change each day, and gold for gems. |
 | **Talents** | Permanent bonuses bought with gold. |
 | **Quests** | Ladders of goals that pay gems. |
 
@@ -94,6 +94,18 @@ gear. Each level is +3.5% of the item's main stat.
 
 **The Forge** takes three items of the same slot and the same rarity. The one
 you pick first is kept and rises one rarity; the other two are used up.
+
+**Selling.** Open an item you are not wearing and press **Sell** (it asks once
+more). Only valuable gear sells, and the two prices add up:
+
+| Rarity | Gold | | Grade | Gold |
+| --- | --- | --- | --- | --- |
+| Mythic | 20,000 | | S | 10,000 |
+| Surpass | 60,000 | | SS | 100,000 |
+| ??? | 200,000 | | | |
+
+So a ??? SS-grade item sells for 300,000. Anything below Mythic that is also plain
+grade is worth nothing to the buyer.
 
 **Quick forge** does every forge that is possible in one press, including forges
 that only become possible after an earlier one (27 Common items become one Epic).

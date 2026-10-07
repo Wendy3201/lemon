@@ -477,6 +477,14 @@
     bossScale: function (chapter) { return BOSS_SCALE[chapter - 1]; },
     recPower: function (chapter) { return REC_POWER[chapter - 1]; },
     gold: function (chapter) { return Math.round(450 * Math.pow(1.35, chapter - 1)); },
+    /** What one chest costs when your furthest chapter is `chapter`: a fixed share of
+     *  what a chapter pays (a Seed Crate a fifth, a Gilded Chest four fifths), so five
+     *  crates or one chest per clear whether you are on chapter 1 or chapter 20. */
+    chestPrice: function (kind, chapter) {
+      var price = PS.BAL.gold(chapter) * PS.CHESTS[kind].share;
+      var step = Math.pow(10, Math.max(0, Math.floor(Math.log(price) / Math.LN10) - 1)); // two significant figures
+      return Math.max(1, Math.round(price / step) * step);
+    },
     gemsFirst: function (chapter) { return 100 + 10 * chapter; },
     gemsRepeat: 5,
     duration: function (chapter) { return 180 + Math.min(chapter - 1, 4) * 30; },
@@ -555,10 +563,17 @@
   /* ----------------------------------------------------------------- shop */
 
   PS.CHESTS = {
-    crate: { key: "crate", name: "Seed Crate", cost: 60, shift: 0, minR: 0, s: 0.005, ss: 0,
+    crate: { key: "crate", name: "Seed Crate", share: 0.2, shift: 0, minR: 0, s: 0.005, ss: 0,
       text: "One piece of gear, about as good as what the next chapter drops." },
-    gilded: { key: "gilded", name: "Gilded Chest", cost: 240, shift: 1, minR: 1, s: 0.02, ss: 0.001,
+    gilded: { key: "gilded", name: "Gilded Chest", share: 0.8, shift: 1, minR: 1, s: 0.02, ss: 0.001,
       text: "One piece of gear a whole rarity better, with a small chance of S and SS grade." }
+  };
+  /* What a piece of gear sells for: its rarity's price plus its grade's price, so
+     a ??? SS-grade item sells for both added together. Below Mythic, and plain
+     (A) grade, is worth nothing to the buyer. */
+  PS.SELL = {
+    rarity: { 5: 20000, 6: 60000, 7: 200000 },
+    grade: { S: 10000, SS: 100000 }
   };
   PS.CHEST_BULK = { count: 10, big: 100, discount: 0.9 }; // 10 and 100 at once, both 10% off
   PS.DROP_GRADE = { s: 0.04, sFrom: 3, ss: 0.004, ssFrom: 10 };

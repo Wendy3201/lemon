@@ -674,6 +674,23 @@
      chapter's length earns 1.2 chapter-clears), and the coins you picked up. */
   var SWARM_PAY = 1.2;
 
+  /** Gold for selling an item: its rarity's price plus its grade's price. */
+  function sellValue(item) {
+    return (PS.SELL.rarity[item.r] || 0) + (PS.SELL.grade[defOf(item).grade] || 0);
+  }
+
+  /** Sell an item that is not being worn. Returns the gold, or 0 if it cannot be sold. */
+  function sell(u) {
+    var item = byUid(u);
+    if (!item || isEquipped(item)) return 0;
+    var value = sellValue(item);
+    if (!value) return 0;
+    remove(u);
+    S.gold += value;
+    commit();
+    return value;
+  }
+
   function paySwarm(chapter, time, coins) {
     var ch = PS.chapter(chapter);
     var base = ch.gold * Math.max(0, time) / ch.duration + (coins || 0);
@@ -687,15 +704,15 @@
   /* ---------------------------------------------------------------- shop */
 
   function chestCost(kind, count) {
-    var cost = PS.CHESTS[kind].cost * count;
+    var cost = PS.BAL.chestPrice(kind, frontier()) * count;
     return count >= PS.CHEST_BULK.count ? Math.round(cost * PS.CHEST_BULK.discount) : cost;
   }
 
   function openChest(kind, count) {
     var chest = PS.CHESTS[kind];
     var cost = chestCost(kind, count);
-    if (!chest || S.gems < cost) return null;
-    S.gems -= cost;
+    if (!chest || S.gold < cost) return null;
+    S.gold -= cost;
 
     var mu = PS.BAL.lootMu(frontier()) + chest.shift;
     var out = [];
@@ -899,6 +916,8 @@
     quests: quests,
     claimQuest: claimQuest,
     paySwarm: paySwarm,
+    sellValue: sellValue,
+    sell: sell,
     badges: badges,
     // dev menu
     give: function (id, rarity) {
