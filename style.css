@@ -1868,6 +1868,82 @@ button.tile:hover:not(:disabled) {
   color: var(--ink);
 }
 
+/* quick forge */
+.quick__sum {
+  margin: 10px 0 8px;
+  color: var(--ink-soft);
+}
+
+.quick__sum b {
+  color: var(--ink);
+}
+
+.quick__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.quick__steps li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.quick__steps li b {
+  margin-left: auto;
+  font-family: var(--font-display);
+  font-size: 17px;
+}
+
+.quick__steps .ico {
+  width: 0.85em;
+  height: 0.85em;
+  color: var(--ink-faint);
+}
+
+.quick__label {
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.quick__made {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.quick__made .tile {
+  width: 46px;
+}
+
+.quick__keep {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.quick__keep input {
+  margin-top: 3px;
+  accent-color: var(--accent-deep);
+}
+
 .forge__warn {
   display: flex;
   flex-direction: column;

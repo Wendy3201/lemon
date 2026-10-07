@@ -95,6 +95,12 @@ gear. Each level is +3.5% of the item's main stat.
 **The Forge** takes three items of the same slot and the same rarity. The one
 you pick first is kept and rises one rarity; the other two are used up.
 
+**Quick forge** does every forge that is possible in one press, including forges
+that only become possible after an earlier one (27 Common items become one Epic).
+The item you are wearing is the one that rises. A preview shows what you will end
+up with first, and Epic and above, and S / SS-grade, items are kept safe unless
+you untick the box.
+
 ### Weapons
 
 | Weapon | Grade | How it attacks |

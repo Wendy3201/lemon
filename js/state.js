@@ -453,6 +453,67 @@
     return forgeMaterials(main).length >= 2;
   }
 
+  /* ---- quick forge: every forge that can be made, in one go.
+     Works low rarity to high, so an item made Uncommon can go on into an Uncommon
+     forge in the same pass. In each group of the same slot and rarity, the worn
+     item is the one that rises (otherwise the best one), and the cheapest ones are
+     used up. With `keep`, Epic or rarer and S / SS-grade items are never used up. */
+
+  function quickPlan(keep) {
+    var items = S.items.map(function (item) {
+      var def = defOf(item);
+      return { u: item.u, id: item.id, r: item.r, slot: def.slot, rank: GRADE_RANK[def.grade], base: def.base, eq: isEquipped(item), gone: false, made: false };
+    });
+    function valuable(it) { return it.r >= 3 || it.rank > 0; }
+    function worth(it) { return it.rank * 1000 + it.base; }
+    var steps = [];
+    var usedUp = [];
+
+    for (var r = 0; r < PS.MAX_RARITY; r++) {
+      PS.SLOTS.forEach(function (slot) {
+        for (;;) {
+          var group = items.filter(function (it) { return !it.gone && it.r === r && it.slot === slot.key; });
+          if (group.length < 3) return;
+          var main = group.filter(function (it) { return it.eq; })[0] ||
+            group.slice().sort(function (a, b) { return worth(b) - worth(a); })[0];
+          var pool = group.filter(function (it) { return it !== main && !it.eq && !(keep && valuable(it)); })
+            .sort(function (a, b) { return worth(a) - worth(b); });
+          if (pool.length < 2) return;
+          steps.push({ main: main.u, mats: [pool[0].u, pool[1].u], from: r });
+          [pool[0], pool[1]].forEach(function (it) {
+            it.gone = true;
+            usedUp.push(it);
+          });
+          main.r++;
+          main.made = true;
+        }
+      });
+    }
+
+    var made = items.filter(function (it) { return it.made && !it.gone; })
+      .sort(function (a, b) { return b.r - a.r || b.rank - a.rank; })
+      .map(function (it) { return { id: it.id, r: it.r, u: it.u }; });
+    return {
+      steps: steps,
+      used: usedUp.length,
+      valuableUsed: usedUp.filter(valuable).map(function (it) { return { id: it.id, r: it.r }; }),
+      made: made
+    };
+  }
+
+  function quickForge(keep) {
+    var plan = quickPlan(keep);
+    if (!plan.steps.length) return plan;
+    plan.steps.forEach(function (step) {
+      remove(step.mats[0]);
+      remove(step.mats[1]);
+      byUid(step.main).r++;
+    });
+    S.stats.forges += plan.steps.length;
+    commit();
+    return plan;
+  }
+
   function forgeAvailable() {
     for (var i = 0; i < S.items.length; i++) {
       if (canForge(S.items[i])) return true;
@@ -800,6 +861,8 @@
     canForge: canForge,
     forgeAvailable: forgeAvailable,
     forge: forge,
+    quickPlan: quickPlan,
+    quickForge: quickForge,
     // talents
     talentInfo: talentInfo,
     buyTalent: buyTalent,

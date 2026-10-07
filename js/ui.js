@@ -353,6 +353,7 @@
             '<div><p class="kicker">Power</p><p class="bigpower">' + PS.icon("power") + fmt(stats.power) + "</p></div>" +
             '<div class="gear__buttons">' +
               '<button class="btn btn--sm" type="button" data-act="equip-best" data-key="equip-best">Equip best</button>' +
+              '<button class="btn btn--sm" type="button" data-act="forge-quick" data-key="forge-quick">' + PS.icon("bolt") + "Quick forge</button>" +
               '<button class="btn btn--sm btn--primary' + (canForge ? " has-badge" : "") + '" type="button" data-act="forge-open" data-key="forge-open">' + PS.icon("forge") + "Forge</button>" +
             "</div>" +
           "</div>" +
@@ -466,6 +467,7 @@
               }).join("") + "</div>"
             : "") +
           '<div class="forge__actions">' +
+            '<button class="btn btn--sm" type="button" data-act="forge-quick" data-key="forge-quick-2">' + PS.icon("bolt") + "Quick forge</button>" +
             '<button class="btn btn--sm" type="button" data-act="forge-auto" data-key="forge-auto"' + (main && options.length >= 2 && mats.length < 2 ? "" : " disabled") + ">Auto-fill</button>" +
             '<button class="btn btn--primary" type="button" data-act="forge-go" data-key="forge-go"' + (ready ? "" : " disabled") + (armed ? ' data-armed="1"' : "") + ">" + PS.icon("forge") + (armed ? "Yes, melt them down" : costly.length ? "Forge…" : "Forge") + "</button>" +
           "</div>" +
@@ -869,6 +871,46 @@
     );
   }
 
+  function quickModal(modal) {
+    var plan = st.quickPlan(modal.keep);
+    var counts = {};
+    plan.steps.forEach(function (step) { counts[step.from] = (counts[step.from] || 0) + 1; });
+    var rows = "";
+    for (var r = 0; r < PS.MAX_RARITY; r++) {
+      if (counts[r]) rows += "<li>" + rarityName(r) + " " + PS.icon("right") + " " + rarityName(r + 1) + "<b>× " + counts[r] + "</b></li>";
+    }
+    var risky = !modal.keep && plan.valuableUsed.length;
+    var melted = {};
+    plan.valuableUsed.forEach(function (it) {
+      var grade = PS.ITEMS[it.id].grade;
+      var label = (grade !== "A" ? grade + "-grade " : "") + PS.RARITY[it.r].name;
+      melted[label] = (melted[label] || 0) + 1;
+    });
+    return (
+      '<div class="quick">' +
+        '<button class="modal__close" type="button" data-act="close" aria-label="Close">' + PS.icon("close") + "</button>" +
+        '<h2 id="modal-title">Quick forge</h2>' +
+        (plan.steps.length
+          ? '<p class="quick__sum"><b>' + plan.steps.length + (plan.steps.length === 1 ? " forge" : " forges") + "</b> in one go, using up <b>" + plan.used + "</b> items.</p>" +
+            '<ul class="quick__steps">' + rows + "</ul>" +
+            '<p class="quick__label">You will end up with</p>' +
+            '<div class="quick__made">' + plan.made.slice(0, 8).map(function (it) { return tile(it, { plain: true, cls: "tile--mini" }); }).join("") +
+              (plan.made.length > 8 ? '<span class="count">+' + (plan.made.length - 8) + " more</span>" : "") + "</div>"
+          : '<p class="quick__sum">Nothing to forge yet. A forge needs three items of the same slot and rarity. The one you are wearing can be the one that goes up, but is never used up.</p>' +
+            (modal.keep ? '<p class="hint">Some forges may be waiting on gear that is being kept safe. Untick the box to include it.</p>' : "")) +
+        '<label class="quick__keep"><input type="checkbox" id="quick-keep"' + (modal.keep ? " checked" : "") + " /> Keep Epic and above, and S / SS-grade, safe (never used up)</label>" +
+        (risky
+          ? '<div class="forge__warn" role="alert"><strong>' + PS.icon("lock") + " These will be destroyed for good:</strong>" +
+            Object.keys(melted).map(function (label) { return "<span>" + melted[label] + " × " + esc(label) + "</span>"; }).join("") + "</div>"
+          : "") +
+        '<div class="modal__actions">' +
+          '<button class="btn btn--sm" type="button" data-act="close">Cancel</button>' +
+          '<button class="btn ' + (risky ? "btn--danger" : "btn--primary") + '" type="button" data-act="quick-go" data-key="quick-go"' + (plan.steps.length ? "" : " disabled") + ">" + PS.icon("forge") + (risky ? "Melt them down and forge all" : "Forge all") + "</button>" +
+        "</div>" +
+      "</div>"
+    );
+  }
+
   function renderModal() {
     var modal = view.modal;
     var html = null;
@@ -876,6 +918,7 @@
     else if (modal.type === "loot") html = lootModal(modal);
     else if (modal.type === "settings") html = settingsModal(modal);
     else if (modal.type === "secret") html = modal.open ? devMenu() : secretModal(modal);
+    else if (modal.type === "quick") html = quickModal(modal);
     if (html === null) {
       closeModal();
       return;
@@ -1088,6 +1131,17 @@
       }
       render();
     },
+    "forge-quick": function () {
+      openModal({ type: "quick", keep: true });
+    },
+    "quick-go": function () {
+      var plan = st.quickForge(view.modal.keep);
+      closeModal();
+      if (!plan.steps.length) return;
+      PS.sfx.play("forge");
+      toast("Quick forge: " + plan.steps.length + (plan.steps.length === 1 ? " forge" : " forges") + ", " + plan.used + " items used up");
+      pulse($(".bench"), "is-forged", 900);
+    },
     "forge-go": function () {
       var forge = view.forge;
       // Epic and above, or S and SS grade, are not melted down without a second click
@@ -1170,7 +1224,7 @@
   var SOUND = {
     tab: "tab", fight: "start", again: "start", equip: "equip", "equip-best": "equip", "dev-give": "equip", "dev-set": "equip",
     upgrade: "upgrade", "upgrade-max": "upgrade", talent: "talent", quest: "coin", deal: "coin", gold: "coin",
-    gift: null, chest: null, "forge-go": null, sound: null
+    gift: null, chest: null, "forge-go": null, "quick-go": null, sound: null
   };
 
   function upgraded(slot, text) {
@@ -1265,6 +1319,10 @@
       document.addEventListener("submit", onSubmit);
       el.modal.addEventListener("close", function () { view.modal = null; });
       el.modal.addEventListener("change", function (e) {
+        if (e.target.id === "quick-keep" && view.modal && view.modal.type === "quick") {
+          view.modal.keep = e.target.checked;
+          renderModal();
+        }
         if (e.target.id === "dev-id") view.dev.id = e.target.value;
         if (e.target.id === "dev-rarity") view.dev.r = Number(e.target.value);
       });
