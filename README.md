@@ -245,4 +245,5 @@ git add .
 git commit -m "Updated site content"
 git push origin main
 
-<img width="170" height="289" alt="image" src="https://github.com/user-attachments/assets/370f3add-70ee-4a9e-9128-4029abb46433" />
+<img width="231" height="141" alt="image" src="https://github.com/user-attachments/assets/8d9ffbad-b7c2-416b-9b04-48fc4bc9dd7e" />
+
