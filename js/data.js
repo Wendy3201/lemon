@@ -560,7 +560,7 @@
     gilded: { key: "gilded", name: "Gilded Chest", cost: 240, shift: 1, minR: 1, s: 0.02, ss: 0.001,
       text: "One piece of gear a whole rarity better, with a small chance of S and SS grade." }
   };
-  PS.CHEST_BULK = { count: 10, discount: 0.9 };
+  PS.CHEST_BULK = { count: 10, big: 100, discount: 0.9 }; // 10 and 100 at once, both 10% off
   PS.DROP_GRADE = { s: 0.04, sFrom: 3, ss: 0.004, ssFrom: 10 };
   PS.GIFT = { every: 4 * 60 * 60 * 1000, gems: 10, goldShare: 0.25 };
   PS.GOLD_PACK = { gems: 50, runs: 2 };

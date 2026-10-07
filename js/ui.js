@@ -512,6 +512,7 @@
     var S = st.get();
     var one = st.chestCost(kind, 1);
     var ten = st.chestCost(kind, PS.CHEST_BULK.count);
+    var hundred = st.chestCost(kind, PS.CHEST_BULK.big);
     var pity = "";
     if (chest.pityS) {
       pity = '<p class="pity">S-grade guaranteed within ' + (chest.pityS - S.shop.pityS) + " · SS-grade within " + (chest.pitySS - S.shop.pitySS) + "</p>";
@@ -526,6 +527,7 @@
           '<div class="chest__buy">' +
             '<button class="btn btn--primary" type="button" data-act="chest" data-kind="' + kind + '" data-count="1" data-key="chest-' + kind + '-1"' + (S.gems >= one ? "" : " disabled") + ">Open " + price("gems", one) + "</button>" +
             '<button class="btn" type="button" data-act="chest" data-kind="' + kind + '" data-count="' + PS.CHEST_BULK.count + '" data-key="chest-' + kind + '-10"' + (S.gems >= ten ? "" : " disabled") + ">Open " + PS.CHEST_BULK.count + " " + price("gems", ten) + "</button>" +
+            '<button class="btn" type="button" data-act="chest" data-kind="' + kind + '" data-count="' + PS.CHEST_BULK.big + '" data-key="chest-' + kind + '-100"' + (S.gems >= hundred ? "" : " disabled") + ">Open " + PS.CHEST_BULK.big + " " + price("gems", hundred) + "</button>" +
           "</div>" +
         "</div>" +
       "</div>"
@@ -723,15 +725,35 @@
   function lootModal(modal) {
     var best = 0;
     modal.items.forEach(function (item) { if (item.r > best) best = item.r; });
+    // a big batch is a ranked, compact grid with a tally, not a hundred captions
+    var many = modal.items.length > 12;
+    var shown = many ? st.sorted(modal.items) : modal.items;
+    var tally = "";
+    if (many) {
+      var counts = {};
+      var graded = { S: 0, SS: 0 };
+      modal.items.forEach(function (item) {
+        counts[item.r] = (counts[item.r] || 0) + 1;
+        var g = st.def(item).grade;
+        if (g !== "A") graded[g]++;
+      });
+      for (var r = PS.MAX_RARITY; r >= 0; r--) {
+        if (counts[r]) tally += '<span class="rname r' + r + '">' + counts[r] + " " + PS.RARITY[r].name + "</span>";
+      }
+      if (graded.SS) tally += '<span class="rname g-SS">' + graded.SS + " SS-grade</span>";
+      if (graded.S) tally += '<span class="rname g-S">' + graded.S + " S-grade</span>";
+      tally = '<p class="loot__tally">' + tally + "</p>";
+    }
     return (
-      '<div class="loot' + (modal.art ? " loot--reveal" : "") + '">' +
+      '<div class="loot' + (modal.art ? " loot--reveal" : "") + (many ? " loot--many" : "") + '">' +
         (modal.art ? '<div class="loot__flash r' + best + '"></div><div class="loot__box">' + PS.art(modal.art) + "</div>" : "") +
         '<h2 id="modal-title">' + esc(modal.title) + "</h2>" +
         (modal.gold || modal.gems ? '<p class="loot__money">' + (modal.gold ? price("gold", modal.gold) : "") + (modal.gems ? price("gems", modal.gems) : "") + "</p>" : "") +
-        '<div class="loot__items">' + modal.items.map(function (item, index) {
+        tally +
+        '<div class="loot__items">' + shown.map(function (item, index) {
           var def = st.def(item);
           return (
-            '<div class="loot__item" style="--i:' + index + '">' + tile(item, { plain: true, cls: "tile--pop" }) +
+            '<div class="loot__item" style="--i:' + Math.min(index, 24) + '">' + tile(item, { plain: true, cls: "tile--pop" }) +
               '<strong class="rname r' + item.r + '">' + esc(def.name) + "</strong>" +
               "<span>" + PS.RARITY[item.r].name + (def.grade !== "A" ? ' <b class="rname g-' + def.grade + '">' + def.grade + "</b>" : "") + "</span>" +
             "</div>"
