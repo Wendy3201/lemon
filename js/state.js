@@ -672,7 +672,7 @@
   /* Swarm mode (the dev menu's endless battle) pays gold only: 1.2 times what a
      normal chapter run pays, in proportion to how long you lasted (lasting a
      chapter's length earns 1.2 chapter-clears), and the coins you picked up. */
-  var SWARM_PAY = 1.2;
+  var SWARM_PAY = 120;
 
   /** Gold for selling an item: its rarity's price plus its grade's price. */
   function sellValue(item) {
