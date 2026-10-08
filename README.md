@@ -244,3 +244,6 @@ notes on inspiration are in `CREDITS.md`.
 git add .
 git commit -m "Updated site content"
 git push origin main
+
+<img width="231" height="141" alt="image" src="https://github.com/user-attachments/assets/8d9ffbad-b7c2-416b-9b04-48fc4bc9dd7e" />
+
