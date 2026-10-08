@@ -931,6 +931,39 @@
       S.gold = Math.floor(num(gold, 0, 0, 1e12));
       S.gems = Math.floor(num(gems, 0, 0, 1e12));
       commit();
+    },
+    /** Highest chapter cleared, set directly (0 locks everything but chapter 1). */
+    devSetBest: function (n) {
+      S.best = Math.floor(num(n, 0, 0, PS.BAL.CHAPTERS));
+      S.chapter = Math.min(S.chapter, Math.min(PS.BAL.CHAPTERS, S.best + 1));
+      commit();
+    },
+    devMaxTalents: function () {
+      PS.TALENTS.forEach(function (talent) { S.talents[talent.id] = talent.max; });
+      commit();
+    },
+    /** Every slot's level up to what its worn item's rarity allows. */
+    devMaxSlots: function () {
+      PS.SLOTS.forEach(function (slot) {
+        var item = equipped(slot.key);
+        if (item) S.lv[slot.key] = Math.max(S.lv[slot.key], PS.RARITY[item.r].cap);
+      });
+      commit();
+    },
+    /** Free gift ready now and today's deals back on the shelf. */
+    devRefreshShop: function () {
+      S.shop.freeAt = 0;
+      S.shop.bought = [];
+      commit();
+    },
+    exportSave: function () { return JSON.stringify(S); },
+    importSave: function (text) {
+      var raw;
+      try { raw = JSON.parse(text); } catch (err) { return false; }
+      if (!raw || typeof raw !== "object" || raw.v !== VERSION) return false;
+      S = sanitise(raw);
+      commit();
+      return true;
     }
   };
 })();

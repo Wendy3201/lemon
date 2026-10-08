@@ -156,6 +156,7 @@ lemon/
 │   ├── enemies.js    pests, bosses, and who turns up when
 │   ├── upgrades.js   the level-up cards and the abilities they add
 │   ├── hud.js        health bar, timer, level-up cards, pause screen
+│   ├── dev.js        the DEV panel inside a battle (godmode, upgrades, run controls)
 │   └── ui.js         the menus: Battle, Equipment, Forge, Shop, Talents, Quests
 ├── assets/icons/lemon.svg
 ├── games/survivor/index.html   the old address; it forwards to index.html
@@ -187,9 +188,13 @@ Most tweaks are one line in `js/data.js`.
   naturally has by each chapter, so if you make gear or gold much more
   generous, raise them to match.
 - **A new upgrade card:** add it to `UPGRADES` in `js/upgrades.js`.
-- **The password on the `?` button** is `SECRET_PASSWORD` in `js/ui.js`. It is
-  checked in the browser, so anyone who reads the file can see it.
-  Behind it is a dev menu for testing: give or remove any item, set gold and
+- **The password on the `?` button** is `PS.dev.password` in `js/core.js`. It is
+  checked in the browser, so anyone who reads the file can see it. Entering it
+  once (here or on the construction page) unlocks developer tools for that tab:
+  a **DEV button in every battle** (godmode, one-hit kills, game speed, take or
+  max any upgrade, level up, skip to the boss) and a tabbed dev menu in the
+  lobby (Gear, Money, Progress, Battle, Owned, Save).
+  The lobby menu can give or remove any item, set gold and
   gems to an exact figure, and start **Swarm mode**, an endless battle with no
   boss and a swarm that keeps growing, with pests as tough as the chapter you
   pick. It pays gold (1.2 times what a normal run of that chapter pays, scaled by how

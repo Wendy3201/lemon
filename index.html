@@ -37,6 +37,12 @@
         <h1>Under construction</h1>
         <p class="closed__text">The lemon is getting some work done. Come back a little later!</p>
         <div class="bar closed__bar" aria-hidden="true"><i></i></div>
+        <button class="foot__secret closed__key" id="closed-key" type="button" aria-label="Developers">?</button>
+        <form class="closed__form" id="closed-form" hidden>
+          <label class="visually-hidden" for="closed-input">Password</label>
+          <input class="secret__input" id="closed-input" type="password" autocomplete="off" spellcheck="false" />
+          <p class="secret__error" id="closed-error" role="alert"></p>
+        </form>
       </div>
     </main>
 
@@ -93,12 +99,33 @@
     <script src="js/outfit.js"></script>
     <script src="js/upgrades.js"></script>
     <script src="js/hud.js"></script>
+    <script src="js/dev.js"></script>
     <script src="js/ui.js"></script>
     <script>
       var UNDER_CONSTRUCTION = true;
-      if (UNDER_CONSTRUCTION) {
+      // a developer who already entered the password in this tab goes straight in
+      if (UNDER_CONSTRUCTION && !PS.dev.unlocked) {
         document.getElementById("closed").hidden = false;
         document.getElementById("app").hidden = true;
+        // developers: the ? opens a password box, and the right password opens the game
+        var form = document.getElementById("closed-form");
+        var input = document.getElementById("closed-input");
+        document.getElementById("closed-key").addEventListener("click", function () {
+          form.hidden = false;
+          input.focus();
+        });
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+          if (input.value === PS.dev.password) {
+            PS.dev.unlock();
+            document.getElementById("closed").hidden = true;
+            document.getElementById("app").hidden = false;
+            PS.ui.init();
+          } else {
+            document.getElementById("closed-error").textContent = "Wrong password.";
+            input.select();
+          }
+        });
       } else {
         PS.ui.init();
       }

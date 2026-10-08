@@ -62,6 +62,7 @@
     root.appendChild(canvas);
     ctx = canvas.getContext("2d");
     B.hud.mount(root);
+    if (B.devPanel) B.devPanel.mount(root);
     bindInput();
     window.addEventListener("resize", resize);
   };
@@ -73,6 +74,10 @@
     var p = makePlayer(stats);
     p.outfit = B.outfitOf();
     calm = PS.reducedMotion();
+    var cheats = PS.dev.cheats;
+    cheats.god = false;
+    cheats.oneHit = false;
+    cheats.speed = 1;
     R = B.run = {
       ch: ch, zone: PS.ZONES[ch.zone], weaponId: stats.weapon, weapon: B.WEAPONS[stats.weapon],
       src: stats.weapon, dmgBy: {}, mode: mode === "swarm" ? "swarm" : "normal",
@@ -134,14 +139,19 @@
     var dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
     last = now;
     if (!R) return;
-    B.step(dt);
+    var speed = PS.dev.cheats.speed;
+    if (speed < 1) {
+      B.step(dt * speed);
+    } else {
+      for (var n = 0; n < speed; n++) B.step(dt);
+    }
     draw();
     B.hud.update(R);
   }
 
   /** One tick of the simulation. Does nothing while paused or choosing. */
   B.step = function (dt) {
-    if (!R || R.paused || R.choices || R.done) return;
+    if (!R || R.paused || R.choices || R.done || R.devOpen) return;
     if (R.phase === "won" || R.phase === "lost") {
       R.over -= dt;
       updateDrops(dt, R.phase === "won");
@@ -258,6 +268,7 @@
   function xpNeeded(level) {
     return Math.round(4 + 2.2 * level + 0.62 * level * level);
   }
+  B.xpNeeded = xpNeeded;
 
   function steering() {
     var mx = 0;
@@ -357,7 +368,7 @@
   /** Hurt the lemon. `amount` is raw damage; armour and shields come off here. */
   B.hurt = function (amount) {
     var p = R.p;
-    if (p.invuln > 0 || R.phase === "won" || R.phase === "lost") return;
+    if (p.invuln > 0 || PS.dev.cheats.god || R.phase === "won" || R.phase === "lost") return;
     var dmg = amount * (1 - p.armor) * p.mods.armor;
     if (p.fx.lastStand && p.hp < p.maxHp * 0.35) dmg *= 1 - p.fx.lastStand;
     if (p.fx.dmgCap) {
@@ -437,6 +448,15 @@
     if (!R || !R.choices || !R.choices[index]) return;
     PS.sfx.play("pick");
     B.takeUpgrade(R.choices[index]);
+    R.choices = null;
+    if (R.pending > 0) openChoices();
+    else B.hud.choices(R);
+    last = performance.now();
+  };
+
+  /** The dev menu took an upgrade by hand: that counts as the level-up pick. */
+  B.devResolve = function () {
+    if (!R || !R.choices) return;
     R.choices = null;
     if (R.pending > 0) openChoices();
     else B.hud.choices(R);
@@ -608,7 +628,7 @@
     var p = R.p;
     var fx = p.fx;
     var dot = opts && opts.dot;
-    var dmg = amount;
+    var dmg = PS.dev.cheats.oneHit ? Math.max(amount, e.hp) : amount;
     var flags = 1;
     if (!dot && Math.random() < p.crit + p.mods.crit) {
       dmg *= p.critDmg + p.mods.critDmg;
@@ -1698,6 +1718,10 @@
   function bindInput() {
     window.addEventListener("keydown", function (e) {
       if (!R || R.done) return;
+      if (R.devOpen) {
+        if (e.key === "Escape") B.devPanel.close();
+        return;
+      }
       if (e.key === "Tab") {
         e.preventDefault();
         B.hud.toggleMeter();
@@ -1736,7 +1760,7 @@
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
     canvas.addEventListener("pointerdown", function (e) {
-      if (!R || R.choices || R.paused) return;
+      if (!R || R.choices || R.paused || R.devOpen) return;
       e.preventDefault();
       var pos = at(e);
       stick.on = true;

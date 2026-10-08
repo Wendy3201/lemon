@@ -22,6 +22,7 @@
       '<div class="hud__top">' +
         '<button class="hud__btn" type="button" data-hud="pause" aria-label="Pause">' + PS.icon("pause") + "</button>" +
         '<button class="hud__btn" type="button" data-hud="meter" aria-label="Damage meter" aria-pressed="true" title="Damage meter (Tab)">' + PS.icon("chart") + "</button>" +
+        '<button class="hud__btn hud__btn--dev" type="button" data-hud="dev" aria-label="Dev menu" title="Dev menu" hidden>DEV</button>' +
         '<div class="hud__hp" role="img" aria-label="Health"><i class="hud__hp-fill"></i><i class="hud__hp-shield"></i><span></span></div>' +
         '<span class="hud__pill hud__lvl"></span>' +
         '<span class="hud__gap"></span>' +
@@ -39,6 +40,7 @@
         '<p class="choose__title"></p>' +
         '<div class="choose__cards"></div>' +
         '<button class="btn btn--sm choose__reroll" type="button" data-hud="reroll"></button>' +
+        '<button class="btn btn--sm choose__dev" type="button" data-hud="dev" hidden>DEV: pick any upgrade</button>' +
       '</div>' +
     '</div>' +
     '<div class="sheet" data-panel="pause" hidden>' +
@@ -47,6 +49,7 @@
         '<p class="pausebox__where"></p>' +
         '<div class="pausebox__build"></div>' +
         '<div class="pausebox__actions">' +
+          '<button class="btn" type="button" data-hud="dev" hidden>DEV</button>' +
           '<button class="btn" type="button" data-hud="quit">Give up</button>' +
           '<button class="btn btn--primary" type="button" data-hud="resume">Keep going</button>' +
         '</div>' +
@@ -171,6 +174,7 @@
     else if (action === "resume") B.resume();
     else if (action === "meter") B.hud.toggleMeter();
     else if (action === "reroll") B.reroll();
+    else if (action === "dev") B.devPanel.open();
     else if (action === "quit") {
       if (quitArmed) {
         B.giveUp();
@@ -219,6 +223,8 @@
       shown = {};
       meterOpen = PS.store.get("lemon:meter", window.innerWidth >= 900) === true;
       applyMeter();
+      var devButtons = el.hud.parentNode.querySelectorAll('[data-hud="dev"]');
+      for (var i = 0; i < devButtons.length; i++) devButtons[i].hidden = !PS.dev.unlocked;
       el.hud.hidden = false;
       el.choose.hidden = true;
       el.pause.hidden = true;

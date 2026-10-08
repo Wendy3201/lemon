@@ -16,7 +16,6 @@
   var fmt = PS.fmt;
 
   var KEY_THEME = "lemon:theme";
-  var SECRET_PASSWORD = "howdidyoufindit";
 
   var el = {};
   var view = {
@@ -24,6 +23,7 @@
     filter: "all",
     forge: null, // { main: uid, mats: [uid, uid] } while the forge is open
     dev: { id: "sling", r: 0 }, // the dev menu's picker
+    devTab: "gear", // which tab of the dev menu is showing
     entering: true, // the next render should play the screen's entrance animation
     slide: 0, // -1 / 1 while the chapter title slides in from a side
     modal: null, // { type, ... } while a pop-up is open
@@ -829,9 +829,13 @@
     );
   }
 
-  function devMenu() {
-    var S = st.get();
-    var d = view.dev;
+  var DEV_TABS = [["gear", "Gear"], ["money", "Money"], ["progress", "Progress"], ["battle", "Battle"], ["owned", "Owned"], ["save", "Save"]];
+
+  function devButton(act, label, attrs, cls) {
+    return '<button class="btn btn--sm' + (cls ? " " + cls : "") + '" type="button" data-act="' + act + '"' + (attrs || "") + ">" + label + "</button>";
+  }
+
+  function devGear(S, d) {
     var picks = PS.SLOTS.map(function (slot) {
       var list = PS.ITEM_ORDER.filter(function (id) { return PS.ITEMS[id].slot === slot.key; });
       return '<optgroup label="' + slot.plural + '">' + list.map(function (id) {
@@ -842,6 +846,67 @@
     var rarities = PS.RARITY.map(function (r, i) {
       return '<option value="' + i + '"' + (i === d.r ? " selected" : "") + ">" + r.name + "</option>";
     }).join("");
+    return (
+      '<div class="dev__give">' +
+        '<label>Item<select id="dev-id">' + picks + "</select></label>" +
+        '<label>Rarity<select id="dev-rarity">' + rarities + "</select></label>" +
+        devButton("dev-give", "Give and equip", "", "btn--primary") +
+      "</div>" +
+      '<div class="dev__grant">' +
+        devButton("dev-set", "Give a full set (all 6 slots) at this rarity") +
+        devButton("dev-max-slots", "Max every slot's level") +
+      "</div>" +
+      '<p class="hint">The full set is one basic item per slot. Slot levels stop at what the worn item\'s rarity allows.</p>'
+    );
+  }
+
+  function devMoney(S) {
+    return (
+      '<div class="dev__give">' +
+        '<label>Gold<input id="dev-gold" type="number" min="0" step="1" value="' + S.gold + '" /></label>' +
+        '<label>Gems<input id="dev-gems" type="number" min="0" step="1" value="' + S.gems + '" /></label>' +
+        devButton("dev-money", "Set") +
+      "</div>" +
+      '<div class="dev__grant">' +
+        devButton("dev-add", "+10K gold", ' data-gold="10000" data-gems="0"') +
+        devButton("dev-add", "+1M gold", ' data-gold="1000000" data-gems="0"') +
+        devButton("dev-add", "+1K gems", ' data-gold="0" data-gems="1000"') +
+        devButton("dev-add", "+100K gems", ' data-gold="0" data-gems="100000"') +
+      "</div>" +
+      '<div class="dev__grant">' + devButton("dev-shop", "Free gift ready now, deals restocked") + "</div>"
+    );
+  }
+
+  function devProgress(S) {
+    var maxed = PS.TALENTS.filter(function (t) { return (S.talents[t.id] || 0) >= t.max; }).length;
+    return (
+      '<p class="hint">Chapters cleared: <b>' + S.best + "</b> of " + PS.BAL.CHAPTERS + ". Talents maxed: <b>" + maxed + "</b> of " + PS.TALENTS.length + ".</p>" +
+      '<div class="dev__give">' +
+        '<label>Chapters cleared<input id="dev-best" type="number" min="0" max="' + PS.BAL.CHAPTERS + '" step="1" value="' + S.best + '" /></label>' +
+        devButton("dev-best", "Set") +
+        devButton("dev-unlock", "Unlock every chapter") +
+      "</div>" +
+      '<div class="dev__grant">' + devButton("dev-max-talents", "Max every talent") + "</div>"
+    );
+  }
+
+  function devBattle(S) {
+    return (
+      '<div class="dev__give">' +
+        '<label>Chapter<input id="dev-start-ch" type="number" min="1" max="' + PS.BAL.CHAPTERS + '" step="1" value="' + S.chapter + '" /></label>' +
+        devButton("dev-start", "Start it, even if locked", "", "btn--primary") +
+      "</div>" +
+      '<p class="hint">A normal battle: a win here is saved like any other.</p>' +
+      '<div class="dev__give">' +
+        '<label>Swarm mode: pests as tough as chapter<input id="dev-swarm-ch" type="number" min="1" max="' + PS.BAL.CHAPTERS + '" step="1" value="' + S.chapter + '" /></label>' +
+        devButton("dev-swarm", "Start swarm mode", "", "btn--primary") +
+      "</div>" +
+      '<p class="hint">Endless, no boss. Pays 1.2× the usual gold for the chapter you pick.</p>' +
+      '<p class="hint">Inside any battle a DEV button appears with godmode, one-hit kills, game speed, and every upgrade to pick or max.</p>'
+    );
+  }
+
+  function devOwned(S) {
     var owned = st.sorted(S.items).map(function (item) {
       var worn = st.isEquipped(item);
       // worn gear is only taken off, never deleted, so nothing can be lost by accident
@@ -853,31 +918,39 @@
           : '<button class="btn btn--sm" type="button" data-act="dev-remove" data-u="' + item.u + '">Remove</button>') + "</li>"
       );
     }).join("");
+    return "<h3>Owned (" + S.items.length + ")</h3>" + '<ul class="dev__list">' + owned + "</ul>";
+  }
+
+  function devSave(modal) {
+    return (
+      '<p class="hint">Copy the save to keep a backup or move it to another browser, or paste one in and load it.</p>' +
+      '<textarea class="dev__save" id="dev-save" rows="6" spellcheck="false" aria-label="Save data">' + esc(modal.exported || "") + "</textarea>" +
+      '<div class="dev__grant">' +
+        devButton("dev-export", "Show my save") +
+        devButton("dev-import", "Load this save", "", "btn--danger") +
+        devButton("dev-lock", "Lock the dev menu again") +
+      "</div>"
+    );
+  }
+
+  function devMenu(modal) {
+    var S = st.get();
+    var tab = view.devTab;
+    var body = tab === "money" ? devMoney(S)
+      : tab === "progress" ? devProgress(S)
+      : tab === "battle" ? devBattle(S)
+      : tab === "owned" ? devOwned(S)
+      : tab === "save" ? devSave(modal)
+      : devGear(S, view.dev);
     return (
       '<div class="dev">' +
         '<button class="modal__close" type="button" data-act="close" aria-label="Close">' + PS.icon("close") + "</button>" +
         '<h2 id="modal-title">Dev menu</h2>' +
         '<p class="hint">For testing. Changes only touch this browser\'s save.</p>' +
-        '<div class="dev__give">' +
-          '<label>Item<select id="dev-id">' + picks + "</select></label>" +
-          '<label>Rarity<select id="dev-rarity">' + rarities + "</select></label>" +
-          '<button class="btn btn--primary btn--sm" type="button" data-act="dev-give" data-key="dev-give">Give and equip</button>' +
-        "</div>" +
-        '<div class="dev__grant">' +
-          '<button class="btn btn--sm" type="button" data-act="dev-set" data-key="dev-set">Give a full set (all 6 slots) at this rarity</button>' +
-        "</div>" +
-        '<div class="dev__give">' +
-          '<label>Swarm mode: pests as tough as chapter<input id="dev-swarm-ch" type="number" min="1" max="' + PS.BAL.CHAPTERS + '" step="1" value="' + S.chapter + '" /></label>' +
-          '<button class="btn btn--sm btn--primary" type="button" data-act="dev-swarm" data-key="dev-swarm">Start swarm mode</button>' +
-        "</div>" +
-        '<p class="hint">Endless, no boss. Pays 1.2× the usual gold for the chapter you pick.</p>' +
-        '<div class="dev__give">' +
-          '<label>Gold<input id="dev-gold" type="number" min="0" step="1" value="' + S.gold + '" /></label>' +
-          '<label>Gems<input id="dev-gems" type="number" min="0" step="1" value="' + S.gems + '" /></label>' +
-          '<button class="btn btn--sm" type="button" data-act="dev-money" data-key="dev-money">Set</button>' +
-        "</div>" +
-        "<h3>Owned (" + S.items.length + ")</h3>" +
-        '<ul class="dev__list">' + owned + "</ul>" +
+        '<div class="devtabs" role="tablist">' + DEV_TABS.map(function (t) {
+          return '<button class="devtabs__tab' + (tab === t[0] ? " is-active" : "") + '" type="button" role="tab" aria-selected="' + (tab === t[0]) + '" data-act="dev-tab" data-tab-name="' + t[0] + '">' + t[1] + "</button>";
+        }).join("") + "</div>" +
+        '<div class="dev__body">' + body + "</div>" +
       "</div>"
     );
   }
@@ -928,7 +1001,7 @@
     if (modal.type === "item") html = itemModal(modal.u, modal);
     else if (modal.type === "loot") html = lootModal(modal);
     else if (modal.type === "settings") html = settingsModal(modal);
-    else if (modal.type === "secret") html = modal.open ? devMenu() : secretModal(modal);
+    else if (modal.type === "secret") html = modal.open ? devMenu(modal) : secretModal(modal);
     else if (modal.type === "quick") html = quickModal(modal);
     if (html === null) {
       closeModal();
@@ -1036,7 +1109,7 @@
     close: function () { closeModal(); },
     settings: function () { openModal({ type: "settings", armed: false }); },
     secret: function () {
-      openModal({ type: "secret", open: false, wrong: false });
+      openModal({ type: "secret", open: PS.dev.unlocked, wrong: false });
       var input = $("#secret-input");
       if (input) input.focus();
     },
@@ -1273,6 +1346,56 @@
       var chapter = Math.max(1, Math.min(PS.BAL.CHAPTERS, Math.round(Number($("#dev-swarm-ch").value) || 1)));
       startBattle(chapter, "swarm");
     },
+    "dev-tab": function (node) {
+      view.devTab = node.getAttribute("data-tab-name");
+      renderModal();
+    },
+    "dev-add": function (node) {
+      var S = st.get();
+      st.setMoney(S.gold + Number(node.getAttribute("data-gold")), S.gems + Number(node.getAttribute("data-gems")));
+      toast("Now " + fmt(st.get().gold) + " gold and " + fmt(st.get().gems) + " gems");
+    },
+    "dev-shop": function () {
+      st.devRefreshShop();
+      toast("Free gift is ready and today's deals are back");
+    },
+    "dev-best": function () {
+      st.devSetBest(Number($("#dev-best").value));
+      toast("Chapters cleared: " + st.get().best);
+    },
+    "dev-unlock": function () {
+      st.devSetBest(PS.BAL.CHAPTERS);
+      toast("Every chapter is open");
+    },
+    "dev-max-talents": function () {
+      st.devMaxTalents();
+      toast("Every talent is maxed");
+    },
+    "dev-max-slots": function () {
+      st.devMaxSlots();
+      toast("Slot levels maxed for what you are wearing");
+    },
+    "dev-start": function () {
+      var chapter = Math.max(1, Math.min(PS.BAL.CHAPTERS, Math.round(Number($("#dev-start-ch").value) || 1)));
+      startBattle(chapter);
+    },
+    "dev-export": function () {
+      view.modal.exported = st.exportSave();
+      renderModal();
+      var box = $("#dev-save");
+      if (box) box.select();
+    },
+    "dev-import": function () {
+      var box = $("#dev-save");
+      if (box && st.importSave(box.value.trim())) toast("Save loaded");
+      else toast("That is not a save this game can read");
+    },
+    "dev-lock": function () {
+      PS.dev.unlocked = false;
+      try { sessionStorage.removeItem("lemon:dev"); } catch (err) { /* blocked */ }
+      closeModal();
+      toast("Dev menu locked");
+    },
     "dev-money": function () {
       st.setMoney(Number($("#dev-gold").value), Number($("#dev-gems").value));
       toast("Set to " + fmt(st.get().gold) + " gold and " + fmt(st.get().gems) + " gems");
@@ -1315,7 +1438,8 @@
     if (e.target.getAttribute("data-form") !== "secret") return;
     e.preventDefault();
     var input = $("#secret-input");
-    if (input && input.value === SECRET_PASSWORD) {
+    if (input && input.value === PS.dev.password) {
+      PS.dev.unlock();
       view.modal.open = true;
       renderModal();
     } else {

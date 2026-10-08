@@ -197,4 +197,25 @@
     if (mode !== "auto") return mode === "off";
     return Boolean(global.matchMedia && global.matchMedia("(prefers-reduced-motion: reduce)").matches);
   };
+
+  /* ------------------------------------------------------------ dev access */
+  /* Unlocked once per browser tab by the developer password (the "?" on the
+     construction page or in the footer). While unlocked, battles show a DEV
+     button and the lobby's dev menu opens without asking again. */
+
+  var KEY_DEV = "lemon:dev";
+  var devOn = false;
+  try { devOn = sessionStorage.getItem(KEY_DEV) === "1"; } catch (err) { /* blocked */ }
+
+  PS.dev = {
+    password: "howdidyoufindit",
+    unlocked: devOn,
+    // switches the battle looks at; they reset whenever a battle starts
+    cheats: { god: false, oneHit: false, speed: 1 },
+    unlock: function () {
+      PS.dev.unlocked = true;
+      try { sessionStorage.setItem(KEY_DEV, "1"); } catch (err) { /* blocked */ }
+      PS.emit("dev");
+    }
+  };
 })(window);
