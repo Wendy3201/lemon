@@ -3259,3 +3259,68 @@ button.tile:hover:not(:disabled) {
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
 }
+
+/* ------------------------------------------------------ under construction */
+
+.closed {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  height: 100dvh;
+  padding: 16px;
+}
+
+.closed[hidden],
+.app[hidden] {
+  display: none;
+}
+
+.closed__card {
+  width: min(100%, 440px);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(180deg, var(--lemon-pale), var(--surface));
+  border-color: var(--rind);
+  padding: clamp(24px, 6vw, 40px);
+}
+
+:root[data-theme="dark"] .closed__card {
+  background: linear-gradient(180deg, #4a4020, var(--surface));
+}
+
+.closed__mark {
+  width: 96px;
+  height: 96px;
+  margin-bottom: 6px;
+  animation: wiggle 2.4s ease-in-out infinite;
+}
+
+.closed__card h1 {
+  font-family: var(--font-display);
+  font-size: clamp(30px, 8vw, 40px);
+  line-height: 1.1;
+}
+
+.closed__text {
+  color: var(--ink-soft);
+  margin: 6px 0 14px;
+}
+
+.closed__bar {
+  width: 100%;
+  height: 14px;
+}
+
+.closed__bar i {
+  width: 100%;
+  background: repeating-linear-gradient(-45deg, var(--lemon) 0 12px, var(--charcoal) 12px 24px);
+  background-size: 34px 100%;
+  animation: closed-stripes 1.2s linear infinite;
+}
+
+@keyframes closed-stripes {
+  to { background-position: 34px 0; }
+}

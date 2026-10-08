@@ -20,6 +20,26 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <!-- ------------------------------------------------- under construction
+         Set UNDER_CONSTRUCTION to false in the script at the bottom to open
+         the game again. -->
+    <main class="closed" id="closed" hidden>
+      <div class="panel closed__card">
+        <svg class="closed__mark" viewBox="0 0 48 48" aria-hidden="true">
+          <ellipse cx="24" cy="27" rx="17" ry="14" fill="#F7D94C" stroke="#E0B93C" stroke-width="2" />
+          <ellipse cx="18" cy="22" rx="5" ry="3" fill="#FFF4B8" opacity=".8" />
+          <path d="M24 13c0-5 4-8 9-8-1 5-4 8-9 8z" fill="#8FAE65" />
+          <path d="M11 24c0-8 6-13 13-13s13 5 13 13z" fill="#29261F" opacity=".92" />
+          <rect x="8" y="23" width="32" height="5" rx="2.5" fill="#29261F" />
+          <rect x="20" y="9" width="8" height="6" rx="2" fill="#FFE66D" />
+        </svg>
+        <p class="kicker">Pip Survivors</p>
+        <h1>Under construction</h1>
+        <p class="closed__text">The lemon is getting some work done. Come back a little later!</p>
+        <div class="bar closed__bar" aria-hidden="true"><i></i></div>
+      </div>
+    </main>
+
     <!-- ------------------------------------------------------------ menus -->
     <div class="app" id="app">
       <header class="topbar">
@@ -75,7 +95,13 @@
     <script src="js/hud.js"></script>
     <script src="js/ui.js"></script>
     <script>
-      PS.ui.init();
+      var UNDER_CONSTRUCTION = true;
+      if (UNDER_CONSTRUCTION) {
+        document.getElementById("closed").hidden = false;
+        document.getElementById("app").hidden = true;
+      } else {
+        PS.ui.init();
+      }
     </script>
   </body>
 </html>
