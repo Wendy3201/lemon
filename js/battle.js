@@ -73,7 +73,7 @@
     var stats = PS.state.calc();
     var p = makePlayer(stats);
     p.outfit = B.outfitOf();
-    calm = PS.reducedMotion();
+    calm = PS.reducedMotion() || !PS.prefs.get("shake");
     var cheats = PS.dev.cheats;
     cheats.god = false;
     cheats.oneHit = false;
@@ -659,7 +659,7 @@
         e.ky += (ky / kd) * opts.knock / e.mass;
       }
       if (opts && opts.stun && !e.boss) e.stun = Math.max(e.stun, opts.stun);
-      if (R.texts.length < 40) {
+      if (R.texts.length < 40 && PS.prefs.get("numbers")) {
         B.text(e.x, e.y - e.r, PS.fmt(Math.max(1, Math.round(dmg))), flags & 2 ? "#FFE66D" : "#FFFCF2", flags & 2 ? 15 : 11);
       }
     }
@@ -1749,10 +1749,10 @@
     window.addEventListener("blur", function () {
       keys = Object.create(null);
       stick.on = false;
-      B.pause();
+      if (PS.prefs.get("autopause")) B.pause();
     });
     document.addEventListener("visibilitychange", function () {
-      if (document.hidden) B.pause();
+      if (document.hidden && PS.prefs.get("autopause")) B.pause();
     });
 
     function at(e) {

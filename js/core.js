@@ -198,6 +198,24 @@
     return Boolean(global.matchMedia && global.matchMedia("(prefers-reduced-motion: reduce)").matches);
   };
 
+  /* ---------------------------------------------------------- preferences */
+  /* Small switches from the Settings pop-up. Each is saved on its own. */
+
+  var PREFS = { volume: 1, shake: true, numbers: true, autopause: true };
+
+  PS.VOLUMES = [{ name: "Low", gain: 0.25 }, { name: "Medium", gain: 0.5 }, { name: "High", gain: 0.85 }];
+
+  PS.prefs = {
+    get: function (name) {
+      var value = PS.store.get("lemon:pref:" + name, PREFS[name]);
+      if (name === "volume") return value === 0 || value === 1 || value === 2 ? value : PREFS.volume;
+      return value !== false;
+    },
+    set: function (name, value) {
+      PS.store.set("lemon:pref:" + name, value);
+    }
+  };
+
   /* ------------------------------------------------------------ dev access */
   /* Unlocked once per browser tab by the developer password (the "?" on the
      construction page or in the footer). While unlocked, battles show a DEV
@@ -208,7 +226,7 @@
   try { devOn = sessionStorage.getItem(KEY_DEV) === "1"; } catch (err) { /* blocked */ }
 
   PS.dev = {
-    password: "howdidyoufindit",
+    password: "3.1415925",
     unlocked: devOn,
     // switches the battle looks at; they reset whenever a battle starts
     cheats: { god: false, oneHit: false, speed: 1 },

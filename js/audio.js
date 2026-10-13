@@ -40,7 +40,7 @@
       ctx = new AC();
       var squash = ctx.createDynamicsCompressor();
       master = ctx.createGain();
-      master.gain.value = 0.5;
+      master.gain.value = PS.VOLUMES[PS.prefs.get("volume")].gain;
       master.connect(squash);
       squash.connect(ctx.destination);
     } catch (err) {
@@ -234,6 +234,10 @@
       make(arg);
     },
     on: function () { return enabled; },
+    /** Apply the volume chosen in Settings (and play a note so it can be judged). */
+    refreshVolume: function () {
+      if (master) master.gain.value = PS.VOLUMES[PS.prefs.get("volume")].gain;
+    },
     set: function (value) {
       enabled = Boolean(value);
       PS.store.set(KEY, enabled);

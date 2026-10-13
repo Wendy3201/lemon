@@ -20,34 +20,13 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <!-- ------------------------------------------------- under construction
-         Set UNDER_CONSTRUCTION to false in the script at the bottom to open
-         the game again. -->
-    <main class="closed" id="closed" hidden>
-      <div class="panel closed__card">
-        <svg class="closed__mark" viewBox="0 0 48 48" aria-hidden="true">
-          <ellipse cx="24" cy="27" rx="17" ry="14" fill="#F7D94C" stroke="#E0B93C" stroke-width="2" />
-          <ellipse cx="18" cy="22" rx="5" ry="3" fill="#FFF4B8" opacity=".8" />
-          <path d="M24 13c0-5 4-8 9-8-1 5-4 8-9 8z" fill="#8FAE65" />
-          <path d="M11 24c0-8 6-13 13-13s13 5 13 13z" fill="#29261F" opacity=".92" />
-          <rect x="8" y="23" width="32" height="5" rx="2.5" fill="#29261F" />
-          <rect x="20" y="9" width="8" height="6" rx="2" fill="#FFE66D" />
-        </svg>
-        <p class="kicker">Pip Survivors</p>
-        <h1>Under construction</h1>
-        <p class="closed__text">The lemon is getting some work done. Come back a little later!</p>
-        <div class="bar closed__bar" aria-hidden="true"><i></i></div>
-        <button class="foot__secret closed__key" id="closed-key" type="button" aria-label="Developers">?</button>
-        <form class="closed__form" id="closed-form" hidden>
-          <label class="visually-hidden" for="closed-input">Password</label>
-          <input class="secret__input" id="closed-input" type="password" autocomplete="off" spellcheck="false" />
-          <p class="secret__error" id="closed-error" role="alert"></p>
-        </form>
-      </div>
-    </main>
-
     <!-- ------------------------------------------------------------ menus -->
     <div class="app" id="app">
+      <div class="head">
+      <!-- The status bar above the top bar. Change the text between the tags
+           whenever you like; leave it empty to hide the bar. -->
+      <p class="status" id="status" role="status">PLAYERS, JUST SAYING THAT ALL DATA YOU HAVE MADE IS GOING TO BE REMOVED</p>
+
       <header class="topbar">
         <div class="brand">
           <svg class="brand__mark" viewBox="0 0 48 48" aria-hidden="true">
@@ -56,7 +35,7 @@
             <path d="M24 13c0-5 4-8 9-8-1 5-4 8-9 8z" fill="#8FAE65" />
           </svg>
           <span class="brand__text">
-            <span class="brand__name">Currently updating, developvers can play with dev mode</span>
+            <span class="brand__name">PIP SURVIVORS</span>
             <span class="brand__tag">a Lemon game</span>
           </span>
         </div>
@@ -67,6 +46,7 @@
           <button class="btn btn--icon" id="open-settings" type="button" data-act="settings" aria-label="Settings"></button>
         </div>
       </header>
+      </div>
 
       <main class="screen" id="screen" tabindex="-1"></main>
 
@@ -102,33 +82,7 @@
     <script src="js/dev.js"></script>
     <script src="js/ui.js"></script>
     <script>
-      var UNDER_CONSTRUCTION = true;
-      // a developer who already entered the password in this tab goes straight in
-      if (UNDER_CONSTRUCTION && !PS.dev.unlocked) {
-        document.getElementById("closed").hidden = false;
-        document.getElementById("app").hidden = true;
-        // developers: the ? opens a password box, and the right password opens the game
-        var form = document.getElementById("closed-form");
-        var input = document.getElementById("closed-input");
-        document.getElementById("closed-key").addEventListener("click", function () {
-          form.hidden = false;
-          input.focus();
-        });
-        form.addEventListener("submit", function (e) {
-          e.preventDefault();
-          if (input.value === PS.dev.password) {
-            PS.dev.unlock();
-            document.getElementById("closed").hidden = true;
-            document.getElementById("app").hidden = false;
-            PS.ui.init();
-          } else {
-            document.getElementById("closed-error").textContent = "Wrong password.";
-            input.select();
-          }
-        });
-      } else {
-        PS.ui.init();
-      }
+      PS.ui.init();
     </script>
   </body>
 </html>

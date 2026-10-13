@@ -489,23 +489,18 @@
 
   /* ---------------------------------------------------------------- shop */
 
+  /** "0.65%", "3%", "62.35%": as many decimals as the number needs, at most two. */
+  function pctText(share) {
+    return String(Number((share * 100).toFixed(2))) + "%";
+  }
+
   function oddsChips(chest) {
-    var mu = PS.BAL.lootMu(st.frontier()) + chest.shift;
-    var weights = PS.rarityWeights(mu);
-    // anything below the chest's floor comes out as the floor
-    var folded = weights.slice();
-    for (var r = 0; r < chest.minR; r++) {
-      folded[chest.minR] += folded[r];
-      folded[r] = 0;
-    }
-    var total = folded.reduce(function (a, b) { return a + b; }, 0);
     var out = "";
-    folded.forEach(function (w, r) {
-      var share = w / total;
-      if (share >= 0.005) out += '<span class="odds r' + r + '">' + PS.RARITY[r].name + " " + (share >= 0.1 ? Math.round(share * 100) : (share * 100).toFixed(1)) + "%</span>";
+    chest.odds.forEach(function (share, r) {
+      if (share > 0) out += '<span class="odds r' + r + '">' + PS.RARITY[r].name + " " + pctText(share) + "</span>";
     });
-    if (chest.s) out += '<span class="odds g-S">S-grade ' + PS.pct(chest.s) + "</span>";
-    if (chest.ss) out += '<span class="odds g-SS">SS-grade ' + PS.pct(chest.ss) + "</span>";
+    if (chest.s) out += '<span class="odds g-S">S-grade ' + pctText(chest.s) + "</span>";
+    if (chest.shard) out += '<span class="odds g-SS">SS shard ' + pctText(chest.shard) + "</span>";
     return out;
   }
 
@@ -560,7 +555,14 @@
 
         '<h2 class="section">Chests</h2>' +
         '<div class="chests">' + chestCard("crate") + chestCard("gilded") + "</div>" +
-        '<p class="hint">Chests get better, and cost more, as you clear chapters. Right now they are tuned to chapter ' + st.frontier() + ".</p>" +
+        '<p class="hint">The odds on a chest never change, however far you get. Only the price rises as you clear chapters. A chest never holds an SS-grade item itself.</p>' +
+        '<div class="panel gift shards' + (S.shards >= PS.SHARDS.needed ? " is-ready" : "") + '">' +
+          '<div class="gift__art">' + PS.art("gold") + "</div>" +
+          '<div class="gift__body"><h3>SS shards <span class="count">' + S.shards + "/" + PS.SHARDS.needed + "</span></h3>" +
+            "<p>Gather " + PS.SHARDS.needed + " from Gilded Chests to craft one " + PS.RARITY[PS.SHARDS.rarity].name + " SS-grade item.</p>" +
+            '<div class="bar"><i style="width:' + Math.min(100, (S.shards / PS.SHARDS.needed) * 100) + '%"></i></div></div>' +
+          '<button class="btn btn--primary" type="button" data-act="craft" data-key="craft"' + (S.shards >= PS.SHARDS.needed ? "" : " disabled") + ">Craft</button>" +
+        "</div>" +
 
         '<h2 class="section">Today\'s deals <small>' + PS.icon("clock") + '<span data-countdown="deals">' + PS.countdown(untilMidnight()) + "</span></small></h2>" +
         '<div class="deals">' + deals.map(function (deal) {
@@ -757,6 +759,7 @@
         (modal.art ? '<div class="loot__flash r' + best + '"></div><div class="loot__box">' + PS.art(modal.art) + "</div>" : "") +
         '<h2 id="modal-title">' + esc(modal.title) + "</h2>" +
         (modal.gold || modal.gems ? '<p class="loot__money">' + (modal.gold ? price("gold", modal.gold) : "") + (modal.gems ? price("gems", modal.gems) : "") + "</p>" : "") +
+        (modal.shards ? '<p class="loot__tally"><span class="rname g-SS">+' + modal.shards + " SS shard" + (modal.shards === 1 ? "" : "s") + "!</span></p>" : "") +
         tally +
         '<div class="loot__items">' + shown.map(function (item, index) {
           var def = st.def(item);
@@ -785,6 +788,14 @@
         '<h2 id="modal-title">Settings</h2>' +
         '<div class="settings__row"><span>Sound effects</span>' +
           '<button class="btn btn--sm" type="button" data-act="sound" data-key="sound">' + (PS.sfx.on() ? "On" : "Off") + "</button></div>" +
+        '<div class="settings__row"><span>Sound volume</span>' +
+          '<button class="btn btn--sm" type="button" data-act="volume" data-key="volume">' + PS.VOLUMES[PS.prefs.get("volume")].name + "</button></div>" +
+        '<div class="settings__row"><span>Screen shake</span>' +
+          '<button class="btn btn--sm" type="button" data-act="pref" data-pref="shake" data-key="pref-shake">' + (PS.prefs.get("shake") ? "On" : "Off") + "</button></div>" +
+        '<div class="settings__row"><span>Damage numbers</span>' +
+          '<button class="btn btn--sm" type="button" data-act="pref" data-pref="numbers" data-key="pref-numbers">' + (PS.prefs.get("numbers") ? "On" : "Off") + "</button></div>" +
+        '<div class="settings__row"><span>Pause when you leave the tab</span>' +
+          '<button class="btn btn--sm" type="button" data-act="pref" data-pref="autopause" data-key="pref-autopause">' + (PS.prefs.get("autopause") ? "On" : "Off") + "</button></div>" +
         '<div class="settings__row"><span>Animations</span>' +
           '<button class="btn btn--sm" type="button" data-act="motion" data-key="motion">' + { auto: "Auto (follow device)", on: "Always on", off: "Off" }[PS.motionMode()] + "</button></div>" +
         '<div class="settings__row"><span>Colours</span>' +
@@ -873,7 +884,7 @@
         devButton("dev-add", "+1K gems", ' data-gold="0" data-gems="1000"') +
         devButton("dev-add", "+100K gems", ' data-gold="0" data-gems="100000"') +
       "</div>" +
-      '<div class="dev__grant">' + devButton("dev-shop", "Free gift ready now, deals restocked") + "</div>"
+      '<div class="dev__grant">' + devButton("dev-shop", "Free gift ready now, deals restocked") + devButton("dev-shards", "+6 SS shards") + "</div>"
     );
   }
 
@@ -955,6 +966,16 @@
     );
   }
 
+  function noticeModal() {
+    return (
+      '<div class="notice">' +
+        '<h2 id="modal-title">Your data was reset</h2>' +
+        "<p>All your data has been reset because of a bug inside the game. Sorry about that! Everyone starts fresh, so you can play through again.</p>" +
+        '<div class="modal__actions"><button class="btn btn--primary" type="button" data-act="close" data-key="m-ok" autofocus>OK</button></div>' +
+      "</div>"
+    );
+  }
+
   function quickModal(modal) {
     var plan = st.quickPlan(modal.keep);
     var counts = {};
@@ -1003,6 +1024,7 @@
     else if (modal.type === "settings") html = settingsModal(modal);
     else if (modal.type === "secret") html = modal.open ? devMenu(modal) : secretModal(modal);
     else if (modal.type === "quick") html = quickModal(modal);
+    else if (modal.type === "notice") html = noticeModal();
     if (html === null) {
       closeModal();
       return;
@@ -1142,6 +1164,17 @@
       PS.sfx.toggle();
       renderModal();
     },
+    volume: function () {
+      PS.prefs.set("volume", (PS.prefs.get("volume") + 1) % PS.VOLUMES.length);
+      PS.sfx.refreshVolume();
+      renderModal();
+      PS.sfx.play("coin");
+    },
+    pref: function (node) {
+      var name = node.getAttribute("data-pref");
+      PS.prefs.set(name, !PS.prefs.get(name));
+      renderModal();
+    },
     motion: function () {
       var next = { auto: "on", on: "off", off: "auto" }[PS.motionMode()];
       PS.store.set("lemon:motion", next);
@@ -1278,8 +1311,14 @@
       var count = Number(node.getAttribute("data-count"));
       var items = st.openChest(kind, count);
       if (!items) return;
-      openModal({ type: "loot", title: PS.CHESTS[kind].name + (count > 1 ? " × " + count : ""), items: items, art: kind, again: { kind: kind, count: count } });
+      openModal({ type: "loot", title: PS.CHESTS[kind].name + (count > 1 ? " × " + count : ""), items: items, shards: items.shards, art: kind, again: { kind: kind, count: count } });
       revealSound(items);
+    },
+    craft: function () {
+      var item = st.craftShards();
+      if (!item) return;
+      openModal({ type: "loot", title: "SS shards, crafted", items: [item], art: "gilded" });
+      revealSound([item]);
     },
     gift: function () {
       var gift = st.claimGift();
@@ -1355,6 +1394,10 @@
       st.setMoney(S.gold + Number(node.getAttribute("data-gold")), S.gems + Number(node.getAttribute("data-gems")));
       toast("Now " + fmt(st.get().gold) + " gold and " + fmt(st.get().gems) + " gems");
     },
+    "dev-shards": function () {
+      st.devAddShards(PS.SHARDS.needed);
+      toast("+" + PS.SHARDS.needed + " SS shards");
+    },
     "dev-shop": function () {
       st.devRefreshShop();
       toast("Free gift is ready and today's deals are back");
@@ -1406,7 +1449,7 @@
   var SOUND = {
     tab: "tab", fight: "start", again: "start", equip: "equip", "equip-best": "equip", "dev-give": "equip", "dev-set": "equip",
     upgrade: "upgrade", "upgrade-max": "upgrade", talent: "talent", quest: "coin", deal: "coin", gold: "coin",
-    gift: null, chest: null, sell: null, "forge-go": null, "quick-go": null, sound: null
+    gift: null, chest: null, craft: null, sell: null, "forge-go": null, "quick-go": null, sound: null, volume: null
   };
 
   function upgraded(slot, text) {
@@ -1520,6 +1563,7 @@
       PS.on("battle:end", showResults);
 
       render();
+      if (st.takeWipeNotice()) openModal({ type: "notice" });
       clearInterval(tickTimer);
       tickTimer = setInterval(tick, 1000);
     }

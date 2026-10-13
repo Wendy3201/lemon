@@ -467,6 +467,18 @@
   var BOSS_SCALE = [1, 1.9, 3.6, 5.5, 12, 20, 33, 52, 82, 128, 190, 280, 420, 620, 920, 1350, 1950, 2700, 3400, 4300];
   var REC_POWER = [500, 650, 1200, 2100, 3600, 5500, 8400, 12500, 17500, 26500, 41000, 66000, 105000, 160000, 240000, 330000, 460000, 600000, 900000, 1300000];
 
+  /* Harder than the fitted curve: how much extra each number gets at chapter 20.
+     Chapter 1 is left alone and the extra grows evenly chapter by chapter, so
+     turn these up for a tougher game and down for a gentler one. */
+  var HARDER = { hp: 0.5, dmg: 0.3, boss: 0.6, power: 0.45 };
+  for (var i = 0; i < CHAPTER_COUNT; i++) {
+    var ramp = i / (CHAPTER_COUNT - 1);
+    HP_SCALE[i] *= 1 + HARDER.hp * ramp;
+    DMG_SCALE[i] *= 1 + HARDER.dmg * ramp;
+    BOSS_SCALE[i] *= 1 + HARDER.boss * ramp;
+    REC_POWER[i] = Math.round((REC_POWER[i] * (1 + HARDER.power * ramp)) / 10) * 10;
+  }
+
   PS.BAL = {
     CHAPTERS: CHAPTER_COUNT,
     HERO: { atk: 2, hp: 30, crit: 0.05, critDmg: 1.5 },
@@ -562,12 +574,18 @@
 
   /* ----------------------------------------------------------------- shop */
 
+  /* Chest odds never change, however far you have got: `odds` is the chance of
+     Common, Uncommon, Rare, Epic, Legendary and Mythic, in that order, and
+     adds up to 1. A chest never gives an SS-grade item; the Gilded Chest can
+     drop an SS shard instead (`shard` per chest), and SHARDS.needed of them
+     are turned into one Uncommon SS-grade item at the shop. */
   PS.CHESTS = {
-    crate: { key: "crate", name: "Seed Crate", share: 0.2, shift: 0, minR: 0, s: 0.005, ss: 0,
-      text: "One piece of gear, about as good as what the next chapter drops." },
-    gilded: { key: "gilded", name: "Gilded Chest", share: 0.8, shift: 1, minR: 1, s: 0.02, ss: 0.001,
-      text: "One piece of gear a whole rarity better, with a small chance of S and SS grade." }
+    crate: { key: "crate", name: "Seed Crate", share: 0.2, odds: [0.79, 0.15, 0.06, 0, 0, 0], s: 0.005, ss: 0, shard: 0,
+      text: "One piece of gear: mostly Common, sometimes Uncommon or Rare." },
+    gilded: { key: "gilded", name: "Gilded Chest", share: 0.8, odds: [0.6235, 0.25, 0.09, 0.03, 0.0065, 0], s: 0.02, ss: 0, shard: 0.0002,
+      text: "One piece of gear, up to Legendary, with a tiny chance of an SS shard." }
   };
+  PS.SHARDS = { needed: 6, rarity: 1 }; // 6 SS shards make one Uncommon SS-grade item
   /* What a piece of gear sells for: its rarity's price plus its grade's price, so
      a ??? SS-grade item sells for both added together. Below Mythic, and plain
      (A) grade, is worth nothing to the buyer. */

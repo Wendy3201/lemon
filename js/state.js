@@ -25,6 +25,7 @@
       seed: Math.floor(Math.random() * 2147483647),
       gold: PS.START.gold,
       gems: PS.START.gems,
+      shards: 0, // SS shards from Gilded Chests
       uid: 1,
       items: [],
       eq: {},
@@ -66,6 +67,7 @@
     save.seed = Math.floor(num(raw.seed, save.seed));
     save.gold = Math.floor(num(raw.gold, 0));
     save.gems = Math.floor(num(raw.gems, 0));
+    save.shards = Math.floor(num(raw.shards, 0));
     save.best = Math.floor(num(raw.best, 0, 0, PS.BAL.CHAPTERS));
     save.chapter = Math.floor(num(raw.chapter, 1, 1, Math.min(PS.BAL.CHAPTERS, save.best + 1)));
 
@@ -166,8 +168,23 @@
     PS.emit("change");
   }
 
+  /* One-time wipe. Every browser that has not seen this WIPE_ID yet starts from
+     a fresh save the first time it loads the game, then remembers that it has
+     been wiped. To wipe everyone again, change WIPE_ID to anything new. */
+  var WIPE_ID = "2026-10-13";
+  var KEY_WIPE = "lemon:wipe";
+  var KEY_NOTICE = "lemon:wipe-notice"; // set until the player has seen the message once
+
   function load() {
-    S = sanitise(PS.store.get(KEY, null));
+    if (PS.store.get(KEY_WIPE, null) !== WIPE_ID) {
+      // only someone who actually had a save is told it was reset
+      if (PS.store.get(KEY, null)) PS.store.set(KEY_NOTICE, true);
+      PS.store.set(KEY_WIPE, WIPE_ID);
+      S = fresh();
+      PS.store.set(KEY, S);
+    } else {
+      S = sanitise(PS.store.get(KEY, null));
+    }
     refreshRecords();
     return S;
   }
@@ -588,7 +605,10 @@
     var slot = PS.weighted(slots, slots.map(function (s) { return s.weight; }), rnd());
     var ids = PS.POOL[slot.key][grade];
     var id = ids[Math.floor(rnd() * ids.length)];
-    var rarity = PS.clamp(Math.max(rollRarity(mu, rnd), opts.minR || 0), 0, PS.MAX_DROP_RARITY);
+    // fixed odds (chests) ignore how far the player has got
+    var rarity = opts.odds
+      ? PS.weighted([0, 1, 2, 3, 4, 5], opts.odds, rnd())
+      : PS.clamp(Math.max(rollRarity(mu, rnd), opts.minR || 0), 0, PS.MAX_DROP_RARITY);
     return { id: id, r: rarity };
   }
 
@@ -714,9 +734,10 @@
     if (!chest || S.gold < cost) return null;
     S.gold -= cost;
 
-    var mu = PS.BAL.lootMu(frontier()) + chest.shift;
     var out = [];
+    var shards = 0;
     for (var i = 0; i < count; i++) {
+      if (chest.shard && Math.random() < chest.shard) shards++;
       var forced = null;
       if (chest.pityS) {
         S.shop.pityS++;
@@ -724,7 +745,7 @@
         if (S.shop.pitySS >= chest.pitySS) forced = "SS";
         else if (S.shop.pityS >= chest.pityS) forced = "S";
       }
-      var roll = rollItem(mu, { s: chest.s, ss: chest.ss, grade: forced, minR: chest.minR });
+      var roll = rollItem(0, { s: chest.s, ss: chest.ss, grade: forced, odds: chest.odds });
       if (chest.pityS) {
         var grade = PS.ITEMS[roll.id].grade;
         if (grade === "SS") S.shop.pitySS = 0;
@@ -732,9 +753,21 @@
       }
       out.push(add(roll.id, roll.r));
     }
+    S.shards += shards;
     S.stats.chests += count;
     commit();
+    out.shards = shards;
     return out;
+  }
+
+  /** Turn SHARDS.needed SS shards into one Uncommon SS-grade item. */
+  function craftShards() {
+    if (S.shards < PS.SHARDS.needed) return null;
+    S.shards -= PS.SHARDS.needed;
+    var roll = rollItem(0, { grade: "SS", odds: [0, 1, 0, 0, 0, 0] });
+    var item = add(roll.id, PS.SHARDS.rarity);
+    commit();
+    return item;
   }
 
   function giftWait() {
@@ -869,6 +902,12 @@
   PS.state = {
     load: load,
     reset: reset,
+    /** True once, right after a save was wiped: show the message, then it is gone for good. */
+    takeWipeNotice: function () {
+      if (PS.store.get(KEY_NOTICE, false) !== true) return false;
+      PS.store.set(KEY_NOTICE, false);
+      return true;
+    },
     get: function () { return S; },
     calc: calc,
     compute: compute,
@@ -906,6 +945,7 @@
     // shop
     chestCost: chestCost,
     openChest: openChest,
+    craftShards: craftShards,
     giftWait: giftWait,
     claimGift: claimGift,
     deals: deals,
@@ -936,6 +976,10 @@
     devSetBest: function (n) {
       S.best = Math.floor(num(n, 0, 0, PS.BAL.CHAPTERS));
       S.chapter = Math.min(S.chapter, Math.min(PS.BAL.CHAPTERS, S.best + 1));
+      commit();
+    },
+    devAddShards: function (n) {
+      S.shards += n;
       commit();
     },
     devMaxTalents: function () {

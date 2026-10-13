@@ -86,8 +86,12 @@ Surpass and ??? never drop. They only come out of the forge.
 Some items are **S-grade** or **SS-grade**. The grade belongs to the item
 itself (an S-grade bow is S-grade at every rarity): ×1.2 or ×1.45 on the main
 stat, and stronger perks. They are rare: a Seed Crate has a 0.5% chance of an
-S-grade and never gives SS; a Gilded Chest has 2% for S-grade and 0.1% for
-SS-grade. The boss of every fourth chapter drops one the first time you beat it.
+S-grade; a Gilded Chest has 2%. **Chests never hold an SS-grade item.** Chest
+odds are fixed for the whole game: a Seed Crate is 79% Common, 15% Uncommon,
+6% Rare; a Gilded Chest is 62.35% Common, 25% Uncommon, 9% Rare, 3% Epic and
+0.65% Legendary. A Gilded Chest also has a 0.02% chance of an **SS shard**, and
+6 shards craft one Uncommon SS-grade item in the Shop. The boss of every fourth
+chapter drops an S or SS item the first time you beat it.
 
 **Levels belong to the slot, not the item**, so nothing is lost when you swap
 gear. Each level is +3.5% of the item's main stat.
