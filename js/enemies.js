@@ -207,7 +207,8 @@
     e.name = R.ch.bossName;
     e.tier = R.ch.bossTier;
     e.r = def.r;
-    e.fill = def.fill;
+    e.look = R.ch.look;
+    e.fill = e.look ? e.look.body : def.fill;
     e.hp = e.maxHp = 2250 * R.ch.bossScale * Math.pow(R.dur / 180, 1.3) * def.hp;
     e.speed = def.speed;
     e.hurt = 44 * R.ch.dmgScale;
@@ -626,6 +627,149 @@
     }
   }
 
+  /* The parts of a chapter's boss look that sit behind its body... */
+  function lookBehind(ctx, L, x, y, r, t) {
+    var i;
+    var a;
+    ctx.lineCap = "round";
+    switch (L.feature) {
+      case 0:
+        ctx.strokeStyle = L.dark;
+        ctx.lineWidth = Math.max(4, r * 0.16);
+        for (i = -1; i <= 1; i += 2) {
+          ctx.beginPath();
+          ctx.moveTo(x + i * r * 0.45, y - r * 0.8);
+          ctx.quadraticCurveTo(x + i * r * 1.1, y - r * 0.95, x + i * r * 0.88, y - r * 1.6);
+          ctx.stroke();
+        }
+        break;
+      case 1:
+        ctx.fillStyle = L.dark;
+        for (i = 0; i < 10; i++) {
+          a = (i / 10) * TAU + t * 0.25;
+          ctx.beginPath();
+          ctx.moveTo(x + Math.cos(a - 0.17) * r * 0.9, y + Math.sin(a - 0.17) * r * 0.9);
+          ctx.lineTo(x + Math.cos(a) * r * 1.32, y + Math.sin(a) * r * 1.32);
+          ctx.lineTo(x + Math.cos(a + 0.17) * r * 0.9, y + Math.sin(a + 0.17) * r * 0.9);
+          ctx.closePath();
+          ctx.fill();
+        }
+        break;
+      case 2:
+        ctx.fillStyle = L.accent;
+        ctx.globalAlpha = 0.6;
+        for (i = -1; i <= 1; i += 2) {
+          ctx.beginPath();
+          ctx.ellipse(x + i * r * 1.0, y - r * 0.2, r * 0.8, r * 0.38 + Math.sin(t * 6) * 2, i * (0.5 + Math.sin(t * 6) * 0.12), 0, TAU);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        break;
+      case 3:
+        ctx.strokeStyle = L.dark;
+        ctx.lineWidth = Math.max(4, r * 0.13);
+        ctx.beginPath();
+        ctx.moveTo(x + r * 0.6, y + r * 0.5);
+        ctx.quadraticCurveTo(x + r * 1.55, y + r * 0.75 + Math.sin(t * 3) * 4, x + r * 1.4, y - r * 0.15);
+        ctx.stroke();
+        ctx.fillStyle = L.dark;
+        circle(ctx, x + r * 1.4, y - r * 0.2, r * 0.12);
+        break;
+      case 4:
+        ctx.strokeStyle = L.dark;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        for (i = 0; i < 3; i++) {
+          var lift = Math.sin(t * 8 + i * 2) * 3;
+          ctx.moveTo(x - r * (0.35 + i * 0.22), y + r * (0.75 - i * 0.1));
+          ctx.lineTo(x - r * (0.65 + i * 0.35), y + r * (1.2 - i * 0.05) + lift);
+          ctx.moveTo(x + r * (0.35 + i * 0.22), y + r * (0.75 - i * 0.1));
+          ctx.lineTo(x + r * (0.65 + i * 0.35), y + r * (1.2 - i * 0.05) - lift);
+        }
+        ctx.stroke();
+        break;
+      case 5:
+        ctx.strokeStyle = L.dark;
+        ctx.lineWidth = 3;
+        for (i = -1; i <= 1; i += 2) {
+          var tipX = x + i * r * 0.7 + Math.sin(t * 3 + i) * 3;
+          var tipY = y - r * 1.55;
+          ctx.beginPath();
+          ctx.moveTo(x + i * r * 0.3, y - r * 0.85);
+          ctx.quadraticCurveTo(x + i * r * 0.55, y - r * 1.3, tipX, tipY);
+          ctx.stroke();
+          ctx.fillStyle = L.accent;
+          circle(ctx, tipX, tipY, 5);
+        }
+        break;
+    }
+  }
+
+  /* ...and the parts that sit on top of it: the pattern, then a gem or plates. */
+  function lookFront(ctx, L, x, y, r, t) {
+    var i;
+    if (L.pattern) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x, y, r * 0.95, 0, TAU);
+      ctx.clip();
+      ctx.globalAlpha = 0.38;
+      ctx.fillStyle = L.dark;
+      if (L.pattern === 1) {
+        ctx.fillRect(x - r, y - r * 0.1, r * 2, r * 0.2);
+        ctx.fillRect(x - r, y + r * 0.35, r * 2, r * 0.2);
+      } else if (L.pattern === 2) {
+        circle(ctx, x - r * 0.4, y - r * 0.3, r * 0.15);
+        circle(ctx, x + r * 0.35, y - r * 0.5, r * 0.12);
+        circle(ctx, x, y + r * 0.35, r * 0.17);
+        circle(ctx, x + r * 0.5, y + r * 0.25, r * 0.11);
+        circle(ctx, x - r * 0.55, y + r * 0.4, r * 0.1);
+      } else if (L.pattern === 3) {
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = L.accent;
+        ctx.beginPath();
+        ctx.ellipse(x, y + r * 0.7, r * 0.8, r * 0.5, 0, 0, TAU);
+        ctx.fill();
+      } else {
+        ctx.globalAlpha = 0.45;
+        ctx.strokeStyle = L.dark;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (i = 0; i <= 6; i++) {
+          var zx = x - r + (i * r * 2) / 6;
+          var zy = y + r * 0.1 + (i % 2 ? -r * 0.18 : r * 0.18);
+          if (i) ctx.lineTo(zx, zy);
+          else ctx.moveTo(zx, zy);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (L.feature === 6) {
+      ctx.fillStyle = L.accent;
+      ctx.strokeStyle = L.dark;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x, y - r * 0.75);
+      ctx.lineTo(x + r * 0.17, y - r * 0.5);
+      ctx.lineTo(x, y - r * 0.25);
+      ctx.lineTo(x - r * 0.17, y - r * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else if (L.feature === 7) {
+      ctx.strokeStyle = L.accent;
+      ctx.lineWidth = Math.max(3, r * 0.1);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(x, y + r * 0.05, r * 0.85, Math.PI * 1.15, Math.PI * 1.85);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y + r * 0.2, r * 0.62, Math.PI * 1.2, Math.PI * 1.8);
+      ctx.stroke();
+    }
+  }
+
   function drawBoss(ctx, e, R, nx, ny, body) {
     var x = e.x;
     var y = e.y;
@@ -634,18 +778,23 @@
     var i;
     var angle;
     var dark = "rgba(41,38,31,0.35)";
+    var L = e.look;
+    var dk = L ? L.dark : "#4E7A3A";
+    var dkHornet = L ? L.dark : "#3A2A10";
 
     ctx.fillStyle = "rgba(0,0,0,0.25)";
     ctx.beginPath();
     ctx.ellipse(x, y + r * 0.85, r * 0.95, r * 0.28, 0, 0, TAU);
     ctx.fill();
 
+    if (L) lookBehind(ctx, L, x, y, r, t);
+
     if (e.kind === "queen") {
       // a fat abdomen behind, feelers on top
       ctx.fillStyle = body;
       circle(ctx, x - nx * r * 0.75, y - ny * r * 0.75, r * 0.85);
       circle(ctx, x, y, r);
-      ctx.strokeStyle = "#4E7A3A";
+      ctx.strokeStyle = dk;
       ctx.lineWidth = 3;
       ctx.lineCap = "round";
       ctx.beginPath();
@@ -663,7 +812,7 @@
       ctx.ellipse(x + r * 0.95, y - r * 0.55, r * 0.95, r * 0.4 - flap * 0.4, 0.5, 0, TAU);
       ctx.fill();
       // stinger points the way it will go
-      ctx.fillStyle = "#3A2A10";
+      ctx.fillStyle = dkHornet;
       ctx.beginPath();
       ctx.moveTo(x + Math.cos(angle) * (r + 16), y + Math.sin(angle) * (r + 16));
       ctx.lineTo(x + Math.cos(angle + 0.32) * r * 0.95, y + Math.sin(angle + 0.32) * r * 0.95);
@@ -677,7 +826,7 @@
       ctx.beginPath();
       ctx.arc(x, y, r, 0, TAU);
       ctx.clip();
-      ctx.fillStyle = "#3A2A10";
+      ctx.fillStyle = dkHornet;
       ctx.fillRect(x - r, y + r * 0.18, r * 2, r * 0.24);
       ctx.fillRect(x - r, y + r * 0.6, r * 2, r * 0.24);
       ctx.restore();
@@ -716,6 +865,8 @@
       circle(ctx, x + r * 0.5, y + r * 0.2, r * 0.1);
       circle(ctx, x + r * 0.1, y + r * 0.55, r * 0.08);
     }
+
+    if (L) lookFront(ctx, L, x, y, r, t);
 
     if (e.kind !== "slug") eyes(ctx, x, y, r * 0.8, nx * r * 0.1, ny * r * 0.08, true);
 

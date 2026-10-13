@@ -3858,3 +3858,69 @@ button.tile:hover:not(:disabled) {
     padding: 8px 12px;
   }
 }
+
+/* -------------------------------------------------------------- ascension */
+
+.ascend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+.ascend.is-ready {
+  border-color: var(--rind);
+  background: linear-gradient(180deg, var(--lemon-pale), var(--surface));
+}
+
+:root[data-theme="dark"] .ascend.is-ready {
+  background: linear-gradient(180deg, #4a4020, var(--surface));
+}
+
+.ascend__art {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--lemon-pale);
+  border: 1px solid var(--rind);
+  color: var(--charcoal);
+}
+
+.ascend__art .ico {
+  width: 26px;
+  height: 26px;
+}
+
+.ascend.is-ready .ascend__art {
+  animation: wiggle 1.8s ease-in-out infinite;
+}
+
+.ascend__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ascend__body h3 {
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1.2;
+}
+
+.ascend__body p {
+  color: var(--ink-soft);
+  font-size: 14.5px;
+}
+
+.ascend__body .bar {
+  margin-top: 8px;
+}
+
+.section small {
+  font-family: var(--font-body, inherit);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-faint);
+}

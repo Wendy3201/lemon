@@ -429,6 +429,46 @@
     { id: "hed", name: "Head Start", icon: "startUp", fx: "startUp", per: 1, max: 3, costs: [2500, 30000, 250000],
       text: "Start every battle with a free upgrade" }
   ];
+  /* Ascension: max out every talent of the top tier and you can ascend, which
+     opens the next tier. Each higher tier has the same talents again (their
+     name ends in II or III) at a bigger bonus per level and a much bigger
+     price, plus three talents that only exist from tier II up. */
+  PS.TALENT_TIERS = 3;
+  PS.TALENT_TIER_NAMES = ["Talents", "Ascended talents", "Transcended talents"];
+  (function () {
+    var base = PS.TALENTS.map(function (t) {
+      t.tier = 1;
+      return t;
+    });
+    var extras = [
+      { id: "luk", name: "Lucky Star", icon: "luck", stat: "luck", per: 0.02, max: 15, base: 100, growth: 1.49 },
+      { id: "wid", name: "Wide Swing", icon: "area", stat: "area", per: 0.02, max: 15, base: 100, growth: 1.49 },
+      { id: "gsl", name: "Giant Slayer", icon: "boom", stat: "bossDmg", per: 0.03, max: 20, base: 70, growth: 1.35 }
+    ];
+    var rules = [null, { roman: "II", per: 1.5, cost: 60 }, { roman: "III", per: 2, cost: 600 }];
+    var all = base.slice();
+    for (var tier = 2; tier <= PS.TALENT_TIERS; tier++) {
+      var rule = rules[tier - 1];
+      base.concat(extras).forEach(function (t) {
+        var copy = {};
+        Object.keys(t).forEach(function (key) { copy[key] = t[key]; });
+        copy.id = t.id + tier;
+        copy.name = t.name + " " + rule.roman;
+        copy.tier = tier;
+        copy.per = t.per * rule.per;
+        if (t.base) copy.base = t.base * rule.cost;
+        if (t.costs) copy.costs = t.costs.slice(0, 2).map(function (c) { return c * rule.cost; });
+        if (t.fx) copy.max = 2;
+        if (t.id === "rec") {
+          copy.text = "Regenerate " + String(Number((copy.per * 100).toFixed(3))) + "% more of your health every second";
+        } else if (t.text) {
+          copy.text = t.text;
+        }
+        all.push(copy);
+      });
+    }
+    PS.TALENTS = all;
+  })();
   PS.TALENT = {};
   PS.TALENTS.forEach(function (talent) { PS.TALENT[talent.id] = talent; });
 
@@ -460,7 +500,8 @@
          a fight drags on, see B.hit, which keeps weak builds from stalling.)
      Gold grows 1.35x a chapter, the same slope as level and talent prices. */
 
-  var CHAPTER_COUNT = 20;
+  var FITTED_COUNT = 20; // the chapters the tables below were fitted for
+  var CHAPTER_COUNT = 50;
 
   var HP_SCALE = [1, 1.5, 2.6, 4.2, 6.6, 10.5, 16.5, 26, 41, 64, 100, 158, 260, 420, 800, 1250, 2000, 3000, 3800, 4600];
   var DMG_SCALE = [0.85, 1.1, 1.4, 1.9, 2.6, 3.7, 5.2, 7.3, 10.3, 14.5, 20.5, 28.9, 42, 62, 100, 145, 205, 280, 370, 470];
@@ -471,12 +512,25 @@
      Chapter 1 is left alone and the extra grows evenly chapter by chapter, so
      turn these up for a tougher game and down for a gentler one. */
   var HARDER = { hp: 0.5, dmg: 0.3, boss: 0.6, power: 0.45 };
-  for (var i = 0; i < CHAPTER_COUNT; i++) {
-    var ramp = i / (CHAPTER_COUNT - 1);
+  for (var i = 0; i < FITTED_COUNT; i++) {
+    var ramp = i / (FITTED_COUNT - 1);
     HP_SCALE[i] *= 1 + HARDER.hp * ramp;
     DMG_SCALE[i] *= 1 + HARDER.dmg * ramp;
     BOSS_SCALE[i] *= 1 + HARDER.boss * ramp;
     REC_POWER[i] = Math.round((REC_POWER[i] * (1 + HARDER.power * ramp)) / 10) * 10;
+  }
+
+  /* Chapters 21 to 50 carry on from chapter 20: every number grows by this
+     factor per chapter. They were tuned with simulated battles, so that the
+     very best gear (SS-grade ??? at slot level 80, every talent) can only just
+     finish the last chapters, and ordinary Surpass / ??? gear stalls well
+     before them. Raise a number to make that stretch harder, lower to ease it. */
+  var LATE = { hp: 1.09, dmg: 1.09, boss: 1.09, power: 1.066 };
+  for (var j = FITTED_COUNT; j < CHAPTER_COUNT; j++) {
+    HP_SCALE[j] = HP_SCALE[j - 1] * LATE.hp;
+    DMG_SCALE[j] = DMG_SCALE[j - 1] * LATE.dmg;
+    BOSS_SCALE[j] = BOSS_SCALE[j - 1] * LATE.boss;
+    REC_POWER[j] = Math.round((REC_POWER[j - 1] * LATE.power) / 10) * 10;
   }
 
   PS.BAL = {
@@ -488,7 +542,11 @@
     dmgScale: function (chapter) { return DMG_SCALE[chapter - 1]; },
     bossScale: function (chapter) { return BOSS_SCALE[chapter - 1]; },
     recPower: function (chapter) { return REC_POWER[chapter - 1]; },
-    gold: function (chapter) { return Math.round(450 * Math.pow(1.35, chapter - 1)); },
+    // grows 35% a chapter up to chapter 20, then 8%: there is little left to buy by then
+    gold: function (chapter) {
+      var base = 450 * Math.pow(1.35, Math.min(chapter, FITTED_COUNT) - 1);
+      return Math.round(base * Math.pow(1.08, Math.max(0, chapter - FITTED_COUNT)));
+    },
     /** What one chest costs, in gems. Fixed: it does not change with your chapter. */
     chestPrice: function (kind) {
       return PS.CHESTS[kind].gems;
@@ -518,15 +576,29 @@
     { name: "The Garden", floor: "#33281C", dot: "rgba(240,214,170,0.10)", prop: "#4A3A27", accent: "#C79A5B" },
     { name: "The Greenhouse", floor: "#1C302D", dot: "rgba(170,236,222,0.10)", prop: "#2A4742", accent: "#5FBFAE" },
     { name: "The Kitchen", floor: "#2B2733", dot: "rgba(226,214,255,0.09)", prop: "#3D3749", accent: "#A99BD9" },
-    { name: "The Cellar", floor: "#1B1920", dot: "rgba(214,200,255,0.07)", prop: "#2C2836", accent: "#8F7BC4" }
+    { name: "The Cellar", floor: "#1B1920", dot: "rgba(214,200,255,0.07)", prop: "#2C2836", accent: "#8F7BC4" },
+    { name: "The Pantry", floor: "#2E2A1E", dot: "rgba(255,226,160,0.09)", prop: "#4A4228", accent: "#E3B65B" },
+    { name: "The Attic", floor: "#2A2523", dot: "rgba(230,205,190,0.08)", prop: "#443A36", accent: "#C9A58D" },
+    { name: "The Drains", floor: "#17262B", dot: "rgba(150,225,235,0.08)", prop: "#24404A", accent: "#4FB6C9" },
+    { name: "The Furnace", floor: "#2E1C18", dot: "rgba(255,170,110,0.09)", prop: "#4B2B22", accent: "#F2784B" },
+    { name: "The Rotten Core", floor: "#221A2C", dot: "rgba(225,160,255,0.08)", prop: "#38284A", accent: "#C46BE0" }
   ];
+  /* chapters 1-20 are four to a zone; the rest are six to a zone */
+  function zoneOf(c) {
+    return c <= FITTED_COUNT ? Math.floor((c - 1) / 4) : 5 + Math.floor((c - FITTED_COUNT - 1) / 6);
+  }
 
   var CHAPTER_NAMES = [
     "Windfall Row", "Tall Grass", "Mossy Roots", "The Old Stump",
     "Veg Patch", "Bean Poles", "Slug Alley", "Compost Heap",
     "Seed Trays", "Vine Wall", "Mist Room", "The Hothouse",
     "Counter Top", "Fruit Bowl", "The Sink", "Under the Fridge",
-    "Cellar Stairs", "Jam Shelves", "Cider Press", "The Mould Throne"
+    "Cellar Stairs", "Jam Shelves", "Cider Press", "The Mould Throne",
+    "Spice Rack", "Flour Bin", "Biscuit Tin", "Pickle Jars", "Honey Crock", "The Cold Larder",
+    "Attic Stairs", "Dusty Trunks", "Cobweb Beams", "The Old Cradle", "Moth Loft", "Chimney Flue",
+    "Drain Mouth", "Pipe Maze", "Sludge Run", "Rusty Grate", "Gutter Falls", "The Sump",
+    "Coal Chute", "Boiler Room", "Cinder Lane", "Ember Pit", "Ash Hall", "The Furnace Heart",
+    "Rot Roots", "Spore Garden", "Blight Tunnels", "The Gnarled Bough", "Pip Graveyard", "The Last Pip"
   ];
   var BOSS_KINDS = ["hornet", "queen", "slug", "mould"];
   var BOSS_NAMES = [
@@ -534,25 +606,78 @@
     "Weevil Rex", "Moth Matriarch", "Slug Duke", "Compost Horror",
     "Vine Ripper", "Whitefly Empress", "Mist Snail", "Hothouse Blight",
     "Fruit Fly Ace", "Ant Queen", "Drain Lurker", "Fridge Fuzz",
-    "Jam Wasp", "Spider Mother", "Press Leech", "The Mould King"
+    "Jam Wasp", "Spider Mother", "Press Leech", "The Mould King",
+    "Pantry Moth", "Flour Wraith", "Crumb King", "Brine Slug", "Honey Hornet Queen", "Frost Weevil",
+    "Cobweb Warden", "Trunk Mimic", "Beam Spider", "Cradle Rot", "Moth Lord", "Soot Fiend",
+    "Drain Eel", "Pipe Worm", "Sludge Mother", "Grate Crawler", "Gutter Gator", "Sump Tyrant",
+    "Coal Beetle", "Boiler Brute", "Cinder Wasp", "Ember Slug", "Ash Queen", "Furnace Colossus",
+    "Root Strangler", "Spore Mother", "Blight Rex", "The Gnarled One", "Pip Reaper", "The Rot Sovereign"
   ];
   /* the pest that turns up twice as often in each chapter */
   var FEATURED = [
     null, "spitter", "splitter", "brute", "charger", "dart", "bomber", "splitter", "spitter", "charger",
-    "bomber", "brute", "dart", "spitter", "splitter", "bomber", "charger", "spitter", "brute", null
+    "bomber", "brute", "dart", "spitter", "splitter", "bomber", "charger", "spitter", "brute", null,
+    "splitter", "charger", "bomber", "spitter", "brute", "dart", "splitter", "charger", "bomber", "spitter",
+    "brute", "dart", "splitter", "charger", "bomber", "spitter", "brute", "dart", "splitter", "charger",
+    "bomber", "spitter", "brute", "dart", "splitter", "charger", "bomber", "spitter", "brute", "brute"
   ];
   /* first clear of a zone boss hands out a special item: [grade, slot or null] */
-  var MILESTONES = { 4: ["S", "weapon"], 8: ["S", null], 12: ["S", "weapon"], 16: ["SS", null], 20: ["SS", "weapon"] };
+  var MILESTONES = {
+    4: ["S", "weapon"], 8: ["S", null], 12: ["S", "weapon"], 16: ["SS", null], 20: ["SS", "weapon"],
+    24: ["S", "weapon"], 28: ["SS", null], 32: ["S", null], 36: ["SS", "weapon"], 40: ["SS", null],
+    44: ["SS", null], 48: ["SS", "weapon"], 50: ["SS", null]
+  };
+
+  /* Every boss looks different. The four kinds above decide how a boss fights;
+     its look (colours, a pattern and an extra part) is worked out per chapter
+     here and used by both the menu picture and the battle drawing. Chapters 1
+     to 4 keep the original four. feature: 0 horns, 1 spikes, 2 wings, 3 tail,
+     4 legs, 5 antennae, 6 gem, 7 plates. pattern: 0 none, 1 stripes, 2 spots,
+     3 belly, 4 zigzag. */
+  function hsl(h, s, l) {
+    function channel(n) {
+      var k = (n + h / 30) % 12;
+      var a = s * Math.min(l, 1 - l);
+      var v = l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+      return ("0" + Math.round(v * 255).toString(16)).slice(-2);
+    }
+    return "#" + channel(0) + channel(8) + channel(4);
+  }
+  var ORIGINAL_LOOKS = {
+    queen: { body: "#7FB069", dark: "#4E7A3A", accent: "#C3E3A8" },
+    hornet: { body: "#E0A93B", dark: "#3A2A10", accent: "#F3D58C" },
+    slug: { body: "#9C8AC2", dark: "#6E5E94", accent: "#D4C8EE" },
+    mould: { body: "#6FA8A0", dark: "#4E7F78", accent: "#B5DCD6" }
+  };
+  function bossLook(n) {
+    var kind = BOSS_KINDS[(n - 1) % 4];
+    if (n <= 4) {
+      var o = ORIGINAL_LOOKS[kind];
+      return { body: o.body, dark: o.dark, accent: o.accent, pattern: 0, feature: -1 };
+    }
+    var hue = (n * 47 + 20) % 360;
+    var sat = 0.45 + 0.1 * ((n * 7) % 4);
+    var lit = 0.5 + 0.05 * ((n % 3) - 1);
+    return {
+      body: hsl(hue, sat, lit),
+      dark: hsl(hue, sat, lit * 0.45),
+      accent: hsl(hue, sat * 0.8, Math.min(0.9, lit + 0.26)),
+      pattern: Math.floor(n / 8) % 5,
+      feature: n % 8
+    };
+  }
 
   PS.CHAPTERS = [];
   for (var c = 1; c <= CHAPTER_COUNT; c++) {
     PS.CHAPTERS.push({
+      look: bossLook(c),
       n: c,
       name: CHAPTER_NAMES[c - 1],
-      zone: Math.floor((c - 1) / 4),
+      zone: zoneOf(c),
       boss: BOSS_KINDS[(c - 1) % 4],
       bossName: BOSS_NAMES[c - 1],
-      bossTier: Math.floor((c - 1) / 4),
+      // boss attack patterns top out at the tier of chapter 17 to 20
+      bossTier: Math.min(4, Math.floor((c - 1) / 4)),
       featured: FEATURED[c - 1],
       milestone: MILESTONES[c] || null,
       duration: PS.BAL.duration(c),
@@ -605,7 +730,8 @@
 
   PS.QUESTS = [
     { id: "chapters", name: "Pest Control", stat: "best", text: "Clear chapter {n}",
-      tiers: [1, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20], gems: [40, 40, 50, 60, 70, 80, 100, 120, 140, 160, 200, 400] },
+      tiers: [1, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50],
+      gems: [40, 40, 50, 60, 70, 80, 100, 120, 140, 160, 200, 400, 250, 300, 350, 400, 500, 800] },
     { id: "kills", name: "Squasher", stat: "kills", text: "Squash {n} pests",
       tiers: [100, 500, 2000, 5000, 15000, 40000, 100000], gems: [30, 40, 60, 80, 100, 150, 250] },
     { id: "forge", name: "Blacksmith", stat: "forges", text: "Forge {n} times", first: "Forge an item",

@@ -26,6 +26,7 @@
       gold: PS.START.gold,
       gems: PS.START.gems,
       shards: 0, // SS shards from Gilded Chests
+      ascend: 0, // how many times the talents have been ascended
       uid: 1,
       items: [],
       eq: {},
@@ -68,6 +69,7 @@
     save.gold = Math.floor(num(raw.gold, 0));
     save.gems = Math.floor(num(raw.gems, 0));
     save.shards = Math.floor(num(raw.shards, 0));
+    save.ascend = Math.floor(num(raw.ascend, 0, 0, PS.TALENT_TIERS - 1));
     save.best = Math.floor(num(raw.best, 0, 0, PS.BAL.CHAPTERS));
     save.chapter = Math.floor(num(raw.chapter, 1, 1, Math.min(PS.BAL.CHAPTERS, save.best + 1)));
 
@@ -560,8 +562,32 @@
     var talent = PS.TALENT[id];
     var level = S.talents[id] || 0;
     var maxed = level >= talent.max;
+    var locked = talent.tier > S.ascend + 1;
     var cost = maxed ? 0 : PS.talentCost(talent, level);
-    return { talent: talent, level: level, maxed: maxed, cost: cost, ok: !maxed && S.gold >= cost };
+    return { talent: talent, level: level, maxed: maxed, locked: locked, cost: cost, ok: !maxed && !locked && S.gold >= cost };
+  }
+
+  /** The talents that can be bought right now: every tier up to the current one. */
+  function unlockedTalents() {
+    return PS.TALENTS.filter(function (talent) { return talent.tier <= S.ascend + 1; });
+  }
+
+  /** Where the player is on the ladder of tiers, and whether they can step up. */
+  function ascendInfo() {
+    var tier = S.ascend + 1;
+    var inTier = PS.TALENTS.filter(function (talent) { return talent.tier === tier; });
+    var maxed = inTier.filter(function (talent) { return (S.talents[talent.id] || 0) >= talent.max; }).length;
+    var top = tier >= PS.TALENT_TIERS;
+    var unlocks = top ? 0 : PS.TALENTS.filter(function (talent) { return talent.tier === tier + 1; }).length;
+    return { tier: tier, maxed: maxed, total: inTier.length, top: top, unlocks: unlocks, can: !top && maxed === inTier.length };
+  }
+
+  /** Step up to the next tier of talents. Returns the new tier, or 0. */
+  function ascend() {
+    if (!ascendInfo().can) return 0;
+    S.ascend++;
+    commit();
+    return S.ascend + 1;
   }
 
   function buyTalent(id) {
@@ -903,7 +929,8 @@
     return {
       shop: giftWait() === 0,
       gear: forgeAvailable() || S.items.some(function (item) { return item.n; }),
-      quests: quests().some(function (quest) { return quest.ready; })
+      quests: quests().some(function (quest) { return quest.ready; }),
+      talents: ascendInfo().can
     };
   }
 
@@ -944,6 +971,9 @@
     quickForge: quickForge,
     // talents
     talentInfo: talentInfo,
+    unlockedTalents: unlockedTalents,
+    ascendInfo: ascendInfo,
+    ascend: ascend,
     buyTalent: buyTalent,
     // battles
     chapterOpen: chapterOpen,
@@ -1000,6 +1030,12 @@
     },
     devResetTalents: function () {
       S.talents = {};
+      S.ascend = 0;
+      commit();
+    },
+    /** Step up a tier without having to max the last one first. */
+    devAscend: function () {
+      S.ascend = Math.min(PS.TALENT_TIERS - 1, S.ascend + 1);
       commit();
     },
     /** Claim every quest rung that is ready, until none are. Returns the gems paid. */
@@ -1018,7 +1054,7 @@
       return total;
     },
     devMaxTalents: function () {
-      PS.TALENTS.forEach(function (talent) { S.talents[talent.id] = talent.max; });
+      unlockedTalents().forEach(function (talent) { S.talents[talent.id] = talent.max; });
       commit();
     },
     /** Every slot's level up to what its worn item's rarity allows. */

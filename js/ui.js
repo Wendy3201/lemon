@@ -257,7 +257,7 @@
             "</div>" +
             '<span class="stage__vs" aria-hidden="true">VS</span>' +
             '<div class="stage__side">' +
-              '<div class="stage__boss">' + PS.art(ch.boss) + "</div>" +
+              '<div class="stage__boss">' + PS.bossArt(ch.n) + "</div>" +
               '<span class="stage__label">' + esc(ch.bossName) + '<b class="power power--' + verdict[0] + '">' + PS.icon("power") + fmt(ch.rec) + "</b></span>" +
             "</div>" +
           "</div>" +
@@ -596,38 +596,68 @@
 
   /* ------------------------------------------------------------- talents */
 
-  SCREENS.talents = function () {
+  function talentCard(talent) {
+    var info = st.talentInfo(talent.id);
+    var now;
+    var each;
+    if (talent.stat) {
+      each = talent.text || "+" + PS.pct(talent.per) + " " + PS.STATS[talent.stat].phrase + " a level";
+      now = info.level ? "Now +" + PS.pct(talent.per * info.level) + (talent.stat === "regen" ? " a second" : "") : "Not learned yet";
+    } else {
+      each = talent.text;
+      now = info.level ? "Now " + info.level + (info.level === 1 ? " free upgrade" : " free upgrades") : "Not learned yet";
+    }
     return (
-      '<section class="talents">' +
-        '<p class="lead">Talents are bought with gold and kept for good. They work in every battle, whatever you are wearing.</p>' +
-        '<div class="talentgrid">' + PS.TALENTS.map(function (talent) {
-          var info = st.talentInfo(talent.id);
-          var now;
-          var each;
-          if (talent.stat) {
-            each = talent.text || "+" + PS.pct(talent.per) + " " + PS.STATS[talent.stat].phrase + " a level";
-            now = info.level ? "Now +" + PS.pct(talent.per * info.level) + (talent.stat === "regen" ? " a second" : "") : "Not learned yet";
-          } else {
-            each = talent.text;
-            now = info.level ? "Now " + info.level + (info.level === 1 ? " free upgrade" : " free upgrades") : "Not learned yet";
-          }
-          return (
-            '<div class="panel talent' + (info.maxed ? " is-max" : "") + '">' +
-              '<span class="talent__icon">' + PS.icon(talent.icon) + "</span>" +
-              '<div class="talent__body">' +
-                "<h3>" + talent.name + ' <span class="count">' + info.level + "/" + talent.max + "</span></h3>" +
-                "<p>" + each + "</p>" +
-                '<p class="talent__now">' + now + "</p>" +
-                '<div class="bar"><i style="width:' + (info.level / talent.max) * 100 + '%"></i></div>' +
-              "</div>" +
-              (info.maxed
-                ? '<span class="talent__done">' + PS.icon("check") + "Max</span>"
-                : '<button class="btn btn--sm' + (info.ok ? " btn--primary" : "") + '" type="button" data-act="talent" data-id="' + talent.id + '" data-key="talent-' + talent.id + '"' + (info.ok ? "" : " disabled") + ">" + price("gold", info.cost) + "</button>") +
-            "</div>"
-          );
-        }).join("") + "</div>" +
-      "</section>"
+      '<div class="panel talent' + (info.maxed ? " is-max" : "") + '">' +
+        '<span class="talent__icon">' + PS.icon(talent.icon) + "</span>" +
+        '<div class="talent__body">' +
+          "<h3>" + talent.name + ' <span class="count">' + info.level + "/" + talent.max + "</span></h3>" +
+          "<p>" + each + "</p>" +
+          '<p class="talent__now">' + now + "</p>" +
+          '<div class="bar"><i style="width:' + (info.level / talent.max) * 100 + '%"></i></div>' +
+        "</div>" +
+        (info.maxed
+          ? '<span class="talent__done">' + PS.icon("check") + "Max</span>"
+          : '<button class="btn btn--sm' + (info.ok ? " btn--primary" : "") + '" type="button" data-act="talent" data-id="' + talent.id + '" data-key="talent-' + talent.id + '"' + (info.ok ? "" : " disabled") + ">" + price("gold", info.cost) + "</button>") +
+      "</div>"
     );
+  }
+
+  var TIER_NUMERALS = ["I", "II", "III", "IV", "V"];
+
+  SCREENS.talents = function () {
+    var asc = st.ascendInfo();
+    var banner;
+    if (asc.can) {
+      banner =
+        '<div class="panel ascend is-ready">' +
+          '<div class="ascend__art">' + PS.icon("up") + "</div>" +
+          '<div class="ascend__body"><h3>Every talent is maxed!</h3>' +
+            "<p>Ascend to unlock " + asc.unlocks + " stronger talents in tier " + TIER_NUMERALS[asc.tier] + ". Everything you have learned stays.</p></div>" +
+          '<button class="btn btn--primary" type="button" data-act="ascend" data-key="ascend">Ascend</button>' +
+        "</div>";
+    } else if (asc.top) {
+      banner =
+        '<div class="panel ascend"><div class="ascend__art">' + PS.icon("check") + "</div>" +
+          '<div class="ascend__body"><h3>Top tier</h3><p>' + (asc.maxed === asc.total ? "Every talent in the game is maxed." : "Max every talent below. There is nothing above this tier.") + "</p></div>" +
+          '<span class="count">' + asc.maxed + "/" + asc.total + "</span></div>";
+    } else {
+      banner =
+        '<div class="panel ascend"><div class="ascend__art">' + PS.icon("up") + "</div>" +
+          '<div class="ascend__body"><h3>Ascend</h3><p>Max every talent in this tier to unlock tier ' + TIER_NUMERALS[asc.tier] +
+            " with " + asc.unlocks + " stronger talents.</p>" +
+            '<div class="bar"><i style="width:' + (asc.maxed / asc.total) * 100 + '%"></i></div></div>' +
+          '<span class="count">' + asc.maxed + "/" + asc.total + "</span></div>";
+    }
+    var out = '<section class="talents">' +
+      '<p class="lead">Talents are bought with gold and kept for good. They work in every battle, whatever you are wearing.</p>' + banner;
+    // the newest tier first, so what was just unlocked is at the top
+    for (var tier = asc.tier; tier >= 1; tier--) {
+      out +=
+        '<h2 class="section">Tier ' + TIER_NUMERALS[tier - 1] + " <small>" + PS.TALENT_TIER_NAMES[tier - 1] + "</small></h2>" +
+        '<div class="talentgrid">' + PS.TALENTS.filter(function (t) { return t.tier === tier; }).map(talentCard).join("") + "</div>";
+    }
+    return out + "</section>";
   };
 
   /* -------------------------------------------------------------- quests */
@@ -893,7 +923,8 @@
 
   function devOverview(S, calc) {
     var minutes = Math.round(S.stats.time / 60);
-    var maxed = PS.TALENTS.filter(function (t) { return (S.talents[t.id] || 0) >= t.max; }).length;
+    var open = st.unlockedTalents();
+    var maxed = open.filter(function (t) { return (S.talents[t.id] || 0) >= t.max; }).length;
     var ready = st.quests().filter(function (q) { return q.ready; }).length;
     var bytes = JSON.stringify(S).length;
     return (
@@ -904,7 +935,8 @@
         ["SS shards", S.shards + "/" + PS.SHARDS.needed],
         ["Chapters cleared", S.best + " / " + PS.BAL.CHAPTERS],
         ["Items owned", S.items.length],
-        ["Talents maxed", maxed + " / " + PS.TALENTS.length],
+        ["Talents maxed", maxed + " / " + open.length],
+        ["Talent tier", st.ascendInfo().tier + " of " + PS.TALENT_TIERS],
         ["Quests ready", ready]
       ]) +
       devCard("Record", "", [
@@ -1004,7 +1036,9 @@
   }
 
   function devProgress(S) {
-    var maxed = PS.TALENTS.filter(function (t) { return (S.talents[t.id] || 0) >= t.max; }).length;
+    var open = st.unlockedTalents();
+    var asc = st.ascendInfo();
+    var maxed = open.filter(function (t) { return (S.talents[t.id] || 0) >= t.max; }).length;
     var learned = PS.TALENTS.reduce(function (n, t) { return n + (S.talents[t.id] || 0); }, 0);
     var quests = st.quests();
     var ready = quests.filter(function (q) { return q.ready; }).length;
@@ -1027,10 +1061,11 @@
       ) +
       devCard("Talents",
         devRow(
-          devButton("dev-max-talents", "Max every talent") +
+          devButton("dev-max-talents", "Max every unlocked talent") +
+          devButton("dev-ascend", "Ascend a tier now", asc.top ? " disabled" : "") +
           devButton("dev-reset-talents", "Forget all talents", "", "btn--danger")
         ),
-        [["Maxed", maxed + " / " + PS.TALENTS.length], ["Levels learned", learned]]
+        [["Tier", asc.tier + " of " + PS.TALENT_TIERS], ["Maxed", maxed + " / " + open.length], ["Levels learned", learned]]
       ) +
       devCard("Quests",
         devRow(devButton("dev-claim-quests", "Claim everything that is ready")),
@@ -1614,6 +1649,15 @@
       pulse(card, "is-pulse", 800);
       floater(card, "+1");
     },
+    ascend: function () {
+      var tier = st.ascend();
+      if (!tier) return;
+      PS.sfx.play("reveal", 4);
+      toast("Ascended! Tier " + TIER_NUMERALS[tier - 1] + " talents unlocked");
+      view.entering = true;
+      render();
+      el.screen.scrollTop = 0;
+    },
     quest: function (node) {
       var gems = st.claimQuest(node.getAttribute("data-id"));
       if (gems) toast("+" + gems + " gems");
@@ -1727,6 +1771,10 @@
       st.devSetBest(0);
       toast("Only chapter 1 is open");
     },
+    "dev-ascend": function () {
+      st.devAscend();
+      toast("Talent tier " + st.ascendInfo().tier);
+    },
     "dev-reset-talents": function () {
       st.devResetTalents();
       toast("All talents forgotten");
@@ -1798,7 +1846,7 @@
   var SOUND = {
     tab: "tab", fight: "start", again: "start", equip: "equip", "equip-best": "equip", "dev-give": "equip", "dev-set": "equip",
     upgrade: "upgrade", "upgrade-max": "upgrade", talent: "talent", quest: "coin", deal: "coin", gold: "coin",
-    gift: null, chest: null, craft: null, sell: null, "forge-go": null, "quick-go": null, sound: null, volume: null
+    gift: null, chest: null, craft: null, ascend: null, sell: null, "forge-go": null, "quick-go": null, sound: null, volume: null
   };
 
   function upgraded(slot, text) {

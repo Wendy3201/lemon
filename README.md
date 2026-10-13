@@ -3,7 +3,7 @@
 **A Lemon game.** You steer a lemon through swarms of garden pests. It attacks
 by itself; you dodge, grab gems, and pick an upgrade every level. Between
 battles you collect gear, forge it into rarer gear, open chests, learn talents
-and watch your Power climb through twenty chapters.
+and watch your Power climb through fifty chapters.
 
 Plain HTML, CSS and JavaScript. No build step, no framework, no dependencies,
 no accounts, no tracking. It works offline once the folder is on your computer.
@@ -59,7 +59,7 @@ GitHub Pages, Netlify or any web host. Nothing needs compiling.
 | **Battle** | Pick a chapter and fight. Shows your Power against the chapter's recommended Power. |
 | **Equipment** | Six slots: weapon, ring, amulet, helmet, armour, boots. Level slots up with gold, swap gear, and open the **Forge**. |
 | **Shop** | A free gift every four hours, chests bought with gems (a fixed price: 10 for a Seed Crate, 40 for a Gilded Chest), four deals a day (never S-grade), and gold for gems. |
-| **Talents** | Permanent bonuses bought with gold. |
+| **Talents** | Permanent bonuses bought with gold. Max every talent in a tier and you can **ascend**: tier II and tier III repeat the talents at a bigger bonus and a much bigger price, and add Lucky Star, Wide Swing and Giant Slayer. |
 | **Quests** | Ladders of goals that pay gems. |
 
 **Power** is one number for how strong the lemon is: attack, health and

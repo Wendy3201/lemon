@@ -410,6 +410,107 @@
     })()
   };
 
+  /* A boss picture for a chapter: the body of its fighting kind in the
+     chapter's own colours, with that chapter's pattern and extra part. */
+  PS.bossArt = function (n) {
+    var ch = PS.chapter(n);
+    var L = ch.look;
+    var kind = ch.boss;
+    var cx = 24;
+    var cy = 27;
+    var behind = "";
+    var front = "";
+    var i;
+
+    switch (L.feature) {
+      case 0:
+        behind = line("M17 16Q8 14 11 3", L.dark, 3.4) + line("M31 16Q40 14 37 3", L.dark, 3.4);
+        break;
+      case 1:
+        for (i = 0; i < 10; i++) {
+          var a = (i / 10) * Math.PI * 2;
+          var pts = [-0.17, 0, 0.17].map(function (d, k) {
+            var rr = k === 1 ? 20 : 14;
+            return (cx + Math.cos(a + d) * rr).toFixed(1) + "," + (cy + Math.sin(a + d) * rr).toFixed(1);
+          });
+          behind += poly(pts.join(" "), L.dark);
+        }
+        break;
+      case 2:
+        behind = oval(8, 22, 7.5, 4, L.accent, 'opacity="0.6" transform="rotate(-30 8 22)"') +
+          oval(40, 22, 7.5, 4, L.accent, 'opacity="0.6" transform="rotate(30 40 22)"');
+        break;
+      case 3:
+        behind = line("M34 35Q46 38 44 26", L.dark, 3.2) + dot(44, 25, 3, L.dark);
+        break;
+      case 4:
+        behind = line("M15 36 10 44M20.5 40 18 46.5M27.5 40 30 46.5M33 36 38 44", L.dark, 2.8);
+        break;
+      case 5:
+        behind = line("M20 14 16 4M28 14 32 4", L.dark, 2) + dot(16, 4, 2.4, L.accent) + dot(32, 4, 2.4, L.accent);
+        break;
+      case 6:
+        front += poly("24,14.5 27.4,19 24,23.5 20.6,19", L.accent, 'stroke="' + L.dark + '" stroke-width="1"');
+        break;
+      case 7:
+        front += line("M12.5 23Q24 11 35.5 23", L.accent, 2.6) + line("M14.5 28Q24 18.5 33.5 28", L.accent, 2.4);
+        break;
+    }
+
+    var pattern = "";
+    switch (L.pattern) {
+      case 1:
+        pattern = box(8, 22, 32, 3, 0, L.dark, 'opacity="0.38"') + box(8, 29, 32, 3, 0, L.dark, 'opacity="0.38"');
+        break;
+      case 2:
+        pattern = dot(18.5, 23.5, 2.3, L.dark, 'opacity="0.38"') + dot(30, 21.5, 1.9, L.dark, 'opacity="0.38"') +
+          dot(24, 31, 2.5, L.dark, 'opacity="0.38"') + dot(31.5, 30, 1.7, L.dark, 'opacity="0.38"') + dot(16.5, 32, 1.6, L.dark, 'opacity="0.38"');
+        break;
+      case 3:
+        pattern = oval(24, 37, 11, 7, L.accent, 'opacity="0.6"');
+        break;
+      case 4:
+        pattern = line("M9 29 15 24 21 29 27 24 33 29 39 24", L.dark, 2.2, 'opacity="0.45"');
+        break;
+    }
+    var clip = "bossclip" + n;
+    var patterned = pattern
+      ? '<clipPath id="' + clip + '"><circle cx="24" cy="27" r="14"/></clipPath><g clip-path="url(#' + clip + ')">' + pattern + "</g>"
+      : "";
+
+    var body;
+    var face;
+    var crown = poly("15,14 13.5,5 19,9.5 24,3 29,9.5 34.5,5 33,14", C.gold, 'stroke="' + C.goldDark + '" stroke-width="1"');
+    var eyes = dot(18.5, 25, 2.3, C.ink) + dot(29.5, 25, 2.3, C.ink) + line("M14.5 20 21 22.5M33.5 20 27 22.5", C.ink, 2);
+    if (kind === "queen") {
+      body = dot(24, 27, 15.5, L.body) + line("M19 14Q13 8 15 3M29 14Q35 8 33 3", L.dark, 2.4);
+      face = eyes + crown;
+    } else if (kind === "hornet") {
+      body = oval(11, 18, 9, 4.6, C.white, 'opacity="0.55" transform="rotate(-28 11 18)"') +
+        oval(37, 18, 9, 4.6, C.white, 'opacity="0.55" transform="rotate(28 37 18)"') +
+        dot(24, 27, 14.5, L.body) + fill("M10.8 31h26.4a14.5 14.5 0 0 1-1.9 4.5H12.7A14.5 14.5 0 0 1 10.8 31z", L.dark) +
+        poly("24,47 20.5,40.5 27.5,40.5", L.dark);
+      face = dot(18.5, 24, 2.3, C.ink) + dot(29.5, 24, 2.3, C.ink) + line("M14.5 19 21 21.5M33.5 19 27 21.5", C.ink, 2) + crown;
+    } else if (kind === "slug") {
+      body = oval(22, 34, 19, 10, L.body) + dot(29, 27, 12, L.body) + line("M24 18 21 7M34 18 37 7", L.body, 4.4) +
+        dot(21, 6, 4, C.white) + dot(37, 6, 4, C.white);
+      face = dot(21.6, 6.4, 1.9, C.ink) + dot(37.6, 6.4, 1.9, C.ink) + line("M24.5 32Q29 35 33.5 32", C.ink, 1.8) +
+        poly("22,19 21,12.5 25,15.5 29,11 33,15.5 37,12.5 36,19", C.gold, 'stroke="' + C.goldDark + '" stroke-width="1"');
+    } else {
+      var fuzz = "";
+      for (i = 0; i < 12; i++) {
+        var b = (i / 12) * Math.PI * 2;
+        fuzz += dot((24 + Math.cos(b) * 13.5).toFixed(1), (28 + Math.sin(b) * 13.5).toFixed(1), 4.4, L.body);
+      }
+      body = fuzz + dot(24, 28, 14, L.body) + dot(17, 34, 2, L.dark) + dot(31.5, 32, 1.6, L.dark);
+      face = eyes + poly("15,15 13.5,6 19,10.5 24,4 29,10.5 34.5,6 33,15", C.gold, 'stroke="' + C.goldDark + '" stroke-width="1"');
+    }
+    return (
+      '<svg class="art" viewBox="0 0 48 48" aria-hidden="true" focusable="false">' +
+      behind + body + patterned + front + face + "</svg>"
+    );
+  };
+
   PS.art = function (name, extraClass) {
     return (
       '<svg class="art' + (extraClass ? " " + extraClass : "") + '" viewBox="0 0 48 48" aria-hidden="true" focusable="false">' +
