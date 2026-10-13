@@ -499,6 +499,9 @@
     chest.odds.forEach(function (share, r) {
       if (share > 0) out += '<span class="odds r' + r + '">' + PS.RARITY[r].name + " " + pctText(share) + "</span>";
     });
+    if (chest.special) {
+      out += '<span class="odds g-' + chest.special.grade + '">' + chest.special.grade + "-grade " + PS.RARITY[chest.special.rarity].name + " " + pctText(chest.special.chance) + "</span>";
+    }
     if (chest.s) out += '<span class="odds g-S">S-grade ' + pctText(chest.s) + "</span>";
     if (chest.shard) out += '<span class="odds g-SS">SS shard ' + pctText(chest.shard) + "</span>";
     return out;
@@ -516,15 +519,16 @@
     }
     return (
       '<div class="panel chest chest--' + kind + '">' +
+        '<button class="chest__info" type="button" data-act="chest-info" data-kind="' + kind + '" data-key="info-' + kind + '" aria-label="What can the ' + esc(chest.name) + ' hold?" title="What can it hold?">?</button>' +
         '<div class="chest__art">' + PS.art(kind) + "</div>" +
         '<div class="chest__body">' +
           "<h3>" + chest.name + "</h3>" +
           "<p>" + chest.text + "</p>" +
           '<div class="oddsrow">' + oddsChips(chest) + "</div>" + pity +
           '<div class="chest__buy">' +
-            '<button class="btn btn--primary" type="button" data-act="chest" data-kind="' + kind + '" data-count="1" data-key="chest-' + kind + '-1"' + (S.gold >= one ? "" : " disabled") + ">Open " + price("gold", one) + "</button>" +
-            '<button class="btn" type="button" data-act="chest" data-kind="' + kind + '" data-count="' + PS.CHEST_BULK.count + '" data-key="chest-' + kind + '-10"' + (S.gold >= ten ? "" : " disabled") + ">Open " + PS.CHEST_BULK.count + " " + price("gold", ten) + "</button>" +
-            '<button class="btn" type="button" data-act="chest" data-kind="' + kind + '" data-count="' + PS.CHEST_BULK.big + '" data-key="chest-' + kind + '-100"' + (S.gold >= hundred ? "" : " disabled") + ">Open " + PS.CHEST_BULK.big + " " + price("gold", hundred) + "</button>" +
+            '<button class="btn btn--primary" type="button" data-act="chest" data-kind="' + kind + '" data-count="1" data-key="chest-' + kind + '-1"' + (S.gems >= one ? "" : " disabled") + ">Open " + price("gems", one) + "</button>" +
+            '<button class="btn" type="button" data-act="chest" data-kind="' + kind + '" data-count="' + PS.CHEST_BULK.count + '" data-key="chest-' + kind + '-10"' + (S.gems >= ten ? "" : " disabled") + ">Open " + PS.CHEST_BULK.count + " " + price("gems", ten) + "</button>" +
+            '<button class="btn" type="button" data-act="chest" data-kind="' + kind + '" data-count="' + PS.CHEST_BULK.big + '" data-key="chest-' + kind + '-100"' + (S.gems >= hundred ? "" : " disabled") + ">Open " + PS.CHEST_BULK.big + " " + price("gems", hundred) + "</button>" +
           "</div>" +
         "</div>" +
       "</div>"
@@ -555,7 +559,7 @@
 
         '<h2 class="section">Chests</h2>' +
         '<div class="chests">' + chestCard("crate") + chestCard("gilded") + "</div>" +
-        '<p class="hint">The odds on a chest never change, however far you get. Only the price rises as you clear chapters. A chest never holds an SS-grade item itself.</p>' +
+        '<p class="hint">Chests cost gems. The odds and the price never change, however far you get. A chest never holds an SS-grade item itself.</p>' +
         '<div class="panel gift shards' + (S.shards >= PS.SHARDS.needed ? " is-ready" : "") + '">' +
           '<div class="gift__art">' + PS.art("gold") + "</div>" +
           '<div class="gift__body"><h3>SS shards <span class="count">' + S.shards + "/" + PS.SHARDS.needed + "</span></h3>" +
@@ -771,7 +775,7 @@
           );
         }).join("") + "</div>" +
         '<div class="modal__actions">' +
-          (modal.again ? '<button class="btn" type="button" data-act="chest" data-kind="' + modal.again.kind + '" data-count="' + modal.again.count + '"' + (st.get().gold >= st.chestCost(modal.again.kind, modal.again.count) ? "" : " disabled") + ">Open again " + price("gold", st.chestCost(modal.again.kind, modal.again.count)) + "</button>" : "") +
+          (modal.again ? '<button class="btn" type="button" data-act="chest" data-kind="' + modal.again.kind + '" data-count="' + modal.again.count + '"' + (st.get().gems >= st.chestCost(modal.again.kind, modal.again.count) ? "" : " disabled") + ">Open again " + price("gems", st.chestCost(modal.again.kind, modal.again.count)) + "</button>" : "") +
           '<button class="btn btn--primary" type="button" data-act="close" data-key="m-ok" autofocus>Nice</button>' +
         "</div>" +
       "</div>"
@@ -966,6 +970,55 @@
     );
   }
 
+  /** What a chest can hold: every item it can roll, weapons first. */
+  function chestInfoModal(modal) {
+    var chest = PS.CHESTS[modal.kind];
+    if (!chest) return null;
+    // the rarities this chest can roll, and which one is being shown
+    var open = [];
+    chest.odds.forEach(function (share, r) { if (share > 0) open.push(r); });
+    var shown = open.indexOf(modal.r) !== -1 ? modal.r : open[0];
+    function section(grade, note, rarity) {
+      var rows = "";
+      PS.SLOTS.forEach(function (slot) {
+        var ids = (PS.POOL[slot.key] || {})[grade] || [];
+        if (!ids.length) return;
+        rows += '<h4 class="chestinfo__slot">' + slot.plural + "</h4>";
+        rows += '<ul class="chestinfo__list">' + ids.map(function (id) {
+          var def = PS.ITEMS[id];
+          return (
+            '<li class="chestinfo__item">' + tile({ id: id, r: rarity }, { plain: true, cls: "tile--mini" }) +
+              '<span class="chestinfo__text"><strong>' + esc(def.name) + "</strong>" +
+              (slot.key === "weapon" ? "<small>" + esc(def.blurb) + "</small>" : "") + "</span>" +
+            "</li>"
+          );
+        }).join("") + "</ul>";
+      });
+      return note + rows;
+    }
+    var rarities = chest.odds.map(function (share, r) { return share > 0 ? PS.RARITY[r].name : null; }).filter(Boolean);
+    var rare = chest.special || chest.s;
+    var out =
+      '<div class="chestinfo">' +
+        '<button class="modal__close" type="button" data-act="close" aria-label="Close">' + PS.icon("close") + "</button>" +
+        '<h2 id="modal-title">' + esc(chest.name) + "</h2>" +
+        '<p class="hint">One piece of gear per chest, ' + rarities[0] + " to " + rarities[rarities.length - 1] + ". The odds are on the chest.</p>" +
+        '<div class="chestinfo__tabs" role="tablist">' + open.map(function (r) {
+          return '<button class="chestinfo__tab r' + r + (r === shown ? " is-active" : "") + '" type="button" role="tab" aria-selected="' + (r === shown) + '" data-act="chestinfo-r" data-r="' + r + '">' +
+            PS.RARITY[r].name + "<small>" + pctText(chest.odds[r]) + "</small></button>";
+        }).join("") + "</div>" +
+        '<h3>Everyday gear <span class="rname r' + shown + '">' + PS.RARITY[shown].name + "</span></h3>" + section("A", "", shown);
+    if (rare) {
+      out += "<h3>S-grade gear" + (chest.special ? ", " + PS.RARITY[chest.special.rarity].name + " only, " + pctText(chest.special.chance) : "") + "</h3>" +
+        '<p class="hint">Stronger versions with better perks.</p>' + section("S", "", chest.special ? chest.special.rarity : shown);
+    }
+    out += '<p class="hint">' + (chest.shard ? "It can also drop an SS shard, " + pctText(chest.shard) + " of the time. " : "") +
+      "Chests never hold an SS-grade item.</p>" +
+      '<div class="modal__actions"><button class="btn btn--primary" type="button" data-act="close" data-key="m-ok">Got it</button></div>' +
+      "</div>";
+    return out;
+  }
+
   function noticeModal() {
     return (
       '<div class="notice">' +
@@ -1025,6 +1078,7 @@
     else if (modal.type === "secret") html = modal.open ? devMenu(modal) : secretModal(modal);
     else if (modal.type === "quick") html = quickModal(modal);
     else if (modal.type === "notice") html = noticeModal();
+    else if (modal.type === "chestinfo") html = chestInfoModal(modal);
     if (html === null) {
       closeModal();
       return;
@@ -1313,6 +1367,13 @@
       if (!items) return;
       openModal({ type: "loot", title: PS.CHESTS[kind].name + (count > 1 ? " × " + count : ""), items: items, shards: items.shards, art: kind, again: { kind: kind, count: count } });
       revealSound(items);
+    },
+    "chestinfo-r": function (node) {
+      view.modal.r = Number(node.getAttribute("data-r"));
+      renderModal();
+    },
+    "chest-info": function (node) {
+      openModal({ type: "chestinfo", kind: node.getAttribute("data-kind") });
     },
     craft: function () {
       var item = st.craftShards();

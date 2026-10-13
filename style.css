@@ -3537,3 +3537,208 @@ button.tile:hover:not(:disabled) {
     display: none;
   }
 }
+
+/* ------------------------------------------------------------ polish pass */
+/* Looks only: nothing here changes sizes enough to move a button or hide
+   anything, and deleting this whole block puts the old look back. */
+
+.status {
+  border-radius: 0 0 14px 14px;
+  box-shadow: 0 6px 14px -10px rgba(41, 38, 31, 0.55);
+}
+
+.screen {
+  scrollbar-color: var(--line-strong) transparent;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
+}
+
+.modal::backdrop {
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+/* a soft top edge on cards in the day theme, and a gentle lift under a pointer */
+:root:not([data-theme="dark"]) .panel {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), var(--shadow-sm);
+}
+
+.talent,
+.quest,
+.chest,
+.deal,
+.gift {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+@media (hover: hover) {
+  .talent:hover,
+  .quest:hover,
+  .chest:hover,
+  .deal:hover,
+  .gift:hover {
+    transform: translateY(-2px);
+    border-color: var(--rind);
+    box-shadow: 0 10px 22px -14px rgba(41, 38, 31, 0.5);
+  }
+}
+
+/* price buttons share a width, so every talent's bar lines up */
+.talent .btn,
+.talent__done {
+  min-width: 88px;
+  justify-content: center;
+}
+
+.talent__done {
+  display: inline-flex;
+}
+
+/* a line running out from each section heading */
+.section::after {
+  content: "";
+  flex: 1;
+  align-self: center;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--line-strong), transparent);
+}
+
+/* a small marker over the tab you are on */
+.tab:not(.tab--main).is-active::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  width: 20px;
+  height: 3px;
+  margin-left: -10px;
+  border-radius: 3px;
+  background: var(--rind);
+}
+
+/* the four facts on the battle screen read as one tidy row */
+.facts > div {
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+@media (hover: hover) {
+  .facts > div:hover {
+    border-color: var(--rind);
+    background: var(--lemon-pale);
+  }
+
+  :root[data-theme="dark"] .facts > div:hover {
+    background: #3a331c;
+  }
+}
+
+/* ----------------------------------------------------------- chest contents */
+
+.chest {
+  position: relative;
+}
+
+.chest__info {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.chest__info:hover {
+  background: var(--lemon-pale);
+  border-color: var(--rind);
+  color: var(--ink);
+}
+
+.modal--chestinfo {
+  width: min(94vw, 540px);
+}
+
+.chestinfo h4 {
+  margin: 14px 0 6px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--ink-soft);
+}
+
+.chestinfo__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 6px;
+}
+
+.chestinfo__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.chestinfo__item .tile {
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+
+.chestinfo__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.chestinfo__text small {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.chestinfo__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.chestinfo__tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 12px;
+  border: 2px solid color-mix(in srgb, var(--rar) 45%, var(--line));
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: color-mix(in srgb, var(--rar) 70%, var(--ink));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.chestinfo__tab small {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.chestinfo__tab.is-active {
+  border-color: var(--rar);
+  background: color-mix(in srgb, var(--rar) 16%, var(--surface));
+}

@@ -58,7 +58,7 @@ GitHub Pages, Netlify or any web host. Nothing needs compiling.
 | --- | --- |
 | **Battle** | Pick a chapter and fight. Shows your Power against the chapter's recommended Power. |
 | **Equipment** | Six slots: weapon, ring, amulet, helmet, armour, boots. Level slots up with gold, swap gear, and open the **Forge**. |
-| **Shop** | A free gift every four hours, chests bought with gold (the price rises as you clear chapters), four deals that change each day, and gold for gems. |
+| **Shop** | A free gift every four hours, chests bought with gems (a fixed price: 10 for a Seed Crate, 40 for a Gilded Chest), four deals a day (never S-grade), and gold for gems. |
 | **Talents** | Permanent bonuses bought with gold. |
 | **Quests** | Ladders of goals that pay gems. |
 
@@ -86,10 +86,11 @@ Surpass and ??? never drop. They only come out of the forge.
 Some items are **S-grade** or **SS-grade**. The grade belongs to the item
 itself (an S-grade bow is S-grade at every rarity): ×1.2 or ×1.45 on the main
 stat, and stronger perks. They are rare: a Seed Crate has a 0.5% chance of an
-S-grade; a Gilded Chest has 2%. **Chests never hold an SS-grade item.** Chest
-odds are fixed for the whole game: a Seed Crate is 79% Common, 15% Uncommon,
-6% Rare; a Gilded Chest is 62.35% Common, 25% Uncommon, 9% Rare, 3% Epic and
-0.65% Legendary. A Gilded Chest also has a 0.02% chance of an **SS shard**, and
+S-grade. **Chests never hold an SS-grade item.** Chest odds are fixed for the
+whole game: a Seed Crate is 79% Common, 15% Uncommon, 6% Rare; a Gilded Chest
+is 62.35% Common, 25% Uncommon, 9% Rare, 3% Epic, and 0.65% of the time an
+S-grade Uncommon. Neither chest gives Legendary or Mythic. A Gilded Chest also
+has a 0.02% chance of an **SS shard**, and
 6 shards craft one Uncommon SS-grade item in the Shop. The boss of every fourth
 chapter drops an S or SS item the first time you beat it.
 

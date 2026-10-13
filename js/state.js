@@ -724,15 +724,15 @@
   /* ---------------------------------------------------------------- shop */
 
   function chestCost(kind, count) {
-    var cost = PS.BAL.chestPrice(kind, frontier()) * count;
+    var cost = PS.BAL.chestPrice(kind) * count;
     return count >= PS.CHEST_BULK.count ? Math.round(cost * PS.CHEST_BULK.discount) : cost;
   }
 
   function openChest(kind, count) {
     var chest = PS.CHESTS[kind];
     var cost = chestCost(kind, count);
-    if (!chest || S.gold < cost) return null;
-    S.gold -= cost;
+    if (!chest || S.gems < cost) return null;
+    S.gems -= cost;
 
     var out = [];
     var shards = 0;
@@ -745,7 +745,14 @@
         if (S.shop.pitySS >= chest.pitySS) forced = "SS";
         else if (S.shop.pityS >= chest.pityS) forced = "S";
       }
-      var roll = rollItem(0, { s: chest.s, ss: chest.ss, grade: forced, odds: chest.odds });
+      var roll;
+      if (chest.special && Math.random() < chest.special.chance) {
+        // the chest's fixed prize: a set grade at a set rarity
+        roll = rollItem(0, { grade: chest.special.grade, odds: chest.odds });
+        roll.r = chest.special.rarity;
+      } else {
+        roll = rollItem(0, { s: chest.s, ss: chest.ss, grade: forced, odds: chest.odds });
+      }
       if (chest.pityS) {
         var grade = PS.ITEMS[roll.id].grade;
         if (grade === "SS") S.shop.pitySS = 0;
@@ -808,7 +815,8 @@
     var centre = Math.max(0, Math.round(PS.BAL.lootMu(f)));
     var list = [];
     for (var i = 0; i < PS.DEAL_COUNT; i++) {
-      var special = rnd() < 0.2;
+      rnd(); // kept so the day's other rolls stay as they were; deals are never S-grade
+      var special = false;
       var steps = rnd() < 0.35 ? 2 : 1;
       var roll = rollItem(0, { grade: special ? "S" : "A", rnd: rnd });
       var rarity = PS.clamp(centre + steps, 0, PS.MAX_DROP_RARITY);
