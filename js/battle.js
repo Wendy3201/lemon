@@ -75,9 +75,9 @@
     p.outfit = B.outfitOf();
     calm = PS.reducedMotion() || !PS.prefs.get("shake");
     var cheats = PS.dev.cheats;
-    cheats.god = false;
-    cheats.oneHit = false;
-    cheats.speed = 1;
+    cheats.god = PS.dev.startWith.god;
+    cheats.oneHit = PS.dev.startWith.oneHit;
+    cheats.speed = PS.dev.startWith.speed;
     R = B.run = {
       ch: ch, zone: PS.ZONES[ch.zone], weaponId: stats.weapon, weapon: B.WEAPONS[stats.weapon],
       src: stats.weapon, dmgBy: {}, mode: mode === "swarm" ? "swarm" : "normal",

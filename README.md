@@ -198,7 +198,7 @@ Most tweaks are one line in `js/data.js`.
   once (here or on the construction page) unlocks developer tools for that tab:
   a **DEV button in every battle** (godmode, one-hit kills, game speed, take or
   max any upgrade, level up, skip to the boss) and a tabbed dev menu in the
-  lobby (Gear, Money, Progress, Battle, Owned, Save).
+  lobby with a section list down the left (Overview, Gear, Money, Progress, Battle, Owned, Settings, Save).
   The lobby menu can give or remove any item, set gold and
   gems to an exact figure, and start **Swarm mode**, an endless battle with no
   boss and a swarm that keeps growing, with pests as tough as the chapter you

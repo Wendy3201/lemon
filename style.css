@@ -3742,3 +3742,119 @@ button.tile:hover:not(:disabled) {
   border-color: var(--rar);
   background: color-mix(in srgb, var(--rar) 16%, var(--surface));
 }
+
+/* ------------------------------------------------------- dev menu (lobby) */
+
+.modal--secret {
+  width: min(96vw, 880px);
+  max-height: min(94vh, 820px);
+}
+
+.devshell__main {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.devnav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-self: start;
+  position: sticky;
+  top: 0;
+}
+
+.devnav__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.devnav__item .ico {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.devnav__item:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.devnav__item.is-active {
+  background: linear-gradient(180deg, var(--lemon-bright), var(--lemon));
+  border-color: var(--rind);
+  color: var(--charcoal);
+}
+
+.devpane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.devcard {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.devcard h3 {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 17px;
+}
+
+.devcard .devfacts {
+  margin-bottom: 4px;
+}
+
+.devcard .dev__give:first-of-type,
+.devcard .dev__grant:first-of-type {
+  margin-top: 8px;
+}
+
+.devcard .devbox__toggles {
+  margin-top: 4px;
+}
+
+.devcard .devbox__label {
+  margin-top: 12px;
+}
+
+.devcard .dev__list {
+  max-height: 38vh;
+}
+
+@media (max-width: 640px) {
+  .devshell__main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .devnav {
+    flex-direction: row;
+    overflow-x: auto;
+    position: static;
+    padding-bottom: 4px;
+  }
+
+  .devnav__item {
+    flex: none;
+    padding: 8px 12px;
+  }
+}

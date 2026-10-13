@@ -990,6 +990,33 @@
       S.shards += n;
       commit();
     },
+    devSetShards: function (n) {
+      S.shards = Math.floor(num(n, 0, 0, 1e9));
+      commit();
+    },
+    devSetChapter: function (n) {
+      S.chapter = Math.floor(num(n, 1, 1, PS.BAL.CHAPTERS));
+      commit();
+    },
+    devResetTalents: function () {
+      S.talents = {};
+      commit();
+    },
+    /** Claim every quest rung that is ready, until none are. Returns the gems paid. */
+    devClaimQuests: function () {
+      var total = 0;
+      var again = true;
+      while (again) {
+        again = false;
+        quests().forEach(function (quest) {
+          if (quest.ready) {
+            total += claimQuest(quest.id);
+            again = true;
+          }
+        });
+      }
+      return total;
+    },
     devMaxTalents: function () {
       PS.TALENTS.forEach(function (talent) { S.talents[talent.id] = talent.max; });
       commit();

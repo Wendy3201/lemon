@@ -230,6 +230,8 @@
     unlocked: devOn,
     // switches the battle looks at; they reset whenever a battle starts
     cheats: { god: false, oneHit: false, speed: 1 },
+    // what the next battle starts with (set in the lobby dev menu's Battle section)
+    startWith: { god: false, oneHit: false, speed: 1 },
     unlock: function () {
       PS.dev.unlocked = true;
       try { sessionStorage.setItem(KEY_DEV, "1"); } catch (err) { /* blocked */ }
