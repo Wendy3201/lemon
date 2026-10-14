@@ -402,6 +402,164 @@
       P(7, "Every level-up in battle heals you and adds 2% damage", null, { levelAtk: 0.02 }, 0.4)
     ]);
 
+  /* more weapons */
+
+  def("whip", "weapon", "A", "Vine Whip", 10,
+    "A long lash that cracks across a whole row of pests.", null, [
+      P(2, null, { area: 0.2 }),
+      P(3, "Every 3rd lash cracks in a full circle", null, { emp: 3 }, 0.1),
+      P(4, null, { crit: 0.1, critDmg: 0.2 }),
+      P(5, "+1 lash with every attack", null, { count: 1 }, 0.3),
+      P(7, "Lashes snap back for 60% damage on the return", null, { q: 1 }, 0.35)
+    ]);
+
+  def("cannon", "weapon", "A", "Pit Cannon", 10,
+    "Spits a burst of pellets. Cruel up close, weak far away.", null, [
+      P(2, "Pellets pass through 1 more pest", null, { pierce: 1 }, 0.05),
+      P(3, "Every 3rd blast fires a full ring of pellets", null, { emp: 3 }, 0.1),
+      P(4, null, { atkPct: 0.1 }),
+      P(5, "+2 pellets with every shot", null, { count: 1 }, 0.3),
+      P(7, "Pellets explode where they hit", null, { q: 1 }, 0.35)
+    ]);
+
+  def("mace", "weapon", "A", "Pith Mace", 10,
+    "Spins a ring of force around you, over and over. Nothing gets past it.", null, [
+      P(2, null, { area: 0.2 }),
+      P(3, "Every 3rd spin hits 60% harder and throws pests far back", null, { emp: 3 }, 0.1),
+      P(4, null, { hpPct: 0.15 }),
+      P(5, "Each spin hits twice", null, { count: 1 }, 0.3),
+      P(7, "Spins leave a ring of burning zest on the ground", null, { q: 1 }, 0.35)
+    ]);
+
+  def("flask", "weapon", "A", "Acid Flask", 10,
+    "Lobs a flask that bursts into a pool that eats at everything in it.", null, [
+      P(2, null, { area: 0.25 }),
+      P(3, "Every 3rd throw is three flasks at once", null, { emp: 3 }, 0.1),
+      P(4, null, { haste: 0.15 }),
+      P(5, "+1 flask with every throw", null, { count: 1 }, 0.3),
+      P(7, "Pools last twice as long and burn 50% hotter", null, { q: 1 }, 0.35)
+    ]);
+
+  def("comet", "weapon", "S", "Comet Staff", 10,
+    "Calls a comet down on the thickest part of the swarm.", null, [
+      P(2, null, { area: 0.2 }),
+      P(3, "Every 3rd cast calls down three comets", null, { emp: 3 }, 0.12),
+      P(4, "Hits set pests on fire for 50% damage per second", null, { burn: 0.5 }, 0.12),
+      P(5, "+1 comet with every cast", null, { count: 1 }, 0.35),
+      P(7, "Every comet leaves a crater of fire", null, { q: 1 }, 0.4)
+    ]);
+
+  def("hive", "weapon", "S", "Hive Horn", 10,
+    "Blows a swarm of homing pips that hunt pests down on their own.", null, [
+      P(2, null, { haste: 0.1 }),
+      P(3, "Every 4th blast is a swarm of 10 pips", null, { emp: 4 }, 0.12),
+      P(4, null, { crit: 0.1, critDmg: 0.3 }),
+      P(5, "+2 pips with every blast", null, { count: 1 }, 0.35),
+      P(7, "Pips split in two when they hit a pest", null, { q: 1 }, 0.4)
+    ]);
+
+  def("thornlash", "weapon", "S", "Thornlash", 10,
+    "A barbed whip. Pests it catches are softened up for everything else.",
+    { fx: { shock: 0.15 }, text: "Pests you hit take 15% more damage for 3 seconds" }, [
+      P(2, null, { area: 0.2 }),
+      P(3, "Every 3rd lash cracks in a full circle", null, { emp: 3 }, 0.12),
+      P(4, "Pests below 15% health are finished off (not bosses)", null, { execute: 0.15 }, 0.15),
+      P(5, "+1 lash with every attack, and lashes reach further", { area: 0.15 }, { count: 1 }, 0.35),
+      P(7, "Lashes snap back for 60% damage, and squashing a pest heals you", null, { q: 1, leech: 0.003 }, 0.45)
+    ]);
+
+  def("nova", "weapon", "SS", "Supernova", 10,
+    "A heartbeat of light, then a ring of fire that sweeps everything away.", null, [
+      P(2, null, { area: 0.25 }),
+      P(3, "Every 3rd burst is almost twice as big", null, { emp: 3 }, 0.15),
+      P(4, "Pests you hit take 30% more damage for 3 seconds", null, { shock: 0.3 }, 0.25),
+      P(5, "Each burst throws 8 piercing shards", null, { shards: 1 }, 0.3),
+      P(7, "Bursts leave a ring of fire that burns for 3 seconds", null, { q: 1 }, 0.5)
+    ]);
+
+  def("geyser", "weapon", "SS", "Lemonade Geyser", 10,
+    "Erupts geysers under the pests nearest you and flings them skyward.", null, [
+      P(2, null, { area: 0.25 }),
+      P(3, "Every 3rd cast erupts under six more pests", null, { emp: 3 }, 0.15),
+      P(4, "Hits slow pests by 35%", null, { chill: 0.35 }, 0.2),
+      P(5, "+2 geysers with every cast", null, { count: 1 }, 0.3),
+      P(7, "Every eruption is followed by a second, bigger one", null, { q: 1 }, 0.5)
+    ]);
+
+  /* more armour, boots, rings, amulets and helmets */
+
+  def("warden", "helmet", "S", "Grove Warden's Hood", 44,
+    "Woven from living leaves. The grove looks after whoever wears it.", null, [
+      P(2, null, { hpPct: 0.1 }),
+      P(3, "Pests near you are slowed by 20%", null, { auraChill: 0.2 }, 0.1),
+      P(4, null, { armor: 0.08 }),
+      P(5, "A shield soaks up damage worth 20% of your health, then grows back", null, { barrier: 0.2 }, 0.16),
+      P(7, "Start every battle with two free upgrades", null, { startUp: 2 }, 0.35)
+    ]);
+
+  def("thornmail", "armor", "S", "Thornmail", 66,
+    "Every plate has a point, and every point has an opinion.", null, [
+      P(2, "Pests touching you take 100% damage per second", null, { thorns: 1.0 }, 0.08),
+      P(3, null, { hpPct: 0.15 }),
+      P(4, null, { armor: 0.1 }),
+      P(5, "Below 35% health you take 30% less damage", null, { lastStand: 0.3 }, 0.12),
+      P(7, "Getting hurt sets off a burst of thorns around you", null, { thornBurst: 1 }, 0.25)
+    ]);
+
+  def("gale", "boots", "S", "Gale Striders", 30,
+    "They lean into the wind so you do not have to.", { s: { speed: 0.08 } }, [
+      P(2, null, { speed: 0.08 }),
+      P(3, null, { haste: 0.1 }),
+      P(4, "You leave a trail of burning zest behind you", null, { trail: 1 }, 0.2),
+      P(5, null, { magnet: 0.3, speed: 0.08 }),
+      P(7, "+25% damage while you are moving", null, { movingDmg: 0.25 }, 0.25)
+    ]);
+
+  def("rindring", "ring", "S", "Ring of Rind", 3.5,
+    "Cut from a single, very stubborn peel.", null, [
+      P(2, null, { atkPct: 0.1 }),
+      P(3, null, { haste: 0.1 }),
+      P(4, null, { crit: 0.08 }),
+      P(5, null, { atkPct: 0.12, critDmg: 0.3 }),
+      P(7, "+1 shot or strike with every attack", null, { count: 1 }, 0.35)
+    ]);
+
+  def("locket", "amulet", "S", "Moonpip Locket", 3,
+    "A pip that only shines at night. Open it and it hums.", null, [
+      P(2, null, { gold: 0.12 }),
+      P(3, null, { xp: 0.1, hpPct: 0.08 }),
+      P(4, "Heal 0.3% of your health for every pest you squash", null, { leech: 0.003 }, 0.06),
+      P(5, null, { atkPct: 0.12 }),
+      P(7, "+1 reroll per battle and better upgrade cards", { luck: 0.2 }, { reroll: 1 }, 0.15)
+    ]);
+
+  def("firstwind", "boots", "SS", "Firstwind Greaves", 32,
+    "Cut from the first breeze that ever crossed the orchard.", { s: { speed: 0.1 } }, [
+      P(2, null, { speed: 0.1, haste: 0.08 }),
+      P(3, "Pests near you are slowed by 30%", null, { auraChill: 0.3 }, 0.12),
+      P(4, null, { magnet: 0.4, hpPct: 0.12 }),
+      P(5, "+30% damage while you are moving", null, { movingDmg: 0.3 }, 0.3),
+      P(7, "You can never lose more than 18% of your health in one second", null, { dmgCap: 0.18 }, 0.5)
+    ]);
+
+  def("evering", "ring", "SS", "Everlong Band", 3.5,
+    "It has no beginning and, as far as anyone can tell, no end.", null, [
+      P(2, null, { atkPct: 0.15 }),
+      P(3, null, { crit: 0.1, critDmg: 0.4 }),
+      P(4, "Every attack repeats for 30% damage", null, { echo: 0.3 }, 0.25),
+      P(5, null, { atkPct: 0.2, haste: 0.1 }),
+      P(7, "Every attack repeats for 50% damage and strikes one more time", null, { echo: 0.5, count: 1 }, 0.55)
+    ]);
+
+  def("firstseed", "amulet", "SS", "The First Seed", 3,
+    "Every orchard there has ever been started as this.", null, [
+      P(2, null, { atkPct: 0.12, hpPct: 0.12 }),
+      P(3, "Start every battle with a free upgrade", null, { startUp: 1 }, 0.2),
+      P(4, "Every level-up in battle heals you and adds 2% damage", null, { levelAtk: 0.02 }, 0.4),
+      P(5, null, { xp: 0.15, gold: 0.2 }),
+      P(7, "Come back to life once per battle, and every level-up adds 3% damage", null, { revive: 1, levelAtk: 0.03 }, 0.5)
+    ]);
+
   /* quick lookups: PS.POOL[slot][grade] -> [item ids] */
   PS.POOL = {};
   PS.ITEM_ORDER.forEach(function (id) {
@@ -720,6 +878,35 @@
   };
   PS.CHEST_BULK = { count: 10, big: 100, discount: 0.9 }; // 10 and 100 at once, both 10% off
   PS.DROP_GRADE = { s: 0.04, sFrom: 3, ss: 0.004, ssFrom: 10 };
+  /* Pets. A pet egg costs gems and hatches one pet: a species and a rarity.
+     The rarities are Common, Uncommon, Rare and Epic, and there is no S or SS
+     grade. Hatching a pet you already have levels it up; gold
+     levels it up too. The pet you bring along fights next to you and gives its
+     stat bonus. A pet's bonus is per * level * the rarity's multiplier. */
+  PS.PET_SPECIES = [
+    { id: "bumble", name: "Bumble", stat: "haste", per: 0.004, color: "#E0A93B", blurb: "A fuzzy little bee that makes you faster." },
+    { id: "ladybug", name: "Ladybug", stat: "armor", per: 0.003, color: "#E5484D", blurb: "Hard shell, soft heart." },
+    { id: "snail", name: "Snail", stat: "hpPct", per: 0.006, color: "#B9A98A", blurb: "Slow, steady and hard to hurt." },
+    { id: "ant", name: "Ant", stat: "gold", per: 0.006, color: "#6F4A2A", blurb: "Finds coins nobody else saw." },
+    { id: "moth", name: "Moth", stat: "xp", per: 0.005, color: "#C9BEA6", blurb: "Drawn to the glow of every gem." },
+    { id: "firefly", name: "Firefly", stat: "crit", per: 0.002, color: "#FFE14A", blurb: "Lights up the weak spots." },
+    { id: "cricket", name: "Cricket", stat: "speed", per: 0.003, color: "#6FBF5A", blurb: "Always one hop ahead." },
+    { id: "beetle", name: "Beetle", stat: "atkPct", per: 0.006, color: "#4A5FA8", blurb: "Small, shiny and surprisingly strong." }
+  ];
+  PS.PET = {};
+  PS.PET_SPECIES.forEach(function (sp) { PS.PET[sp.id] = sp; });
+  // how many pets can come along: you start with one and unlock more with gems
+  PS.PET_SLOTS = { start: 1, max: 3, costs: [0, 150, 400] };
+  PS.PET_RARITY = [{ mult: 1, cap: 10 }, { mult: 1.5, cap: 20 }, { mult: 2.2, cap: 30 }, { mult: 3.2, cap: 40 }];
+  // Common, Uncommon, Rare, Epic
+  PS.EGG = { gems: 20, odds: [0.7, 0.18, 0.09, 0.03], bulk: { count: 10, discount: 0.9 } };
+  PS.petBonus = function (sp, r, level) {
+    return PS.PET[sp].per * level * PS.PET_RARITY[r].mult;
+  };
+  PS.petCost = function (r, level) {
+    return Math.round(150 * Math.pow(1.15, level - 1) * (1 + 0.5 * r));
+  };
+
   PS.GIFT = { every: 4 * 60 * 60 * 1000, gems: 10, goldShare: 0.25 };
   PS.GOLD_PACK = { gems: 50, runs: 2 };
   PS.DEAL_COUNT = 4;

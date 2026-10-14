@@ -439,7 +439,7 @@ ul {
 
 .tabbar {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   align-items: end;
   gap: 4px;
   padding: 8px clamp(8px, 2vw, 20px) calc(8px + env(safe-area-inset-bottom, 0px));
@@ -3923,4 +3923,714 @@ button.tile:hover:not(:disabled) {
   font-size: 14px;
   font-weight: 700;
   color: var(--ink-faint);
+}
+
+/* ------------------------------------------------------------------- pets */
+
+.pets {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: min(100%, 980px);
+  margin-inline: auto;
+}
+
+.pethero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  border-color: var(--rind);
+  background: linear-gradient(180deg, var(--lemon-pale), var(--surface));
+}
+
+:root[data-theme="dark"] .pethero {
+  background: linear-gradient(180deg, #4a4020, var(--surface));
+}
+
+.pethero__art {
+  width: 96px;
+  height: 96px;
+  flex: none;
+}
+
+.pethero__body {
+  min-width: 0;
+}
+
+.pethero__body h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.pethero__body p {
+  color: var(--ink-soft);
+}
+
+.petgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.pet {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+}
+
+.pet.is-eq {
+  border-color: var(--rind);
+}
+
+.pet__art {
+  width: 64px;
+  height: 64px;
+  flex: none;
+}
+
+.pet__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.pet__body h3 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.pet__body p {
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.pet__lv {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.pet__body .bar {
+  margin-top: 6px;
+}
+
+.pet__acts {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.pet__tile {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
+.pettags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pet__tag {
+  gap: 6px;
+  opacity: 0.55;
+}
+
+.pet__tag.is-have {
+  opacity: 1;
+}
+
+.pet__tag svg {
+  width: 28px;
+  height: 28px;
+}
+
+.pet__tag em {
+  font-style: normal;
+}
+
+@media (max-width: 520px) {
+  .pet {
+    flex-wrap: wrap;
+  }
+
+  .pet__acts {
+    flex-direction: row;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .pethero {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+/* ---------------------------------------------------------------- pet team */
+
+.petteam {
+  border-color: var(--rind);
+  background: linear-gradient(180deg, var(--lemon-pale), var(--surface));
+}
+
+:root[data-theme="dark"] .petteam {
+  background: linear-gradient(180deg, #4a4020, var(--surface));
+}
+
+.petslots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 10px 0 8px;
+}
+
+.petslot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 150px;
+  padding: 12px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: center;
+}
+
+.petslot svg.art {
+  width: 64px;
+  height: 64px;
+}
+
+.petslot b {
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.petslot span {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.petslot.is-empty {
+  border-style: dashed;
+  opacity: 0.75;
+}
+
+.petslot.is-locked {
+  background: var(--surface-2);
+  color: var(--ink-faint);
+}
+
+.petslot.is-locked svg.ico {
+  width: 28px;
+  height: 28px;
+}
+
+@media (max-width: 520px) {
+  .petslot {
+    min-height: 130px;
+    padding: 8px 4px;
+  }
+
+  .petslot b {
+    font-size: 13px;
+  }
+}
+
+/* =========================================================================
+   REVAMP
+   One design layer over everything above: a sunnier backdrop, glassy bars,
+   candy buttons, a floating dock, glossier cards and bars. It only changes
+   how things look (colours, borders, shadows, small spacing). Delete this
+   whole block and the old look is back exactly.
+   ========================================================================= */
+
+:root {
+  --sun: #ffd23f;
+  --sun-deep: #f2a31b;
+  --leaf: #7fb069;
+  --glass: rgba(255, 252, 242, 0.74);
+  --glass-edge: rgba(255, 255, 255, 0.85);
+  --card-top: #fffdf6;
+  --card-bottom: #fff6d6;
+  --press: #c99a1c;
+}
+
+:root[data-theme="dark"] {
+  --glass: rgba(43, 39, 31, 0.72);
+  --glass-edge: rgba(255, 244, 184, 0.1);
+  --card-top: #332e24;
+  --card-bottom: #29251d;
+  --press: #8a6a10;
+}
+
+/* ------------------------------------------------------------- backdrop */
+
+body::before {
+  background:
+    radial-gradient(900px 520px at 8% -8%, rgba(255, 210, 63, 0.55), transparent 62%),
+    radial-gradient(760px 480px at 100% 4%, rgba(127, 176, 105, 0.3), transparent 60%),
+    radial-gradient(900px 600px at 50% 112%, rgba(255, 226, 120, 0.4), transparent 62%),
+    linear-gradient(180deg, #fffbe8 0%, #fff3c2 100%);
+}
+
+:root[data-theme="dark"] body::before {
+  background:
+    radial-gradient(900px 520px at 8% -8%, rgba(247, 217, 76, 0.16), transparent 62%),
+    radial-gradient(760px 480px at 100% 4%, rgba(127, 176, 105, 0.12), transparent 60%),
+    radial-gradient(900px 600px at 50% 115%, rgba(247, 217, 76, 0.1), transparent 62%),
+    linear-gradient(180deg, #221f18 0%, #1a1812 100%);
+}
+
+/* ------------------------------------------------------------- the bars */
+
+.status {
+  margin: 8px clamp(12px, 3vw, 24px) 0;
+  padding: 8px 16px;
+  border: 1px solid var(--rind);
+  border-radius: 14px;
+  background:
+    repeating-linear-gradient(-45deg, rgba(41, 38, 31, 0.06) 0 10px, transparent 10px 20px),
+    linear-gradient(180deg, var(--lemon-bright), var(--sun));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 6px 14px -10px rgba(120, 90, 0, 0.7);
+  font-weight: 700;
+}
+
+.topbar {
+  margin: 8px clamp(12px, 3vw, 24px) 0;
+  padding: 8px 12px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 22px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 var(--glass-edge);
+}
+
+.brand__name {
+  background: linear-gradient(180deg, var(--charcoal) 30%, #6b5314 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: 0.06em;
+}
+
+:root[data-theme="dark"] .brand__name {
+  background: linear-gradient(180deg, #fff6c9 20%, var(--sun) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.pill {
+  padding: 7px 14px 7px 10px;
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, var(--card-top), var(--card-bottom));
+  font-weight: 800;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 0 var(--line-strong);
+}
+
+.pill--power {
+  background: linear-gradient(180deg, #fff08a, var(--sun));
+  border-color: var(--sun-deep);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 2px 0 #c98a1b, 0 0 18px -4px rgba(255, 190, 40, 0.7);
+}
+
+#top-gold {
+  background: linear-gradient(180deg, #fffbe9, #ffefb0);
+}
+
+#top-gems {
+  background: linear-gradient(180deg, #f5fcff, #d9f1ff);
+  border-color: #a9d6ee;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 2px 0 #a9d6ee;
+}
+
+:root[data-theme="dark"] #top-gold {
+  background: linear-gradient(180deg, #3d3526, #31291a);
+}
+
+:root[data-theme="dark"] #top-gems {
+  background: linear-gradient(180deg, #243542, #1d2b36);
+  border-color: #3b5870;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 0 #3b5870;
+}
+
+/* ------------------------------------------------------------- buttons */
+
+.btn {
+  background: linear-gradient(180deg, var(--card-top), var(--card-bottom));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 3px 0 var(--line-strong), 0 8px 14px -10px rgba(41, 38, 31, 0.5);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.03);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 5px 0 var(--line-strong), 0 14px 18px -12px rgba(41, 38, 31, 0.55);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 0 var(--line-strong);
+}
+
+.btn--primary {
+  border-color: var(--sun-deep);
+  background: linear-gradient(180deg, #fff3a0 0%, var(--sun) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 3px 0 var(--press), 0 10px 16px -10px rgba(190, 130, 0, 0.7);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #fff7bd 0%, #ffdc5a 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 5px 0 var(--press), 0 16px 20px -12px rgba(190, 130, 0, 0.8);
+}
+
+.btn--primary:active:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 0 var(--press);
+}
+
+.btn--xl {
+  padding: 16px 52px;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.85), 0 6px 0 var(--press), 0 18px 26px -14px rgba(190, 130, 0, 0.85);
+}
+
+.btn--xl:hover:not(:disabled) {
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.9), 0 8px 0 var(--press), 0 24px 30px -14px rgba(190, 130, 0, 0.9);
+}
+
+.btn--xl:active:not(:disabled) {
+  transform: translateY(5px);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5), 0 1px 0 var(--press);
+}
+
+.btn--danger {
+  border-color: color-mix(in srgb, var(--bad) 70%, var(--line-strong));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 3px 0 color-mix(in srgb, var(--bad) 45%, var(--line-strong));
+}
+
+.btn:disabled {
+  filter: saturate(0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 0 var(--line);
+}
+
+/* ---------------------------------------------------------- the dock */
+
+.tabbar {
+  margin: 0 clamp(10px, 3vw, 24px) calc(10px + env(safe-area-inset-bottom, 0px));
+  padding: 8px clamp(6px, 1.6vw, 14px);
+  border: 1px solid var(--glass-edge);
+  border-radius: 28px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(16px) saturate(1.35);
+  backdrop-filter: blur(16px) saturate(1.35);
+  box-shadow: 0 18px 34px -18px rgba(41, 38, 31, 0.55), inset 0 2px 0 rgba(255, 255, 255, 0.5);
+}
+
+.tab {
+  border-radius: 20px;
+  font-size: 12px;
+}
+
+.tab.is-active {
+  background: linear-gradient(180deg, rgba(255, 240, 150, 0.9), rgba(255, 224, 90, 0.6));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 0 0 1px rgba(224, 185, 60, 0.45);
+}
+
+:root[data-theme="dark"] .tab.is-active {
+  background: linear-gradient(180deg, rgba(247, 217, 76, 0.22), rgba(247, 217, 76, 0.1));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 0 1px rgba(247, 217, 76, 0.3);
+}
+
+.tab--main {
+  border: 1px solid var(--sun-deep);
+  background: linear-gradient(180deg, #fff3a0, var(--sun));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.85), 0 5px 0 var(--press), 0 14px 22px -10px rgba(210, 140, 0, 0.75);
+}
+
+.tab--main.is-active,
+.tab--main:hover,
+:root[data-theme="dark"] .tab--main.is-active {
+  background: linear-gradient(180deg, #fff8c4, #ffe066);
+}
+
+.tab:not(.tab--main).is-active::before {
+  top: 3px;
+  width: 22px;
+  height: 4px;
+  margin-left: -11px;
+  background: linear-gradient(90deg, var(--sun), var(--sun-deep));
+  box-shadow: 0 0 10px rgba(242, 163, 27, 0.7);
+}
+
+/* ------------------------------------------------------------- cards */
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: linear-gradient(180deg, var(--card-top), var(--card-bottom));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), var(--shadow);
+}
+
+:root[data-theme="dark"] .panel {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), var(--shadow);
+}
+
+.gift.is-ready,
+.quest.is-ready,
+.ascend.is-ready,
+.pethero,
+.petteam {
+  border-color: var(--sun-deep);
+  background:
+    radial-gradient(420px 160px at 0% 0%, rgba(255, 224, 90, 0.55), transparent 70%),
+    linear-gradient(180deg, #fffbe6, #fff0b0);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 0 0 1px rgba(255, 210, 63, 0.4), var(--shadow);
+}
+
+:root[data-theme="dark"] .gift.is-ready,
+:root[data-theme="dark"] .quest.is-ready,
+:root[data-theme="dark"] .ascend.is-ready,
+:root[data-theme="dark"] .pethero,
+:root[data-theme="dark"] .petteam {
+  background:
+    radial-gradient(420px 160px at 0% 0%, rgba(247, 217, 76, 0.18), transparent 70%),
+    linear-gradient(180deg, #403720, #2d2718);
+}
+
+.lead {
+  font-size: 15.5px;
+}
+
+.section {
+  font-size: 24px;
+}
+
+.section::before {
+  content: "";
+  flex: none;
+  align-self: center;
+  width: 10px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--sun), var(--sun-deep));
+  box-shadow: 0 2px 0 var(--press);
+}
+
+.section::after {
+  background: linear-gradient(90deg, var(--line-strong), transparent);
+}
+
+.kicker {
+  letter-spacing: 0.14em;
+}
+
+/* the chapter card on the Battle screen takes on its zone colour */
+.chapter {
+  border-color: color-mix(in srgb, var(--zone, var(--rind)) 45%, var(--line));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 24px 44px -28px color-mix(in srgb, var(--zone, var(--rind)) 80%, transparent),
+    var(--shadow);
+}
+
+.chapter__title h1 {
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.7);
+}
+
+:root[data-theme="dark"] .chapter__title h1 {
+  text-shadow: 0 2px 12px color-mix(in srgb, var(--zone, #f7d94c) 40%, transparent);
+}
+
+.stage {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 -30px 40px -30px rgba(0, 0, 0, 0.45);
+}
+
+.facts > div {
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fffdf2, #fff3cc);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+:root[data-theme="dark"] .facts > div {
+  background: linear-gradient(180deg, #38322a, #2e2920);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.slot,
+.deal,
+.dev__row {
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--card-top), var(--card-bottom));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), var(--shadow-sm);
+}
+
+.talent__icon,
+.ascend__art {
+  background: linear-gradient(180deg, #fff6c2, #ffe36a);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 2px 0 var(--press);
+}
+
+:root[data-theme="dark"] .talent__icon,
+:root[data-theme="dark"] .ascend__art {
+  background: linear-gradient(180deg, #4a4020, #3a3118);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 0 #2a2210;
+}
+
+/* ------------------------------------------------------ bars and tags */
+
+.bar {
+  height: 10px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--line-strong) 55%, var(--surface));
+  box-shadow: inset 0 1px 2px rgba(41, 38, 31, 0.18);
+}
+
+.bar i {
+  position: relative;
+  background: linear-gradient(180deg, #ffe97a 0%, var(--sun) 45%, var(--sun-deep) 100%);
+  box-shadow: 0 0 10px -2px rgba(255, 190, 40, 0.7);
+}
+
+.bar i::after {
+  content: "";
+  position: absolute;
+  inset: 1px 4px auto 4px;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.odds {
+  padding: 3px 9px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.tile {
+  border-radius: 18px;
+}
+
+.tile::after {
+  content: "";
+  position: absolute;
+  inset: 3px 3px 55% 3px;
+  border-radius: 13px 13px 40px 40px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------ pop-ups */
+
+.modal {
+  border: 1px solid var(--glass-edge);
+  border-radius: 28px;
+  background: linear-gradient(180deg, var(--card-top), var(--card-bottom));
+  box-shadow: 0 40px 80px -30px rgba(41, 38, 31, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.modal::backdrop {
+  background: radial-gradient(900px 600px at 50% 40%, rgba(41, 38, 31, 0.45), rgba(20, 18, 12, 0.72));
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.modal__close {
+  background: linear-gradient(180deg, var(--card-top), var(--card-bottom));
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 2px 0 var(--line-strong);
+}
+
+.toast {
+  box-shadow: 0 16px 30px -14px rgba(41, 38, 31, 0.7);
+}
+
+/* ------------------------------------------------------- small polish */
+
+.screen {
+  padding-top: 12px;
+}
+
+.screen::-webkit-scrollbar {
+  width: 10px;
+}
+
+.screen::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 99px;
+  background: var(--line-strong) padding-box;
+}
+
+@media (hover: hover) {
+  .talent:hover,
+  .quest:hover,
+  .chest:hover,
+  .deal:hover,
+  .gift:hover,
+  .pet:hover {
+    transform: translateY(-3px);
+    border-color: var(--sun-deep);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 20px 30px -20px rgba(150, 100, 0, 0.55);
+  }
+}
+
+@media (max-width: 520px) {
+  .topbar {
+    margin-inline: 8px;
+    border-radius: 18px;
+  }
+
+  .status {
+    margin-inline: 8px;
+    border-radius: 12px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .tabbar {
+    margin-inline: 8px;
+    border-radius: 24px;
+  }
+
+  .section {
+    font-size: 21px;
+  }
+}
+
+/* a pet in the build bar: its picture, then its name and level */
+.chip--pet {
+  gap: 5px;
+  padding: 3px 9px 3px 4px;
+}
+
+.chip--pet svg {
+  width: 26px;
+  height: 26px;
+}
+
+.chip--pet em {
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.chip--pet b {
+  position: static;
+  margin-left: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+/* the dev password only gets one section, so there is no list beside it */
+.devshell__main--solo {
+  grid-template-columns: minmax(0, 1fr);
 }

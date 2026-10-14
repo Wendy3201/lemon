@@ -28,7 +28,13 @@
     wind: { c: "#E3EEF9", d: "#6C8FB5" },
     pebble: { c: "#B5AFA6", d: "#6F6A62" },
     dew: { c: "#7FD4F5", d: "#3A9BD9" },
-    heart: { c: "#5DB661", d: "#B97F14" }
+    heart: { c: "#5DB661", d: "#B97F14" },
+    warden: { c: "#4E7A3A", d: "#2F4F22", shape: "dome" },
+    thornmail: { c: "#6B5A4A", d: "#CBD2DC" },
+    gale: { c: "#B7E1F2", d: "#4FA0C8" },
+    locket: { c: "#DDF4FF", d: "#5C6B8A" },
+    firstwind: { c: "#FFFCF2", d: "#C98A1B" },
+    firstseed: { c: "#8FAE65", d: "#F2B93B" }
   };
 
   function trim(item) {

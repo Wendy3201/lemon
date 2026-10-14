@@ -111,6 +111,52 @@
     R = B.run = null;
   };
 
+  /* ------------------------------------------------------- shaded bodies */
+  /* Everything with a round body is drawn with a lit side, a shaded rim and a
+     glint, so the pests, the bosses and the lemon read as little solid things
+     instead of flat discs. `tint` lightens (amount > 0) or darkens (< 0) a
+     #rrggbb colour. */
+
+  B.tint = function (hex, amount) {
+    var n = parseInt(hex.slice(1), 16);
+    var out = [n >> 16, (n >> 8) & 255, n & 255].map(function (c) {
+      var v = amount > 0 ? c + (255 - c) * amount : c * (1 + amount);
+      return Math.max(0, Math.min(255, Math.round(v)));
+    });
+    return "rgb(" + out[0] + "," + out[1] + "," + out[2] + ")";
+  };
+
+  /** A lit ball in the current fill colour. Other fill styles are drawn flat. */
+  B.ball = function (ctx, x, y, r) {
+    var c = ctx.fillStyle;
+    if (typeof c !== "string" || c.charAt(0) !== "#" || c.length !== 7) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+    var g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.08, x, y, r * 1.05);
+    g.addColorStop(0, B.tint(c, 0.42));
+    g.addColorStop(0.5, c);
+    g.addColorStop(1, B.tint(c, -0.34));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    if (r > 6) {
+      ctx.strokeStyle = B.tint(c, -0.55);
+      ctx.globalAlpha *= 0.55;
+      ctx.lineWidth = Math.max(1, r * 0.07);
+      ctx.stroke();
+      ctx.globalAlpha /= 0.55;
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
+      ctx.beginPath();
+      ctx.ellipse(x - r * 0.36, y - r * 0.44, r * 0.26, r * 0.14, -0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = c;
+  };
+
   function resize() {
     if (!canvas) return;
     var cw = canvas.clientWidth || window.innerWidth;
@@ -164,6 +210,7 @@
     R.procs = 0;
     R.src = R.weaponId;
     updatePlayer(dt);
+    if (B.petUpdate) B.petUpdate(dt);
     B.director(dt);
     updateEnemies(dt);
     updateShots(dt);
@@ -1447,28 +1494,82 @@
 
     if (p.invuln > 0) ctx.globalAlpha = 0.55 + 0.35 * Math.sin(R.t * 30);
     B.drawOutfit(ctx, p, y, "under", R.t);
+    // the lemon is a little squashed and stretched as it moves
+    var squash = p.moving ? Math.sin(R.t * 14) * 0.05 : Math.sin(R.t * 3) * 0.02;
+    ctx.save();
+    ctx.translate(p.x, y);
+    ctx.scale((14 / 12) * (1 + squash), 1 - squash);
     ctx.fillStyle = p.flash > 0 ? P.white : P.lemon;
+    B.ball(ctx, 0, 0, 12);
     ctx.strokeStyle = P.rind;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2.2;
     ctx.beginPath();
-    ctx.ellipse(p.x, y, 14, 12, 0, 0, TAU);
-    ctx.fill();
+    ctx.arc(0, 0, 12, 0, TAU);
     ctx.stroke();
+    ctx.restore();
+    // the pointed tips a lemon has
+    ctx.fillStyle = p.flash > 0 ? P.white : P.rind;
+    ctx.beginPath();
+    ctx.moveTo(p.x - 14.5, y - 1.5);
+    ctx.lineTo(p.x - 18, y);
+    ctx.lineTo(p.x - 14.5, y + 1.5);
+    ctx.closePath();
+    ctx.moveTo(p.x + 14.5, y - 1.5);
+    ctx.lineTo(p.x + 18, y);
+    ctx.lineTo(p.x + 14.5, y + 1.5);
+    ctx.closePath();
+    ctx.fill();
     B.drawOutfit(ctx, p, y, "body", R.t);
     B.drawOutfit(ctx, p, y, "head", R.t);
+    // a leaf with a vein
+    ctx.save();
+    ctx.translate(p.x + 5, y - 12);
+    ctx.rotate(-0.6);
     ctx.fillStyle = P.green;
     ctx.beginPath();
-    ctx.ellipse(p.x + 5, y - 12, 6, 3, -0.6, 0, TAU);
+    ctx.ellipse(0, 0, 6.4, 3.2, 0, 0, TAU);
     ctx.fill();
-
-    // eyes follow whatever the lemon is aiming at
-    var ex = Math.cos(p.aim) * 2.4;
-    var ey = Math.sin(p.aim) * 1.8;
-    ctx.fillStyle = P.charcoal;
+    ctx.strokeStyle = "#5F8244";
+    ctx.lineWidth = 0.9;
     ctx.beginPath();
-    ctx.arc(p.x - 4.5 + ex, y - 1 + ey, 1.9, 0, TAU);
-    ctx.arc(p.x + 4.5 + ex, y - 1 + ey, 1.9, 0, TAU);
+    ctx.moveTo(-5, 0);
+    ctx.lineTo(5, 0);
+    ctx.stroke();
+    ctx.restore();
+
+    // cheeks, and eyes that follow whatever the lemon is aiming at
+    ctx.fillStyle = "rgba(240,120,90,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(p.x - 8.2, y + 3, 2.6, 1.6, 0, 0, TAU);
+    ctx.ellipse(p.x + 8.2, y + 3, 2.6, 1.6, 0, 0, TAU);
     ctx.fill();
+    var ex = Math.cos(p.aim) * 1.6;
+    var ey = Math.sin(p.aim) * 1.2;
+    for (var side = -1; side <= 1; side += 2) {
+      ctx.fillStyle = "#FFFCF2";
+      ctx.beginPath();
+      ctx.arc(p.x + side * 4.6, y - 1.5, 3.1, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = P.charcoal;
+      ctx.beginPath();
+      ctx.arc(p.x + side * 4.6 + ex, y - 1.5 + ey, 1.8, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = "#FFFFFF";
+      ctx.beginPath();
+      ctx.arc(p.x + side * 4.6 + ex - 0.6, y - 2.2 + ey, 0.6, 0, TAU);
+      ctx.fill();
+    }
+    // a small smile, an "oh" when it has just been hit
+    ctx.strokeStyle = P.charcoal;
+    ctx.lineWidth = 1.2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    if (p.flash > 0) {
+      ctx.arc(p.x, y + 5, 1.3, 0, TAU);
+    } else {
+      ctx.arc(p.x, y + 3, 2.6, 0.25, Math.PI - 0.25);
+    }
+    ctx.stroke();
     ctx.globalAlpha = 1;
 
     R.weapon.held(ctx, p, R);
@@ -1681,6 +1782,7 @@
     for (i = 0; i < R.shots.length; i++) B.drawShot(ctx, R.shots[i], R);
     B.drawAbilities(ctx, R);
     drawPlayer();
+    if (B.petDraw) B.petDraw(ctx, R);
     drawFx();
 
     for (i = 0; i < R.sparks.length; i++) {

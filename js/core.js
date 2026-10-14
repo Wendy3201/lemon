@@ -221,20 +221,40 @@
      construction page or in the footer). While unlocked, battles show a DEV
      button and the lobby's dev menu opens without asking again. */
 
+  /* Two levels. The dev password (level 1) opens the battle tools: the Battle
+     section of the lobby dev menu and the DEV panel inside a battle. The admin
+     password (level 2) opens everything, and it can only be asked for after
+     the secret key code (see ui.js) has been typed. */
   var KEY_DEV = "lemon:dev";
-  var devOn = false;
-  try { devOn = sessionStorage.getItem(KEY_DEV) === "1"; } catch (err) { /* blocked */ }
+  var devLevel = 0;
+  try { devLevel = Number(sessionStorage.getItem(KEY_DEV)) || 0; } catch (err) { /* blocked */ }
+  if (devLevel !== 1 && devLevel !== 2) devLevel = 0;
 
   PS.dev = {
     password: "3.1415925",
-    unlocked: devOn,
+    adminPassword: "3.1415926",
+    level: devLevel,
+    unlocked: devLevel >= 1,
+    admin: devLevel >= 2,
     // switches the battle looks at; they reset whenever a battle starts
     cheats: { god: false, oneHit: false, speed: 1 },
     // what the next battle starts with (set in the lobby dev menu's Battle section)
     startWith: { god: false, oneHit: false, speed: 1 },
-    unlock: function () {
+    /** level 1 (dev) or 2 (admin); never lowers a level that is already open */
+    unlock: function (level) {
+      level = level === 2 ? 2 : 1;
+      if (level < PS.dev.level) return;
+      PS.dev.level = level;
       PS.dev.unlocked = true;
-      try { sessionStorage.setItem(KEY_DEV, "1"); } catch (err) { /* blocked */ }
+      PS.dev.admin = level >= 2;
+      try { sessionStorage.setItem(KEY_DEV, String(level)); } catch (err) { /* blocked */ }
+      PS.emit("dev");
+    },
+    lock: function () {
+      PS.dev.level = 0;
+      PS.dev.unlocked = false;
+      PS.dev.admin = false;
+      try { sessionStorage.removeItem(KEY_DEV); } catch (err) { /* blocked */ }
       PS.emit("dev");
     }
   };

@@ -59,6 +59,7 @@ GitHub Pages, Netlify or any web host. Nothing needs compiling.
 | **Battle** | Pick a chapter and fight. Shows your Power against the chapter's recommended Power. |
 | **Equipment** | Six slots: weapon, ring, amulet, helmet, armour, boots. Level slots up with gold, swap gear, and open the **Forge**. |
 | **Shop** | A free gift every four hours, chests bought with gems (a fixed price: 10 for a Seed Crate, 40 for a Gilded Chest), four deals a day (never S-grade), and gold for gems. |
+| **Pets** | Hatch pets from eggs bought with gems in the Shop (Common 70%, Uncommon 18%, Rare 9%, Epic 3%; never S or SS). You start with one team slot and can unlock a second (150 gems) and a third (400 gems); every pet in your team fights beside you and gives its stat bonus. Hatching a duplicate, or spending gold, levels it up. |
 | **Talents** | Permanent bonuses bought with gold. Max every talent in a tier and you can **ascend**: tier II and tier III repeat the talents at a bigger bonus and a much bigger price, and add Lucky Star, Wide Swing and Giant Slayer. |
 | **Quests** | Ladders of goals that pay gems. |
 
@@ -193,7 +194,8 @@ Most tweaks are one line in `js/data.js`.
   naturally has by each chapter, so if you make gear or gold much more
   generous, raise them to match.
 - **A new upgrade card:** add it to `UPGRADES` in `js/upgrades.js`.
-- **The password on the `?` button** is `PS.dev.password` in `js/core.js`. It is
+- **Two passwords.** The dev password (`PS.dev.password` in `js/core.js`) opens the battle tools only: the Battle section of the lobby dev menu and the DEV panel in a battle. The admin password (`PS.dev.adminPassword`) opens everything, including a full admin menu in the lobby and an extra Admin tab in battle. The admin prompt is hidden: type the key code up, up, down, down, left, right, left, right, B, A anywhere in the menus to open it.
+- **The password on the `?` button** is the dev password. It is
   checked in the browser, so anyone who reads the file can see it. Entering it
   once (here or on the construction page) unlocks developer tools for that tab:
   a **DEV button in every battle** (godmode, one-hit kills, game speed, take or

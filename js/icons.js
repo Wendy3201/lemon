@@ -156,6 +156,7 @@
     tabBattle: group("rotate(45 12 12)", fill("M12 0 14.2 3v11.5H9.8V3z") + box(6.8, 14.5, 10.4, 2.3, 1) + box(10.7, 16.8, 2.6, 4.6, 0.8)) +
       group("rotate(-45 12 12)", fill("M12 0 14.2 3v11.5H9.8V3z") + box(6.8, 14.5, 10.4, 2.3, 1) + box(10.7, 16.8, 2.6, 4.6, 0.8)),
     tabTalents: line("M12 21.5V11", null, 2.6) + fill("M12 12C7 12 4 9 3.5 4.5 8.5 4.5 11.5 7 12 12z") + fill("M12 15.5c0-4 2.5-6.5 8-7-.3 4.8-3 7-8 7z"),
+    tabPets: dot(12, 16, 5.2) + dot(5.6, 10.6, 2.5) + dot(9.6, 5.6, 2.5) + dot(14.4, 5.6, 2.5) + dot(18.4, 10.6, 2.5),
     tabQuests: '<rect x="4.5" y="3" width="15" height="18" rx="2.6" fill="none" stroke="currentColor" stroke-width="2.2"/>' +
       line("M7.8 9l1.4 1.4L11.6 8M7.8 15l1.4 1.4 2.4-2.4M14 9.5h2.6M14 15.5h2.6", null, 1.8)
   };
@@ -352,6 +353,91 @@
       group("translate(24 32) scale(0.9) translate(-12 -12.5)", fill(HEART, "#5DB661")) +
       oval(20.4, 29, 2.4, 1.6, C.white, 'opacity="0.75" transform="rotate(-30 20.4 29)"')),
 
+
+    /* more weapons and gear */
+    whip:
+      line("M13 41Q3 25 19 19Q33 14 37 4", C.woodDark, 5.6) + line("M13 41Q3 25 19 19Q33 14 37 4", "#8FAE65", 3.4) +
+      box(9, 39, 8, 7, 2, C.woodDark) + box(10, 40, 6, 5, 1.4, C.wood) + poly("37,2 41,7 35,8", C.goldDark),
+
+    cannon:
+      group("rotate(-30 24 26)",
+        box(5, 18, 33, 13, 4, C.slate) + box(34, 15, 9, 19, 3, "#39445C") + box(6, 20, 31, 3.4, 1.4, "#8D96A8", 'opacity="0.7"') +
+        dot(12, 33, 6.5, C.woodDark) + dot(12, 33, 3, C.wood)) +
+      dot(40, 9, 2.4, "#FFB84A") + dot(44, 16, 1.8, "#FFB84A") + dot(37, 4, 1.6, "#FFB84A"),
+
+    mace: tilt(
+      box(22.4, 18, 3.2, 28, 1.4, C.wood) + dot(24, 12, 10, C.steelDark) + dot(24, 12, 7.6, C.steel) +
+      poly("24,-4 27,3 21,3", C.steelDark) + poly("13,3 19,6 15,10", C.steelDark) + poly("35,3 29,6 33,10", C.steelDark) +
+      poly("14,18 20,16 18,21", C.steelDark) + poly("34,18 28,16 30,21", C.steelDark) + dot(21, 9, 2.4, C.white, 'opacity="0.8"')),
+
+    flask:
+      box(19, 3, 10, 6, 1.6, C.wood) + fill("M19 9H29V16L37 32Q40 43 30 44H18Q8 43 11 32L19 16Z", "#DDF4FF", 'opacity="0.85"') +
+      fill("M15.4 29Q24 33 32.6 29L36 34Q38 42 30 43H18Q10 42 12 34Z", "#6FBF5A") + oval(24, 29.5, 8.4, 2.4, "#9BE08A") +
+      dot(20, 37, 2, "#C8F2B0") + dot(28, 39, 1.4, "#C8F2B0") + oval(18, 22, 1.8, 5, C.white, 'opacity="0.7" transform="rotate(14 18 22)"'),
+
+    comet: staff("#5C4A3A",
+      poly("24,0 30,8 24,20 18,8", "#FFB84A") + dot(24, 9, 6.5, "#FFD166") + dot(22.4, 7.4, 2, C.white) +
+      line("M33 1 41 -2M35 7 44 5", "#FFB84A", 2.2, 'opacity="0.8"') + box(21.2, 19, 5.6, 3, 1, "#3A2A10")),
+
+    hive:
+      fill("M7 32Q9 15 25 12L40 7Q43 25 31 37Q18 46 7 32z", "#E0A93B") + fill("M40 7Q43 25 31 37Q36 22 40 7z", "#B97F14", 'opacity="0.6"') +
+      line("M16 17Q15 31 25 38M24 13Q23 28 30 35", "#3A2A10", 2.4, 'opacity="0.8"') +
+      oval(41, 14, 4.2, 8.4, "#3A2A10", 'transform="rotate(-18 41 14)"') + oval(41, 14, 2.2, 6, "#FFD166", 'transform="rotate(-18 41 14)"') +
+      dot(9, 36, 3.2, "#3A2A10"),
+
+    thornlash:
+      line("M13 41Q3 25 19 19Q33 14 37 4", "#3A2F52", 5.8) + line("M13 41Q3 25 19 19Q33 14 37 4", C.violet, 3.6) +
+      poly("11,28 5,26 10,32", C.violetDark) + poly("19,17 17,11 23,15", C.violetDark) + poly("30,13 31,7 35,11", C.violetDark) +
+      box(9, 39, 8, 7, 2, "#3A2F52") + box(10, 40, 6, 5, 1.4, "#5B4B8A") + poly("37,1 42,7 35,8", "#C9BEFF"),
+
+    nova:
+      poly(star(24, 24, 21, 8, 10), "#F2A31B") + poly(star(24, 24, 17, 7, 10, 0.15), "#FFD166") +
+      dot(24, 24, 9, C.white) + dot(24, 24, 6, "#FFF4B8") + dot(24, 24, 3, "#F2B93B"),
+
+    geyser:
+      box(10, 38, 28, 6, 3, C.slate) + box(15, 33, 18, 7, 2.4, "#8D96A8") +
+      fill("M24 34C20 26 21 16 24 6C27 16 28 26 24 34z", "#7FD4F5") + fill("M24 30C22 24 22.6 17 24 10C25.4 17 26 24 24 30z", "#DDF4FF") +
+      line("M20 24Q12 20 9 11M28 24Q36 20 39 11", "#7FD4F5", 3) +
+      dot(9, 9, 2.4, "#DDF4FF") + dot(39, 9, 2.4, "#DDF4FF") + dot(15, 6, 1.8, "#DDF4FF") + dot(33, 5, 1.8, "#DDF4FF"),
+
+    warden:
+      fill(DOME, "#4E7A3A") + fill("M24 11Q40 11 40 31H24Z", "#3A5C2B", 'opacity="0.45"') + box(5, 29.5, 38, 6, 3, "#3A5C2B") +
+      oval(14, 11, 7, 3.4, C.leafLight, 'transform="rotate(-35 14 11)"') + oval(24, 7, 7, 3.4, C.leaf, 'transform="rotate(-90 24 7)"') +
+      oval(34, 11, 7, 3.4, C.leafLight, 'transform="rotate(35 34 11)"') + poly("24,19 27,24 24,29 21,24", C.gold),
+
+    thornmail:
+      fill(VEST, "#6B5A4A") + fill("M24 12H28L34 8 41 15 36 21V41H24Z", "#4A3B2E", 'opacity="0.45"') +
+      poly("9,16 4,13 8,21", "#CBD2DC") + poly("39,16 44,13 40,21", "#CBD2DC") + poly("14,41 12,46 19,42", "#CBD2DC") +
+      poly("34,41 36,46 29,42", "#CBD2DC") + poly("24,40 21,46 27,46", "#CBD2DC") +
+      line("M17 20v17M24 14v25M31 20v17", "#2E241B", 1.6, 'opacity="0.75"') + line("M20 12Q24 17 28 12", C.steelLight, 2),
+
+    gale: boot("#B7E1F2", "#E3F6FF", "#4FA0C8",
+      fill("M15 22Q0 19 2 5Q8 12 15 11Z", C.white, 'stroke="#7FD4F5" stroke-width="1.5"') +
+      fill("M15 27Q3 29 2 18Q8 22 15 20Z", C.white, 'stroke="#7FD4F5" stroke-width="1.5"') +
+      line("M31 30l6 2M33 35l5 1", "#7FD4F5", 2)),
+
+    rindring: ringArt("#E0B93C", "#B97F14",
+      poly("24,4 31,12 24,20 17,12", "#F7D94C") + poly("24,4 31,12 17,12", C.pale) + poly(star(37, 6, 4, 1.4, 4), C.white)),
+
+    locket: amulet(
+      oval(24, 32, 10, 11, "#5C6B8A") + oval(24, 31.4, 8.6, 9.6, "#8D96A8") + oval(24, 31.4, 5.4, 6.4, "#DDF4FF") +
+      poly(star(24, 31.4, 4.6, 1.6, 4), "#F2B93B") + oval(20.4, 26.4, 2, 1.4, C.white, 'opacity="0.8"')),
+
+    firstwind: boot("#FFFCF2", "#FFE08A", "#C98A1B",
+      fill("M15 22Q-1 19 1 3Q8 11 15 10Z", "#FFE08A", 'stroke="#F2B93B" stroke-width="1.5"') +
+      fill("M15 27Q2 30 1 17Q8 22 15 20Z", "#FFE08A", 'stroke="#F2B93B" stroke-width="1.5"') +
+      poly(star(30, 22, 5, 1.8, 4), C.gold) + line("M33 34l6 2", "#F2B93B", 2)),
+
+    evering: ringArt(C.gold, C.goldDark,
+      poly(star(24, 12, 11, 4.2, 8), "#F2A31B") + dot(24, 12, 5.2, C.white) + dot(24, 12, 3, "#7FD4F5") +
+      poly(star(39, 5, 4.5, 1.6, 4), C.white) + poly(star(9, 21, 3.4, 1.2, 4), C.white)),
+
+    firstseed: amulet(
+      fill("M24 20C34 22 38 31 33 39C29 44 19 44 15 39C10 31 14 22 24 20z", "#F2B93B") +
+      fill("M24 23C31 25 34 31 30.5 37C28 40.5 20 40.5 17.5 37C14 31 17 25 24 23z", "#8FAE65") +
+      line("M24 24V40", "#5F8244", 1.8) + oval(20, 29, 2.6, 1.6, C.white, 'opacity="0.7" transform="rotate(-30 20 29)"') +
+      poly(star(36, 16, 4.4, 1.5, 4), C.white) + poly(star(11, 24, 3.2, 1.1, 4), C.white)),
+
     /* shop art */
     crate:
       box(7, 17, 34, 25, 3, C.woodDark) + box(8.6, 18.6, 30.8, 21.8, 2, C.wood) +
@@ -377,9 +463,16 @@
 
     /* the hero and the bosses, for the menus */
     lemon:
-      oval(24, 28, 17, 14, C.lemon, 'stroke="' + C.rind + '" stroke-width="2.4"') + oval(18, 22.6, 5, 3, C.pale, 'opacity="0.85"') +
-      fill("M24 14c0-5 4-8 9-8-1 5-4 8-9 8z", C.leaf) + dot(19.5, 28, 2.1, C.ink) + dot(28.5, 28, 2.1, C.ink) +
-      line("M21 33.5Q24 35.5 27 33.5", C.ink, 1.6),
+      '<defs><radialGradient id="lemonShade" cx="34%" cy="30%" r="78%"><stop offset="0" stop-color="#FFF6B0"/>' +
+      '<stop offset="0.5" stop-color="#F7D94C"/><stop offset="1" stop-color="#D9A81E"/></radialGradient></defs>' +
+      poly("5,28 1.4,28.6 5.4,30.4", C.rind) + poly("43,28 46.6,28.6 42.6,30.4", C.rind) +
+      '<ellipse cx="24" cy="28" rx="17.2" ry="14.2" fill="url(#lemonShade)" stroke="' + C.rind + '" stroke-width="2.2"/>' +
+      oval(17.5, 21.5, 5.4, 2.8, C.white, 'opacity="0.7" transform="rotate(-24 17.5 21.5)"') +
+      fill("M24 14c0-5 4-8 9-8-1 5-4 8-9 8z", C.leaf) + line("M25 12.4Q28.4 9 31.6 7.6", C.leafDark, 1.3) +
+      oval(13.6, 31.6, 2.8, 1.8, "#F08A6A", 'opacity="0.45"') + oval(34.4, 31.6, 2.8, 1.8, "#F08A6A", 'opacity="0.45"') +
+      dot(19.4, 27.4, 3.1, C.white) + dot(28.6, 27.4, 3.1, C.white) + dot(19.8, 27.8, 1.9, C.ink) + dot(29, 27.8, 1.9, C.ink) +
+      dot(19.2, 27, 0.7, C.white) + dot(28.4, 27, 0.7, C.white) +
+      line("M21.2 33.4Q24 36 26.8 33.4", C.ink, 1.6),
 
     queen:
       dot(24, 27, 15.5, "#7FB069") + line("M19 14Q13 8 15 3M29 14Q35 8 33 3", "#4E7A3A", 2.4) +
@@ -481,7 +574,8 @@
     var body;
     var face;
     var crown = poly("15,14 13.5,5 19,9.5 24,3 29,9.5 34.5,5 33,14", C.gold, 'stroke="' + C.goldDark + '" stroke-width="1"');
-    var eyes = dot(18.5, 25, 2.3, C.ink) + dot(29.5, 25, 2.3, C.ink) + line("M14.5 20 21 22.5M33.5 20 27 22.5", C.ink, 2);
+    var eyes = dot(18.5, 25, 3.4, C.white) + dot(29.5, 25, 3.4, C.white) + dot(19, 25.4, 2.1, C.ink) + dot(30, 25.4, 2.1, C.ink) +
+      dot(18.4, 24.6, 0.8, C.white) + dot(29.4, 24.6, 0.8, C.white) + line("M13.5 19.6 21.5 22.8M34.5 19.6 26.5 22.8", C.ink, 2.2);
     if (kind === "queen") {
       body = dot(24, 27, 15.5, L.body) + line("M19 14Q13 8 15 3M29 14Q35 8 33 3", L.dark, 2.4);
       face = eyes + crown;
@@ -490,7 +584,8 @@
         oval(37, 18, 9, 4.6, C.white, 'opacity="0.55" transform="rotate(28 37 18)"') +
         dot(24, 27, 14.5, L.body) + fill("M10.8 31h26.4a14.5 14.5 0 0 1-1.9 4.5H12.7A14.5 14.5 0 0 1 10.8 31z", L.dark) +
         poly("24,47 20.5,40.5 27.5,40.5", L.dark);
-      face = dot(18.5, 24, 2.3, C.ink) + dot(29.5, 24, 2.3, C.ink) + line("M14.5 19 21 21.5M33.5 19 27 21.5", C.ink, 2) + crown;
+      face = dot(18.5, 24, 3.4, C.white) + dot(29.5, 24, 3.4, C.white) + dot(19, 24.4, 2.1, C.ink) + dot(30, 24.4, 2.1, C.ink) +
+        dot(18.4, 23.6, 0.8, C.white) + dot(29.4, 23.6, 0.8, C.white) + line("M13.5 18.6 21.5 21.8M34.5 18.6 26.5 21.8", C.ink, 2.2) + crown;
     } else if (kind === "slug") {
       body = oval(22, 34, 19, 10, L.body) + dot(29, 27, 12, L.body) + line("M24 18 21 7M34 18 37 7", L.body, 4.4) +
         dot(21, 6, 4, C.white) + dot(37, 6, 4, C.white);
@@ -505,9 +600,121 @@
       body = fuzz + dot(24, 28, 14, L.body) + dot(17, 34, 2, L.dark) + dot(31.5, 32, 1.6, L.dark);
       face = eyes + poly("15,15 13.5,6 19,10.5 24,4 29,10.5 34.5,6 33,15", C.gold, 'stroke="' + C.goldDark + '" stroke-width="1"');
     }
+    // a lit side, a shaded edge and a glint, so the body is round
+    var cyBody = kind === "mould" ? 28 : 27;
+    var shade =
+      '<defs><radialGradient id="bossShade' + n + '" cx="34%" cy="30%" r="80%"><stop offset="0" stop-color="#fff" stop-opacity="0.38"/>' +
+      '<stop offset="0.55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.3"/></radialGradient></defs>' +
+      '<circle cx="24" cy="' + cyBody + '" r="14.4" fill="url(#bossShade' + n + ')"/>' +
+      oval(18, cyBody - 8, 4.6, 2.4, C.white, 'opacity="0.55" transform="rotate(-30 18 ' + (cyBody - 8) + ')"');
     return (
       '<svg class="art" viewBox="0 0 48 48" aria-hidden="true" focusable="false">' +
-      behind + body + patterned + front + face + "</svg>"
+      behind + body + shade + patterned + front + face + "</svg>"
+    );
+  };
+
+  /* ---------------------------------------------------------------- pets */
+
+  /* a pair of eyes: white, a pupil and a glint */
+  function pEyes(lx, ly, rx, ry, size) {
+    var s = size || 3;
+    return (
+      dot(lx, ly, s, C.white) + dot(rx, ry, s, C.white) +
+      dot(lx + 0.5, ly + 0.5, s * 0.62, C.ink) + dot(rx + 0.5, ry + 0.5, s * 0.62, C.ink) +
+      dot(lx - 0.4, ly - 0.5, s * 0.22, C.white) + dot(rx - 0.4, ry - 0.5, s * 0.22, C.white)
+    );
+  }
+
+  var PET_ART = {
+    bumble:
+      oval(11, 20, 9.5, 5.2, C.white, 'opacity="0.65" transform="rotate(-28 11 20)"') + oval(37, 20, 9.5, 5.2, C.white, 'opacity="0.65" transform="rotate(28 37 20)"') +
+      line("M6 16 14 21M42 16 34 21", "#DDF4FF", 1, 'opacity="0.9"') +
+      oval(24, 29, 13.5, 11.5, "#F2B93B") + oval(24, 25.5, 9, 5, "#FFE08A", 'opacity="0.7"') +
+      line("M13 27Q24 32 35 27M14.5 33Q24 38 33.5 33", "#3A2A10", 3.6) + poly("24,46 20.5,39.5 27.5,39.5", "#3A2A10") +
+      line("M19 18 15 9M29 18 33 9", "#3A2A10", 1.8) + dot(15, 8.4, 2.2, "#FFE14A") + dot(33, 8.4, 2.2, "#FFE14A") +
+      box(13.5, 21, 21, 6.4, 3.2, "#2B3A55", 'opacity="0.9"') + oval(19, 24.2, 4.4, 2.8, "#7FD4F5") + oval(29, 24.2, 4.4, 2.8, "#7FD4F5") +
+      oval(17.6, 23.4, 1.4, 0.9, C.white, 'opacity="0.9"') + oval(27.6, 23.4, 1.4, 0.9, C.white, 'opacity="0.9"') +
+      line("M21 30Q24 32.4 27 30", C.ink, 1.5),
+    ladybug:
+      line("M9 33 4 39M15 36 12 43M33 36 36 43M39 33 44 39", C.ink, 2.2) +
+      fill("M7 32Q7 9 24 9Q41 9 41 32Z", "#E5484D") + fill("M24 9Q41 9 41 32H24Z", "#B72C31", 'opacity="0.5"') +
+      line("M24 9V32", C.ink, 2.2) + dot(15, 20, 3.4, C.ink) + dot(33, 20, 3.4, C.ink) + dot(19, 28, 2.6, C.ink) + dot(29, 28, 2.6, C.ink) +
+      box(6, 31, 36, 4.4, 2.2, "#3A1113") + dot(24, 11.5, 6.8, C.ink) + dot(19.6, 10.4, 2.4, C.white) + dot(28.4, 10.4, 2.4, C.white) +
+      dot(20, 10.8, 1.2, C.ink) + dot(28.8, 10.8, 1.2, C.ink) + line("M20 6 15 1M28 6 33 1", C.ink, 1.7) +
+      poly("24,14 27,16.5 24,18.6 21,16.5", "#FFB1C0") + oval(17, 6, 3.6, 2.2, "#FFB1C0", 'transform="rotate(-25 17 6)"') +
+      oval(31, 6, 3.6, 2.2, "#FFB1C0", 'transform="rotate(25 31 6)"') + oval(14, 14, 3.4, 1.8, C.white, 'opacity="0.55" transform="rotate(-35 14 14)"'),
+    snail:
+      oval(22, 37, 18, 6.2, "#E3D2B0") + oval(20, 35.5, 12, 3, "#F2E6CB", 'opacity="0.8"') +
+      line("M9 34Q4 24 8 15M15 33Q12 22 16 14", "#E3D2B0", 3.6) + pEyes(8, 14.4, 16, 13.4, 2.8) +
+      dot(29, 25, 12.5, "#8F7A55") + dot(29, 25, 10.6, "#B9A98A") +
+      line("M29 25m-6.4 0a6.4 6.4 0 1 1 6.4 6.4a3.2 3.2 0 1 1-3.2-3.2", "#6F5F3E", 2.2) +
+      poly("22,18 18,9 26,15", "#7FD4F5") + poly("30,14 29,4 35,13", "#9BE0FF") + poly("37,17 42,10 41,20", "#7FD4F5") +
+      oval(24.6, 19, 3.2, 1.8, C.white, 'opacity="0.6" transform="rotate(-30 24.6 19)"') + line("M10 18Q12 20 14 18", C.ink, 1.3),
+    ant:
+      line("M13 31 9 40M20 32 19 42M30 30 31 41M36 28 41 37M16 28 10 35M26 28 27 38", "#3A2616", 2) +
+      dot(11, 30, 6.8, "#4A3320") + dot(22.5, 28, 5.2, "#6F4A2A") + dot(36, 26, 8, "#4A3320") +
+      oval(33.4, 22.6, 3.2, 1.8, "#8F6A44", 'opacity="0.8" transform="rotate(-30 33.4 22.6)"') +
+      line("M38 18 42 9M42 21 47 13", "#3A2616", 1.8) + dot(42, 8.6, 1.8, "#3A2616") + dot(47, 12.4, 1.8, "#3A2616") +
+      box(32.5, 22.4, 12, 5.6, 2.8, "#1B1630") + oval(36, 25.2, 3.4, 2.2, "#3A4A78") + oval(42, 25.2, 3.4, 2.2, "#3A4A78") +
+      oval(35, 24.4, 1.2, 0.7, C.white, 'opacity="0.8"') + line("M36.5 30Q39 31.8 41.5 30", C.white, 1.4),
+    moth:
+      fill("M24 25Q5 6 2 22Q3 40 24 33Z", "#D8CDB4") + fill("M24 25Q43 6 46 22Q45 40 24 33Z", "#D8CDB4") +
+      fill("M24 25Q13 15 8 23Q10 31 24 31Z", "#A99C7C", 'opacity="0.6"') + fill("M24 25Q35 15 40 23Q38 31 24 31Z", "#A99C7C", 'opacity="0.6"') +
+      dot(12, 22, 3.8, "#6F654F") + dot(12, 22, 2.2, C.white) + dot(12, 22, 1, C.ink) +
+      dot(36, 22, 3.8, "#6F654F") + dot(36, 22, 2.2, C.white) + dot(36, 22, 1, C.ink) +
+      oval(24, 28, 4.6, 11, "#8F826A") + oval(24, 26, 3, 6, "#C9BEA6", 'opacity="0.8"') + dot(24, 17, 4.6, "#6F654F") +
+      dot(22.2, 16.4, 1.5, C.white) + dot(25.8, 16.4, 1.5, C.white) + dot(22.4, 16.6, 0.8, C.ink) + dot(26, 16.6, 0.8, C.ink) +
+      line("M22 13Q18 7 13 7M26 13Q30 7 35 7", "#6F654F", 1.6) + dot(12.6, 6.8, 1.4, "#FFE08A") + dot(35.4, 6.8, 1.4, "#FFE08A"),
+    firefly:
+      oval(10.5, 19, 9, 4.8, C.white, 'opacity="0.55" transform="rotate(-25 10.5 19)"') + oval(37.5, 19, 9, 4.8, C.white, 'opacity="0.55" transform="rotate(25 37.5 19)"') +
+      dot(24, 36, 13, "#FFE14A", 'opacity="0.28"') + dot(24, 36, 9, "#FFE14A", 'opacity="0.5"') + dot(24, 36, 6.4, "#FFF08A") + dot(24, 36, 3.4, C.white) +
+      oval(24, 24, 7.6, 10, "#4A3A2A") + oval(24, 21.5, 4.6, 5, "#6F5A3E", 'opacity="0.7"') + dot(24, 13.4, 5.6, "#3A2A1E") +
+      pEyes(21.6, 12.8, 26.4, 12.8, 2.2) + line("M21.5 9 18 3M26.5 9 30 3", "#3A2A1E", 1.5) + dot(17.6, 2.6, 1.5, "#FFE14A") + dot(30.4, 2.6, 1.5, "#FFE14A") +
+      poly(star(8, 36, 3.4, 1.2, 4), "#FFF08A") + poly(star(40, 33, 2.8, 1, 4), "#FFF08A"),
+    cricket:
+      line("M13 31 5 41 13 45M20 33 17 45", "#3E6B2E", 3) + line("M32 31 38 40", "#3E6B2E", 2.4) +
+      oval(21, 27, 15, 8, "#7AD260") + oval(20, 24.4, 11, 3.6, "#A8E88E", 'opacity="0.7"') + dot(36, 24, 7, "#7AD260") +
+      fill("M9 22Q21 14 33 24Q21 29 9 22z", "#4E8C38", 'opacity="0.65"') + line("M30 17 20 3M34 18 43 5", "#3E6B2E", 1.5) +
+      dot(37.6, 22.4, 2.6, C.white) + dot(38.2, 22.6, 1.5, C.ink) + dot(37.4, 21.8, 0.6, C.white) +
+      poly("30,18 44,22 42,15", "#E5484D") + line("M40 27Q42 29 44 27", C.ink, 1.3),
+    beetle:
+      line("M10 37 4 44M18 38 15 46M30 38 33 46M38 37 44 44", "#161F4A", 2.4) +
+      fill("M7 33Q7 9 24 9Q41 9 41 33Z", "#5A72C8") + fill("M24 9Q41 9 41 33H24Z", "#33448A", 'opacity="0.55"') + line("M24 9V33", "#161F4A", 2) +
+      line("M11 27Q24 22 37 27", "#161F4A", 1.6, 'opacity="0.7"') + oval(16, 17, 4.4, 2.2, C.white, 'opacity="0.6" transform="rotate(-30 16 17)"') +
+      box(6, 32, 36, 4.4, 2.2, "#161F4A") + dot(24, 11, 5.6, "#161F4A") + pEyes(21.6, 10.4, 26.4, 10.4, 2) +
+      poly("24,-1 28,8 20,8", "#B9C6FF") + poly("24,1 26.5,7.5 21.5,7.5", C.white, 'opacity="0.7"') +
+      poly("24,18 27,21.5 24,25 21,21.5", "#FFD166", 'stroke="#161F4A" stroke-width="1"'),
+    egg:
+      oval(24, 27, 14.5, 18, "#F4EBD4", 'stroke="#C9BEA6" stroke-width="2"') + fill("M24 9Q39 11 38.5 29Q35 44 24 45Q30 30 24 9z", "#C9BEA6", 'opacity="0.35"') +
+      oval(18.6, 18.4, 4.2, 6.6, C.white, 'opacity="0.75" transform="rotate(20 18.6 18.4)"') +
+      dot(17, 32, 2.4, "#C9BEA6") + dot(30, 24, 2.2, "#C9BEA6") + dot(26, 36, 2.6, "#C9BEA6") + dot(31, 32, 1.5, "#C9BEA6") + dot(19, 26, 1.5, "#C9BEA6") +
+      poly(star(37, 9, 4, 1.4, 4), "#FFE08A")
+  };
+
+  /** A pet's picture on a disc in its rarity's colour. `r` can be left out.
+   *  Better rarities glow more: Uncommon a soft aura, Rare sparkles, Epic a
+   *  halo as well. */
+  PS.petArt = function (sp, r) {
+    var ring = r === undefined ? "#CDBF9C" : PS.RARITY[r].color;
+    var level = r === undefined || sp === "egg" ? 0 : r;
+    var extra = "";
+    if (level >= 1) extra += dot(24, 24, 24, ring, 'opacity="0.16"');
+    if (level >= 2) {
+      extra += poly(star(8, 11, 3.6, 1.2, 4), C.white) + poly(star(41, 14, 3, 1, 4), C.white) + poly(star(40, 39, 2.6, 0.9, 4), C.white);
+    }
+    var halo = level >= 3
+      ? oval(24, 8.5, 10.5, 3, "none", 'stroke="#FFE08A" stroke-width="2.2"') + oval(24, 8.5, 10.5, 3, "none", 'stroke="' + ring + '" stroke-width="0.9" opacity="0.9"')
+      : "";
+    var gloss =
+      sp === "egg"
+        ? ""
+        : '<defs><radialGradient id="petShade" cx="34%" cy="28%" r="85%"><stop offset="0" stop-color="#fff" stop-opacity="0.32"/>' +
+          '<stop offset="0.55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.22"/></radialGradient></defs>' +
+          '<circle cx="24" cy="26" r="15" fill="url(#petShade)"/>';
+    return (
+      '<svg class="art" viewBox="0 0 48 48" aria-hidden="true" focusable="false">' +
+      dot(24, 24, 22, ring, 'opacity="0.2"') + extra + '<circle cx="24" cy="24" r="21.5" fill="none" stroke="' + ring + '" stroke-width="' + (level >= 2 ? 2.6 : 2) + '"/>' +
+      (PET_ART[sp] || PET_ART.egg) + gloss + halo + "</svg>"
     );
   };
 

@@ -75,9 +75,20 @@
     node.innerHTML = html;
   }
 
+  /* the pets that came along, named, in their rarity's colour */
+  function petChips() {
+    return PS.state.petTeam().map(function (pet) {
+      var def = PS.PET[pet.sp];
+      return (
+        '<span class="chip chip--pet" style="--tier:' + PS.RARITY[pet.r].color + '" title="' + PS.esc(def.name) + ' (pet)">' +
+        PS.petArt(pet.sp, pet.r) + "<em>" + PS.esc(def.name) + "</em><b>" + pet.lv + "</b></span>"
+      );
+    }).join("");
+  }
+
   function buildMarkup(R, withNames) {
     var p = R.p;
-    return (p.order || []).map(function (id) {
+    return petChips() + (p.order || []).map(function (id) {
       var up = B.upgrade(id);
       var level = p.up[id];
       var name = typeof up.name === "function" ? up.name(level, R) : up.name;
@@ -101,6 +112,7 @@
     trail: ["Zest Trail", "trail", "#F26B2A"],
     burst: ["Thorn Burst", "burst", "#8FAE65"],
     swarm: ["Pip Swarm", "swarm", "#9BE08A"],
+    pet: ["Your pet", "swarm", "#FFD166"],
     burn: ["Burning", "burn", "#F26B2A"],
     boom: ["Death blasts", "boom", "#F7D94C"],
     thorns: ["Thorns", "armor", "#8FAE65"],
@@ -122,7 +134,14 @@
       var dmg = R.dmgBy[key];
       if (!(dmg > 0)) return;
       total += dmg;
-      if (key === R.weaponId) {
+      var petKey = key.indexOf("pet:") === 0 ? key.split(":") : null;
+      if (petKey && PS.PET[petKey[1]]) {
+        // a pet is listed by its own name
+        rows.push({
+          name: PS.PET[petKey[1]].name, icon: PS.petArt(petKey[1], Number(petKey[2])),
+          color: PS.RARITY[Number(petKey[2])].color, dmg: dmg
+        });
+      } else if (key === R.weaponId) {
         rows.push({ name: PS.ITEMS[key].name, icon: PS.itemIcon(key), color: "#F7D94C", dmg: dmg, weapon: true });
       } else {
         var s = SOURCES[key] || [key, "xp", "#CDBF9C"];
@@ -231,6 +250,7 @@
       el.boss.hidden = true;
       el.toast.classList.remove("is-on");
       el.build.innerHTML = "";
+      B.hud.build(R);
       B.hud.update(R);
     },
 

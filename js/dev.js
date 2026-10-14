@@ -14,6 +14,7 @@
   var B = PS.B;
 
   var TABS = [["cheats", "Cheats"], ["upgrades", "Upgrades"], ["run", "Run"]];
+  var ADMIN_TAB = ["admin", "Admin"]; // only for the admin password
   var SPEEDS = [0.5, 1, 2, 4];
 
   var el = null;
@@ -103,17 +104,36 @@
     );
   }
 
+  function adminTab(R) {
+    var boss = R.boss && !R.boss.dead;
+    return (
+      '<p class="devbox__label">Admin</p>' +
+      '<div class="devbox__row">' +
+        action("admin-levels", "+25 levels") +
+        action("admin-coins", "+1000 coins") +
+        action("admin-fullheal", "Full heal and shield") +
+      "</div>" +
+      '<div class="devbox__row">' +
+        action("admin-bossdown", "Drop the boss to 1% health", boss ? "" : " disabled") +
+        action("admin-bossdead", "Kill the boss", boss ? "" : " disabled") +
+      "</div>" +
+      '<p class="hint">Only the admin password shows this tab.</p>'
+    );
+  }
+
   function render() {
     var R = run();
     if (!el || !R) return;
-    var body = tab === "upgrades" ? upgradesTab(R) : tab === "run" ? runTab(R) : cheatsTab(R);
+    var tabs = PS.dev.admin ? TABS.concat([ADMIN_TAB]) : TABS;
+    if (!PS.dev.admin && tab === "admin") tab = "cheats";
+    var body = tab === "upgrades" ? upgradesTab(R) : tab === "run" ? runTab(R) : tab === "admin" ? adminTab(R) : cheatsTab(R);
     var scroll = el.querySelector(".devbox__body");
     var top = scroll ? scroll.scrollTop : 0;
     el.innerHTML =
       '<div class="panel devbox">' +
-        '<div class="devbox__head"><h2>Dev menu</h2>' +
+        '<div class="devbox__head"><h2>' + (PS.dev.admin ? "Admin menu" : "Dev menu") + "</h2>" +
           '<button class="btn btn--primary btn--sm" type="button" data-dev="close">Back to the battle</button></div>' +
-        '<div class="devbox__tabs" role="tablist">' + TABS.map(function (t) {
+        '<div class="devbox__tabs" role="tablist">' + tabs.map(function (t) {
           return '<button class="devbox__tab' + (tab === t[0] ? " is-active" : "") + '" type="button" role="tab" aria-selected="' + (tab === t[0]) + '" data-dev="tab" data-value="' + t[0] + '">' + t[1] + "</button>";
         }).join("") + "</div>" +
         '<div class="devbox__body">' + body + "</div>" +
@@ -166,6 +186,24 @@
       });
     },
     coins: function (R) { R.coins += R.coinValue * 100; },
+    "admin-levels": function (R) {
+      var p = R.p;
+      var need = p.need - p.xp;
+      for (var k = 1; k < 25; k++) need += B.xpNeeded(p.level + k);
+      p.xp += need;
+    },
+    "admin-coins": function (R) { R.coins += R.coinValue * 1000; },
+    "admin-fullheal": function (R) {
+      R.p.hp = R.p.maxHp;
+      R.p.barrier = R.p.barrierMax;
+      R.p.invuln = Math.max(R.p.invuln, 2);
+    },
+    "admin-bossdown": function (R) {
+      if (R.boss && !R.boss.dead) R.boss.hp = Math.min(R.boss.hp, R.boss.maxHp * 0.01);
+    },
+    "admin-bossdead": function (R) {
+      if (R.boss && !R.boss.dead) B.hit(R.boss, R.boss.hp + 1, { dot: true });
+    },
     boss: function (R) { R.t = R.dur; },
     win: function () {
       B.devPanel.close();

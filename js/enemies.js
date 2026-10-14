@@ -444,12 +444,18 @@
   function eyes(ctx, x, y, r, lookX, lookY, angry) {
     var ex = r * 0.36;
     var ey = -r * 0.1;
-    var er = Math.max(1.4, r * 0.16);
-    ctx.fillStyle = P.charcoal;
-    ctx.beginPath();
-    ctx.arc(x - ex + lookX, y + ey + lookY, er, 0, TAU);
-    ctx.arc(x + ex + lookX, y + ey + lookY, er, 0, TAU);
-    ctx.fill();
+    var er = Math.max(1.5, r * 0.17);
+    var side;
+    for (side = -1; side <= 1; side += 2) {
+      ctx.fillStyle = "#FFFCF2";
+      circle(ctx, x + side * ex, y + ey, er * 1.35);
+      ctx.fillStyle = P.charcoal;
+      circle(ctx, x + side * ex + lookX * 0.6, y + ey + lookY * 0.6, er * 0.85);
+      if (er > 2) {
+        ctx.fillStyle = "#FFFFFF";
+        circle(ctx, x + side * ex + lookX * 0.6 - er * 0.28, y + ey + lookY * 0.6 - er * 0.3, er * 0.26);
+      }
+    }
     if (angry) {
       ctx.strokeStyle = P.charcoal;
       ctx.lineWidth = Math.max(1.5, r * 0.09);
@@ -510,8 +516,8 @@
       case "spitter":
         // two body segments trailing behind
         ctx.fillStyle = body;
-        circle(ctx, x - nx * r * 1.1, y - ny * r * 1.1 + Math.sin(t * 7) * 1.5, r * 0.78);
-        circle(ctx, x - nx * r * 2, y - ny * r * 2 + Math.sin(t * 7 + 1) * 1.5, r * 0.58);
+        B.ball(ctx, x - nx * r * 2, y - ny * r * 2 + Math.sin(t * 7 + 1) * 1.5, r * 0.58);
+        B.ball(ctx, x - nx * r * 1.1, y - ny * r * 1.1 + Math.sin(t * 7) * 1.5, r * 0.78);
         break;
       case "charger":
         // pincers out in front
@@ -548,13 +554,13 @@
     ctx.fillStyle = body;
     if (e.kind === "splitter" || e.kind === "mini") {
       // jelly wobble
-      ctx.beginPath();
-      ctx.ellipse(x, y, r * (1 + 0.08 * Math.sin(t * 6)), r * (1 - 0.08 * Math.sin(t * 6)), 0, 0, TAU);
-      ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.35)";
-      circle(ctx, x - r * 0.35, y - r * 0.4, r * 0.22);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(1 + 0.08 * Math.sin(t * 6), 1 - 0.08 * Math.sin(t * 6));
+      B.ball(ctx, 0, 0, r);
+      ctx.restore();
     } else {
-      circle(ctx, x, y, r);
+      B.ball(ctx, x, y, r);
     }
 
     if (e.kind === "grunt") {
@@ -792,8 +798,8 @@
     if (e.kind === "queen") {
       // a fat abdomen behind, feelers on top
       ctx.fillStyle = body;
-      circle(ctx, x - nx * r * 0.75, y - ny * r * 0.75, r * 0.85);
-      circle(ctx, x, y, r);
+      B.ball(ctx, x - nx * r * 0.75, y - ny * r * 0.75, r * 0.85);
+      B.ball(ctx, x, y, r);
       ctx.strokeStyle = dk;
       ctx.lineWidth = 3;
       ctx.lineCap = "round";
@@ -820,7 +826,7 @@
       ctx.closePath();
       ctx.fill();
       ctx.fillStyle = e.mode === 3 ? "#F3D58C" : body;
-      circle(ctx, x, y, r);
+      B.ball(ctx, x, y, r);
       // stripes, kept inside the body
       ctx.save();
       ctx.beginPath();
@@ -832,10 +838,13 @@
       ctx.restore();
     } else if (e.kind === "slug") {
       ctx.fillStyle = body;
-      ctx.beginPath();
-      ctx.ellipse(x - nx * r * 0.5, y - ny * r * 0.5 + r * 0.15, r * 1.25, r * 0.8, Math.atan2(ny, nx), 0, TAU);
-      ctx.fill();
-      circle(ctx, x, y, r * 0.9);
+      ctx.save();
+      ctx.translate(x - nx * r * 0.5, y - ny * r * 0.5 + r * 0.15);
+      ctx.rotate(Math.atan2(ny, nx));
+      ctx.scale(1.25, 0.8);
+      B.ball(ctx, 0, 0, r);
+      ctx.restore();
+      B.ball(ctx, x, y, r * 0.9);
       // eye stalks
       ctx.strokeStyle = body;
       ctx.lineWidth = 6;
@@ -857,9 +866,9 @@
       ctx.fillStyle = body;
       for (i = 0; i < 14; i++) {
         angle = (i / 14) * TAU + e.spin * 0.4;
-        circle(ctx, x + Math.cos(angle) * r * 0.86, y + Math.sin(angle) * r * 0.86, r * 0.27 + Math.sin(t * 4 + i) * 1.5);
+        B.ball(ctx, x + Math.cos(angle) * r * 0.86, y + Math.sin(angle) * r * 0.86, r * 0.27 + Math.sin(t * 4 + i) * 1.5);
       }
-      circle(ctx, x, y, r * 0.92);
+      B.ball(ctx, x, y, r * 0.92);
       ctx.fillStyle = dark;
       circle(ctx, x - r * 0.45, y + r * 0.35, r * 0.13);
       circle(ctx, x + r * 0.5, y + r * 0.2, r * 0.1);
@@ -886,6 +895,17 @@
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+    // jewels on the points, and a glint across the band
+    var jewels = L ? [L.accent, "#E5484D", L.accent] : ["#7FD4F5", "#E5484D", "#7FD4F5"];
+    var spots = [[-15, -15], [0, -18], [15, -15]];
+    for (i = 0; i < 3; i++) {
+      ctx.fillStyle = jewels[i];
+      circle(ctx, x + spots[i][0], cy + spots[i][1] + 1, 2.4);
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      circle(ctx, x + spots[i][0] - 0.7, cy + spots[i][1] + 0.2, 0.8);
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.fillRect(x - 10, cy - 4, 20, 1.6);
 
     drawStatus(ctx, e, x, y, r);
   }

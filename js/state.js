@@ -27,6 +27,10 @@
       gems: PS.START.gems,
       shards: 0, // SS shards from Gilded Chests
       ascend: 0, // how many times the talents have been ascended
+      pets: [], // { u, sp, r, lv }
+      petSlots: PS.PET_SLOTS.start, // how many pets can come along
+      petTeam: [], // uids of the pets that do
+      petUid: 1,
       uid: 1,
       items: [],
       eq: {},
@@ -39,7 +43,7 @@
       quests: {},
       stats: {
         kills: 0, runs: 0, wins: 0, forges: 0, chests: 0, upgrades: 0, talents: 0,
-        bestLevel: 0, bestPower: 0, maxRarity: 0, grade: 0, time: 0, earned: 0
+        bestLevel: 0, bestPower: 0, maxRarity: 0, grade: 0, time: 0, earned: 0, eggs: 0
       }
     };
     PS.SLOTS.forEach(function (slot) {
@@ -109,6 +113,24 @@
       }
       save.eq.weapon = weapon.u;
     }
+
+    save.pets = [];
+    var petSeen = {};
+    (Array.isArray(raw.pets) ? raw.pets : []).forEach(function (pet) {
+      if (!pet || !PS.PET[pet.sp]) return;
+      var r = Math.floor(num(pet.r, 0, 0, PS.PET_RARITY.length - 1));
+      var u = Math.floor(num(pet.u, 0));
+      if (!u || petSeen[u]) return;
+      petSeen[u] = true;
+      save.pets.push({ u: u, sp: pet.sp, r: r, lv: Math.floor(num(pet.lv, 1, 1, PS.PET_RARITY[r].cap)) });
+      if (u >= save.petUid) save.petUid = u + 1;
+    });
+    save.petSlots = Math.floor(num(raw.petSlots, PS.PET_SLOTS.start, PS.PET_SLOTS.start, PS.PET_SLOTS.max));
+    // older saves kept a single pet in petEq
+    var team = Array.isArray(raw.petTeam) ? raw.petTeam : raw.petEq ? [raw.petEq] : [];
+    team.forEach(function (u) {
+      if (petSeen[u] && save.petTeam.indexOf(u) === -1 && save.petTeam.length < save.petSlots) save.petTeam.push(u);
+    });
 
     PS.TALENTS.forEach(function (talent) {
       var level = Math.floor(num(raw.talents ? raw.talents[talent.id] : 0, 0, 0, talent.max));
@@ -354,6 +376,12 @@
       }
     });
 
+    // the pet that is along for the ride
+    S.petTeam.forEach(function (u) {
+      var along = petByUid(u);
+      if (along) t[PS.PET[along.sp].stat] += PS.petBonus(along.sp, along.r, along.lv);
+    });
+
     var out = {
       atk: t.atk * (1 + t.atkPct),
       hp: t.hp * (1 + t.hpPct),
@@ -596,6 +624,100 @@
     S.gold -= info.cost;
     S.talents[id] = info.level + 1;
     S.stats.talents++;
+    commit();
+    return true;
+  }
+
+  /* ---------------------------------------------------------------- pets */
+
+  function eggCost(count) {
+    var cost = PS.EGG.gems * count;
+    return count >= PS.EGG.bulk.count ? Math.round(cost * PS.EGG.bulk.discount) : cost;
+  }
+
+  function petByUid(u) {
+    for (var i = 0; i < S.pets.length; i++) if (S.pets[i].u === u) return S.pets[i];
+    return null;
+  }
+
+  function hatchOne() {
+    var sp = PS.PET_SPECIES[Math.floor(Math.random() * PS.PET_SPECIES.length)].id;
+    var r = PS.weighted(PS.EGG.odds.map(function (x, i) { return i; }), PS.EGG.odds);
+    var have = null;
+    S.pets.forEach(function (pet) { if (pet.sp === sp && pet.r === r) have = pet; });
+    S.stats.eggs++;
+    if (!have) {
+      var pet = { u: S.petUid++, sp: sp, r: r, lv: 1 };
+      S.pets.push(pet);
+      if (S.petTeam.length < S.petSlots) S.petTeam.push(pet.u);
+      return { pet: pet, status: "new" };
+    }
+    if (have.lv < PS.PET_RARITY[r].cap) {
+      have.lv++;
+      return { pet: have, status: "level" };
+    }
+    // a pet that is already at the top turns the egg into gold
+    var gold = 200 * (r + 1);
+    S.gold += gold;
+    return { pet: have, status: "max", gold: gold };
+  }
+
+  /** Buy and hatch eggs. Returns a list of { pet, status } or null. */
+  function hatch(count) {
+    var cost = eggCost(count);
+    if (S.gems < cost) return null;
+    S.gems -= cost;
+    var out = [];
+    for (var i = 0; i < count; i++) out.push(hatchOne());
+    commit();
+    return out;
+  }
+
+  function petInfo(u) {
+    var pet = petByUid(u);
+    if (!pet) return null;
+    var cap = PS.PET_RARITY[pet.r].cap;
+    var maxed = pet.lv >= cap;
+    var cost = maxed ? 0 : PS.petCost(pet.r, pet.lv);
+    return {
+      pet: pet, def: PS.PET[pet.sp], cap: cap, maxed: maxed, cost: cost, ok: !maxed && S.gold >= cost,
+      bonus: PS.petBonus(pet.sp, pet.r, pet.lv), equipped: S.petTeam.indexOf(pet.u) !== -1
+    };
+  }
+
+  function levelPet(u) {
+    var info = petInfo(u);
+    if (!info || !info.ok) return false;
+    S.gold -= info.cost;
+    info.pet.lv++;
+    commit();
+    return true;
+  }
+
+  /** Bring a pet along, or send it home if it is already out. False if the team is full. */
+  function togglePet(u) {
+    if (!petByUid(u)) return false;
+    var at = S.petTeam.indexOf(u);
+    if (at !== -1) {
+      S.petTeam.splice(at, 1);
+    } else {
+      if (S.petTeam.length >= S.petSlots) return false;
+      S.petTeam.push(u);
+    }
+    commit();
+    return true;
+  }
+
+  /** What the next team slot costs in gems, or 0 once all of them are open. */
+  function petSlotCost() {
+    return S.petSlots >= PS.PET_SLOTS.max ? 0 : PS.PET_SLOTS.costs[S.petSlots];
+  }
+
+  function buyPetSlot() {
+    var cost = petSlotCost();
+    if (!cost || S.gems < cost) return false;
+    S.gems -= cost;
+    S.petSlots++;
     commit();
     return true;
   }
@@ -983,6 +1105,16 @@
     // shop
     chestCost: chestCost,
     openChest: openChest,
+    eggCost: eggCost,
+    hatch: hatch,
+    petInfo: petInfo,
+    levelPet: levelPet,
+    togglePet: togglePet,
+    petSlotCost: petSlotCost,
+    buyPetSlot: buyPetSlot,
+    petTeam: function () {
+      return S.petTeam.map(petByUid).filter(Boolean);
+    },
     craftShards: craftShards,
     giftWait: giftWait,
     claimGift: claimGift,
@@ -1015,6 +1147,13 @@
       S.best = Math.floor(num(n, 0, 0, PS.BAL.CHAPTERS));
       S.chapter = Math.min(S.chapter, Math.min(PS.BAL.CHAPTERS, S.best + 1));
       commit();
+    },
+    /** Hatch eggs without paying for them. */
+    devHatch: function (count) {
+      var out = [];
+      for (var i = 0; i < count; i++) out.push(hatchOne());
+      commit();
+      return out;
     },
     devAddShards: function (n) {
       S.shards += n;

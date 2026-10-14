@@ -535,6 +535,29 @@
     );
   }
 
+  function eggCard() {
+    var S = st.get();
+    var one = st.eggCost(1);
+    var many = st.eggCost(PS.EGG.bulk.count);
+    var odds = PS.EGG.odds.map(function (share, r) {
+      return '<span class="odds r' + r + '">' + PS.RARITY[r].name + " " + pctText(share) + "</span>";
+    }).join("");
+    return (
+      '<div class="panel chest chest--egg">' +
+        '<div class="chest__art">' + PS.petArt("egg") + "</div>" +
+        '<div class="chest__body">' +
+          "<h3>Pet egg</h3>" +
+          "<p>Hatches a pet that fights beside you. Hatching one you already have levels it up.</p>" +
+          '<div class="oddsrow">' + odds + "</div>" +
+          '<div class="chest__buy">' +
+            '<button class="btn btn--primary" type="button" data-act="egg" data-count="1" data-key="egg-1"' + (S.gems >= one ? "" : " disabled") + ">Hatch " + price("gems", one) + "</button>" +
+            '<button class="btn" type="button" data-act="egg" data-count="' + PS.EGG.bulk.count + '" data-key="egg-10"' + (S.gems >= many ? "" : " disabled") + ">Hatch " + PS.EGG.bulk.count + " " + price("gems", many) + "</button>" +
+          "</div>" +
+        "</div>" +
+      "</div>"
+    );
+  }
+
   function untilMidnight() {
     var now = new Date();
     var next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -567,6 +590,9 @@
             '<div class="bar"><i style="width:' + Math.min(100, (S.shards / PS.SHARDS.needed) * 100) + '%"></i></div></div>' +
           '<button class="btn btn--primary" type="button" data-act="craft" data-key="craft"' + (S.shards >= PS.SHARDS.needed ? "" : " disabled") + ">Craft</button>" +
         "</div>" +
+
+        '<h2 class="section">Pet eggs</h2>' +
+        eggCard() +
 
         '<h2 class="section">Today\'s deals <small>' + PS.icon("clock") + '<span data-countdown="deals">' + PS.countdown(untilMidnight()) + "</span></small></h2>" +
         '<div class="deals">' + deals.map(function (deal) {
@@ -658,6 +684,95 @@
         '<div class="talentgrid">' + PS.TALENTS.filter(function (t) { return t.tier === tier; }).map(talentCard).join("") + "</div>";
     }
     return out + "</section>";
+  };
+
+  /* ---------------------------------------------------------------- pets */
+
+  function petBonusText(sp, r, level) {
+    var def = PS.PET[sp];
+    return "+" + PS.pct(PS.petBonus(sp, r, level)) + " " + PS.STATS[def.stat].phrase;
+  }
+
+  function petCard(pet) {
+    var info = st.petInfo(pet.u);
+    var def = info.def;
+    return (
+      '<div class="panel pet' + (info.equipped ? " is-eq" : "") + '">' +
+        '<div class="pet__art">' + PS.petArt(pet.sp, pet.r) + "</div>" +
+        '<div class="pet__body">' +
+          "<h3>" + def.name + ' <span class="rname r' + pet.r + '">' + PS.RARITY[pet.r].name + "</span></h3>" +
+          '<p class="pet__lv">Level ' + pet.lv + " / " + info.cap + "</p>" +
+          "<p>" + petBonusText(pet.sp, pet.r, pet.lv) + "</p>" +
+          '<div class="bar"><i style="width:' + (pet.lv / info.cap) * 100 + '%"></i></div>' +
+        "</div>" +
+        '<div class="pet__acts">' +
+          (info.equipped
+            ? '<button class="btn btn--sm" type="button" data-act="pet-equip" data-u="' + pet.u + '" data-key="pet-eq-' + pet.u + '">With you</button>'
+            : '<button class="btn btn--sm btn--primary" type="button" data-act="pet-equip" data-u="' + pet.u + '" data-key="pet-eq-' + pet.u + '">Bring</button>') +
+          (info.maxed
+            ? '<span class="talent__done">' + PS.icon("check") + "Max</span>"
+            : '<button class="btn btn--sm' + (info.ok ? "" : "") + '" type="button" data-act="pet-level" data-u="' + pet.u + '" data-key="pet-lv-' + pet.u + '"' + (info.ok ? "" : " disabled") + ">" + PS.icon("up") + price("gold", info.cost) + "</button>") +
+        "</div>" +
+      "</div>"
+    );
+  }
+
+  SCREENS.pets = function () {
+    var S = st.get();
+    var pets = S.pets.slice().sort(function (a, b) { return b.r - a.r || b.lv - a.lv || (a.sp < b.sp ? -1 : 1); });
+    var total = PS.PET_SPECIES.length * PS.PET_RARITY.length;
+    var crew = st.petTeam();
+    var lead;
+    var nextCost = st.petSlotCost();
+    var slots = "";
+    for (var i = 0; i < PS.PET_SLOTS.max; i++) {
+      var member = crew[i];
+      if (member) {
+        slots += '<div class="petslot is-full">' + PS.petArt(member.sp, member.r) + "<b>" + PS.PET[member.sp].name + " · Lv " + member.lv + "</b><span>" +
+          petBonusText(member.sp, member.r, member.lv) + "</span></div>";
+      } else if (i < S.petSlots) {
+        slots += '<div class="petslot is-empty">' + PS.petArt("egg") + "<b>Empty</b><span>Bring a pet from below</span></div>";
+      } else {
+        var next = i === S.petSlots;
+        slots += '<div class="petslot is-locked">' + PS.icon("lock") + "<b>Slot " + (i + 1) + "</b>" +
+          (next
+            ? '<button class="btn btn--sm btn--primary" type="button" data-act="pet-slot" data-key="pet-slot"' + (S.gems >= nextCost ? "" : " disabled") + ">Unlock " + price("gems", nextCost) + "</button>"
+            : "<span>Unlock the one before first</span>") +
+          "</div>";
+      }
+    }
+    if (S.pets.length) {
+      lead =
+        '<div class="panel petteam">' +
+          '<p class="kicker">Your team · ' + crew.length + " of " + S.petSlots + " out" + (S.petSlots < PS.PET_SLOTS.max ? "" : " · all slots open") + "</p>" +
+          '<div class="petslots">' + slots + "</div>" +
+          '<p class="hint">Each pet in your team fights beside you and adds its bonus. More slots can be unlocked with gems, up to ' + PS.PET_SLOTS.max + ".</p>" +
+        "</div>";
+    } else {
+      lead =
+        '<div class="panel pethero">' +
+          '<div class="pethero__art">' + PS.petArt("egg") + "</div>" +
+          '<div class="pethero__body"><p class="kicker">No pet yet</p><h2>Hatch your first pet</h2>' +
+            "<p>Pet eggs are in the Shop and cost gems. A pet fights beside you and gives you a bonus.</p>" +
+            '<button class="btn btn--primary btn--sm" type="button" data-act="tab" data-tab="shop" data-key="pet-shop">Go to the Shop</button></div>' +
+        "</div>";
+    }
+    var found = PS.PET_SPECIES.map(function (sp) {
+      var have = S.pets.filter(function (pet) { return pet.sp === sp.id; }).length;
+      return '<span class="chip pet__tag' + (have ? " is-have" : "") + '">' + PS.petArt(sp.id, have ? undefined : undefined) + "<em>" + sp.name + "</em><b>" + have + "</b></span>";
+    }).join("");
+    return (
+      '<section class="pets">' +
+        lead +
+        '<h2 class="section">Your pets <small>' + S.pets.length + " of " + total + " found</small></h2>" +
+        (pets.length
+          ? '<div class="petgrid">' + pets.map(petCard).join("") + "</div>"
+          : '<p class="empty">Nothing hatched yet. Buy an egg in the Shop.</p>') +
+        '<h2 class="section">The family</h2>' +
+        '<div class="pettags">' + found + "</div>" +
+        '<p class="hint">Hatching a pet you already have levels it up. Gold levels a pet up too. Commons reach level 10, Uncommons 20, Rares 30 and Epics 40. Pets are never S or SS grade.</p>' +
+      "</section>"
+    );
   };
 
   /* -------------------------------------------------------------- quests */
@@ -860,7 +975,7 @@
   function secretModal(modal) {
     return (
       '<form class="secret" data-form="secret">' +
-        '<h2 id="modal-title">' + (modal.open ? "Unlocked" : "Password") + "</h2>" +
+        '<h2 id="modal-title">' + (modal.open ? "Unlocked" : modal.admin ? "Admin password" : "Password") + "</h2>" +
         (modal.open
           ? "<p>Nothing in here yet.</p>"
           : '<label class="visually-hidden" for="secret-input">Password</label>' +
@@ -1029,6 +1144,7 @@
         '<div class="dev__give">' + devNumber("dev-shards", "SS shards", S.shards, 0) + devButton("dev-shards-set", "Set") + "</div>" +
         devRow(
           devButton("dev-shards", "+" + PS.SHARDS.needed + " shards") +
+          devButton("dev-eggs", "Hatch 10 eggs free") +
           devButton("dev-shop", "Free gift ready, deals restocked")
         )
       )
@@ -1112,7 +1228,8 @@
           return '<button class="btn btn--sm' + (sw.speed === v ? " btn--primary" : "") + '" type="button" data-act="dev-start-speed" data-value="' + v + '">' + v + "×</button>";
         }).join("")) +
         '<p class="hint">Inside any battle the DEV button changes these live and adds every upgrade to pick or max.</p>'
-      )
+      ) +
+      (PS.dev.admin ? "" : devCard("Done?", devRow(devButton("dev-lock", "Lock the dev menu again"))))
     );
   }
 
@@ -1191,7 +1308,9 @@
     var S = st.get();
     var tab = view.devTab;
     var calc = st.calc();
-    if (!DEV_TABS.some(function (t) { return t[0] === tab; })) tab = view.devTab = "overview";
+    // the dev password only gets the Battle section; the admin password gets all of it
+    var tabs = PS.dev.admin ? DEV_TABS : DEV_TABS.filter(function (t) { return t[0] === "battle"; });
+    if (!tabs.some(function (t) { return t[0] === tab; })) tab = view.devTab = tabs[0][0];
     var body = tab === "gear" ? devGear(S, view.dev, calc)
       : tab === "money" ? devMoney(S)
       : tab === "progress" ? devProgress(S)
@@ -1203,13 +1322,13 @@
     return (
       '<div class="dev devshell">' +
         '<button class="modal__close" type="button" data-act="close" aria-label="Close">' + PS.icon("close") + "</button>" +
-        '<h2 id="modal-title">Dev menu</h2>' +
+        '<h2 id="modal-title">' + (PS.dev.admin ? "Admin menu" : "Dev menu") + "</h2>" +
         '<p class="hint">For testing. Changes only touch this browser\'s save.</p>' +
-        '<div class="devshell__main">' +
-          '<nav class="devnav" role="tablist" aria-label="Dev menu sections">' + DEV_TABS.map(function (t) {
+        '<div class="devshell__main' + (tabs.length === 1 ? " devshell__main--solo" : "") + '">' +
+          (tabs.length === 1 ? "" : '<nav class="devnav" role="tablist" aria-label="Dev menu sections">' + tabs.map(function (t) {
             return '<button class="devnav__item' + (tab === t[0] ? " is-active" : "") + '" type="button" role="tab" aria-selected="' + (tab === t[0]) + '" data-act="dev-tab" data-tab-name="' + t[0] + '">' +
               PS.icon(t[2]) + "<span>" + t[1] + "</span></button>";
-          }).join("") + "</nav>" +
+          }).join("") + "</nav>") +
           '<div class="devpane">' + body + "</div>" +
         "</div>" +
       "</div>"
@@ -1263,6 +1382,31 @@
       '<div class="modal__actions"><button class="btn btn--primary" type="button" data-act="close" data-key="m-ok">Got it</button></div>' +
       "</div>";
     return out;
+  }
+
+  function hatchModal(modal) {
+    var list = modal.results;
+    var many = list.length > 6;
+    return (
+      '<div class="loot loot--reveal' + (many ? " loot--many" : "") + '">' +
+        '<div class="loot__box">' + PS.petArt("egg") + "</div>" +
+        '<h2 id="modal-title">' + (list.length === 1 ? "A pet hatched!" : list.length + " eggs hatched!") + "</h2>" +
+        '<div class="loot__items">' + list.map(function (res, index) {
+          var def = PS.PET[res.pet.sp];
+          var note = res.status === "new" ? "New!" : res.status === "level" ? "Level " + res.pet.lv : "Max · +" + fmt(res.gold) + " gold";
+          return (
+            '<div class="loot__item" style="--i:' + Math.min(index, 24) + '">' +
+              '<span class="tile tile--pop pet__tile">' + PS.petArt(res.pet.sp, res.pet.r) + "</span>" +
+              '<strong class="rname r' + res.pet.r + '">' + def.name + "</strong>" +
+              "<span>" + PS.RARITY[res.pet.r].name + " · " + note + "</span>" +
+            "</div>"
+          );
+        }).join("") + "</div>" +
+        '<div class="modal__actions">' +
+          '<button class="btn btn--primary" type="button" data-act="close" data-key="m-ok" autofocus>Nice</button>' +
+        "</div>" +
+      "</div>"
+    );
   }
 
   function noticeModal() {
@@ -1324,6 +1468,7 @@
     else if (modal.type === "secret") html = modal.open ? devMenu(modal) : secretModal(modal);
     else if (modal.type === "quick") html = quickModal(modal);
     else if (modal.type === "notice") html = noticeModal();
+    else if (modal.type === "hatch") html = hatchModal(modal);
     else if (modal.type === "chestinfo") html = chestInfoModal(modal);
     if (html === null) {
       closeModal();
@@ -1431,7 +1576,7 @@
     close: function () { closeModal(); },
     settings: function () { openModal({ type: "settings", armed: false }); },
     secret: function () {
-      openModal({ type: "secret", open: PS.dev.unlocked, wrong: false });
+      openModal({ type: "secret", open: PS.dev.unlocked, admin: false, wrong: false });
       var input = $("#secret-input");
       if (input) input.focus();
     },
@@ -1614,6 +1759,34 @@
       openModal({ type: "loot", title: PS.CHESTS[kind].name + (count > 1 ? " × " + count : ""), items: items, shards: items.shards, art: kind, again: { kind: kind, count: count } });
       revealSound(items);
     },
+    egg: function (node) {
+      var results = st.hatch(Number(node.getAttribute("data-count")));
+      if (!results) return;
+      var best = 0;
+      results.forEach(function (res) { if (res.pet.r > best) best = res.pet.r; });
+      openModal({ type: "hatch", results: results });
+      PS.sfx.play("chestOpen");
+      setTimeout(function () { PS.sfx.play("reveal", best); }, 600);
+    },
+    "pet-equip": function (node) {
+      var u = Number(node.getAttribute("data-u"));
+      var was = st.petInfo(u).equipped;
+      if (st.togglePet(u)) toast(was ? "Your pet stays home" : "Your pet is coming along");
+      else toast("Your team is full. Send one home or unlock another slot");
+    },
+    "pet-slot": function () {
+      if (!st.buyPetSlot()) return;
+      PS.sfx.play("reveal", 2);
+      toast("Pet slot " + st.get().petSlots + " unlocked");
+    },
+    "pet-level": function (node) {
+      var u = Number(node.getAttribute("data-u"));
+      if (!st.levelPet(u)) return;
+      var button = $('[data-key="pet-lv-' + u + '"]');
+      var card = button ? button.closest(".pet") : null;
+      pulse(card, "is-pulse", 800);
+      floater(card, "+1 Lv");
+    },
     "chestinfo-r": function (node) {
       view.modal.r = Number(node.getAttribute("data-r"));
       renderModal();
@@ -1728,6 +1901,10 @@
       st.devAddShards(PS.SHARDS.needed);
       toast("+" + PS.SHARDS.needed + " SS shards");
     },
+    "dev-eggs": function () {
+      var results = st.devHatch(10);
+      openModal({ type: "hatch", results: results });
+    },
     "dev-shop": function () {
       st.devRefreshShop();
       toast("Free gift is ready and today's deals are back");
@@ -1831,8 +2008,7 @@
       renderModal();
     },
     "dev-lock": function () {
-      PS.dev.unlocked = false;
-      try { sessionStorage.removeItem("lemon:dev"); } catch (err) { /* blocked */ }
+      PS.dev.lock();
       closeModal();
       toast("Dev menu locked");
     },
@@ -1846,7 +2022,7 @@
   var SOUND = {
     tab: "tab", fight: "start", again: "start", equip: "equip", "equip-best": "equip", "dev-give": "equip", "dev-set": "equip",
     upgrade: "upgrade", "upgrade-max": "upgrade", talent: "talent", quest: "coin", deal: "coin", gold: "coin",
-    gift: null, chest: null, craft: null, ascend: null, sell: null, "forge-go": null, "quick-go": null, sound: null, volume: null
+    gift: null, chest: null, craft: null, ascend: null, egg: null, "pet-slot": null, sell: null, "forge-go": null, "quick-go": null, sound: null, volume: null
   };
 
   function upgraded(slot, text) {
@@ -1878,8 +2054,10 @@
     if (e.target.getAttribute("data-form") !== "secret") return;
     e.preventDefault();
     var input = $("#secret-input");
-    if (input && input.value === PS.dev.password) {
-      PS.dev.unlock();
+    // the ordinary prompt takes the dev password; the one the key code opens takes the admin one
+    var good = view.modal.admin ? PS.dev.adminPassword : PS.dev.password;
+    if (input && input.value === good) {
+      PS.dev.unlock(view.modal.admin ? 2 : 1);
       view.modal.open = true;
       renderModal();
     } else {
@@ -1957,6 +2135,29 @@
 
       PS.on("change", function () {
         if (!el.app.hidden) render();
+      });
+
+      // up, up, down, down, left, right, left, right, then B and A (either way round)
+      var CODE = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright"];
+      var typed = [];
+      document.addEventListener("keydown", function (e) {
+        var tag = e.target && e.target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.app.hidden || !e.key) return;
+        typed.push(e.key.toLowerCase());
+        if (typed.length > 10) typed.shift();
+        if (typed.length < 10) return;
+        var head = typed.slice(0, 8).join(",") === CODE.join(",");
+        var tail = typed.slice(8).join("");
+        if (head && (tail === "ba" || tail === "ab")) {
+          typed = [];
+          if (PS.dev.admin) {
+            openModal({ type: "secret", open: true, admin: true, wrong: false });
+          } else {
+            openModal({ type: "secret", open: false, admin: true, wrong: false });
+            var box = $("#secret-input");
+            if (box) box.focus();
+          }
+        }
       });
       PS.on("battle:end", showResults);
 

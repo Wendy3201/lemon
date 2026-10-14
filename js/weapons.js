@@ -585,6 +585,326 @@
     }
   };
 
+  /* ----------------------------------------------------- more weapons */
+
+  function whipAttack(cfg, aim, empowered, mult) {
+    var p = B.run.p;
+    var area = B.area();
+    var dmg = B.dmg() * cfg.dmg * mult;
+    var reach = cfg.reach * area;
+    var opts = { knock: 240, color: cfg.color };
+    var dirs = [];
+    var i;
+    if (empowered) {
+      B.blast(p.x, p.y, reach * 0.85, dmg * 1.2, { knock: 300, color: cfg.color, swat: true });
+      dirs.push(aim);
+    } else {
+      for (i = 0; i <= B.count(); i++) {
+        dirs.push(aim + SIDES[i % 4]);
+        B.sweep(aim + SIDES[i % 4], 0.38, reach, dmg, opts);
+      }
+    }
+    if (p.fx.q) {
+      // the lash snaps back
+      B.later(0.18, function () {
+        for (var k = 0; k < dirs.length; k++) B.sweep(dirs[k] + 0.2, 0.45, reach, dmg * 0.6, opts);
+      });
+    }
+  }
+
+  function drawWhip(ctx, k, rope, tip) {
+    ctx.strokeStyle = WOOD_DARK;
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(6, 5);
+    ctx.lineTo(13, 5);
+    ctx.stroke();
+    ctx.strokeStyle = rope;
+    ctx.lineWidth = 2.2;
+    var flick = k * 14;
+    ctx.beginPath();
+    ctx.moveTo(13, 5);
+    ctx.quadraticCurveTo(24, -10 - flick * 0.4, 36 + flick, 2 - flick * 0.3);
+    ctx.stroke();
+    ctx.fillStyle = tip;
+    ctx.beginPath();
+    ctx.arc(36 + flick, 2 - flick * 0.3, 2.6, 0, TAU);
+    ctx.fill();
+  }
+
+  W.whip = {
+    cd: 0.7,
+    reach: function () { return 165 * B.area(); },
+    countName: "Extra lash", countText: "Lash in one more direction",
+    attack: function (aim, target, empowered, mult) {
+      whipAttack({ dmg: 1.7, reach: 160, color: "#B9D694" }, aim, empowered, mult);
+    },
+    held: function (ctx, k) { drawWhip(ctx, k, "#8FAE65", GOLD); }
+  };
+
+  W.thornlash = {
+    cd: 0.62,
+    reach: function () { return 185 * B.area(); },
+    countName: "Extra lash", countText: "Lash in one more direction",
+    attack: function (aim, target, empowered, mult) {
+      whipAttack({ dmg: 1.9, reach: 180, color: "#C9BEFF" }, aim, empowered, mult);
+    },
+    held: function (ctx, k) { drawWhip(ctx, k, VOID, "#C9BEFF"); }
+  };
+
+  W.cannon = {
+    cd: 0.85, range: 250, pierces: true,
+    countName: "Extra pellets", countText: "+2 pellets with every shot",
+    attack: function (aim, target, empowered, mult) {
+      var p = B.run.p;
+      var area = B.area();
+      var dmg = B.dmg() * 0.65 * mult;
+      var n = 5 + 2 * B.count();
+      var burst = p.fx.q ? function (shot, e) {
+        B.blast(e.x, e.y, 26 * area, shot.dmg * 0.6, { color: "#FFB84A", quiet: true });
+      } : null;
+      var i;
+      for (i = 0; i < n; i++) {
+        B.shoot({
+          angle: aim + (i - (n - 1) / 2) * 0.13 + PS.rand(-0.04, 0.04), speed: 470, range: 230, r: 4.2 * Math.sqrt(area),
+          dmg: dmg, pierce: B.pierce(), sprite: "pip", color: "#FFB84A", bounce: 0, onHit: burst
+        });
+      }
+      if (empowered) {
+        for (i = 0; i < 12; i++) {
+          B.shoot({ angle: aim + (i / 12) * TAU, speed: 440, range: 210, r: 4, dmg: dmg, pierce: B.pierce(), sprite: "pip", color: "#FFD166", bounce: 0 });
+        }
+      }
+    },
+    held: function (ctx, k) {
+      ctx.fillStyle = "#5C6B8A";
+      ctx.fillRect(6 - k * 3, 0, 20, 8);
+      ctx.fillStyle = "#39445C";
+      ctx.fillRect(22 - k * 3, -2, 8, 12);
+      ctx.fillStyle = WOOD_DARK;
+      ctx.beginPath();
+      ctx.arc(9 - k * 3, 10, 3.4, 0, TAU);
+      ctx.fill();
+    }
+  };
+
+  W.mace = {
+    cd: 0.62,
+    reach: function () { return 92 * B.area(); },
+    countName: "Double spin", countText: "Every spin hits one more time",
+    attack: function (aim, target, empowered, mult) {
+      var p = B.run.p;
+      var r = 80 * B.area() * (empowered ? 1.25 : 1);
+      var dmg = B.dmg() * 1.35 * mult * (empowered ? 1.6 : 1);
+      var opts = { knock: empowered ? 620 : 320, color: P.pale, swat: true };
+      B.blast(p.x, p.y, r, dmg, opts);
+      var again = function () { B.blast(p.x, p.y, r, dmg * 0.7, { knock: 220, color: P.pale, swat: true }); };
+      for (var i = 1; i <= B.count(); i++) B.later(0.14 * i, again);
+      if (p.fx.q && !(p.timers.maceZone > 0)) {
+        p.timers.maceZone = 1.4;
+        for (var k = 0; k < 6; k++) {
+          var a = (k / 6) * TAU;
+          B.addZone({ type: "fire", x: p.x + Math.cos(a) * r * 0.7, y: p.y + Math.sin(a) * r * 0.7, r: 20, life: 2.2, dps: B.dmg() * 0.5 });
+        }
+      }
+    },
+    tick: function (dt) {
+      var t = B.run.p.timers;
+      if (t.maceZone > 0) t.maceZone -= dt;
+    },
+    held: function (ctx, k) {
+      ctx.rotate(-0.8 + (1 - k) * 0.8);
+      ctx.strokeStyle = WOOD;
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(8, 5);
+      ctx.lineTo(24, 5);
+      ctx.stroke();
+      ctx.fillStyle = STEEL_DARK;
+      ctx.beginPath();
+      ctx.arc(28, 5, 7, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = STEEL;
+      ctx.beginPath();
+      ctx.arc(26.5, 3.5, 3, 0, TAU);
+      ctx.fill();
+    }
+  };
+
+  /* a thrown thing's arc, then what it does where it lands */
+  function lobTo(x, y, color, land) {
+    var R = B.run;
+    var p = R.p;
+    R.fx.push({ type: "lob", x0: p.x, y0: p.y, x1: x, y1: y, color: color, size: 6, t: 0, dur: 0.5 });
+    B.later(0.5, land);
+  }
+
+  W.flask = {
+    cd: 1.0, range: 380,
+    countName: "Extra flask", countText: "+1 flask with every throw",
+    attack: function (aim, target, empowered, mult) {
+      var p = B.run.p;
+      var area = B.area();
+      var q = p.fx.q;
+      var n = 1 + B.count() + (empowered ? 2 : 0);
+      var used = [];
+      for (var i = 0; i < n; i++) {
+        var spot = B.cluster(380, 80, used) || target;
+        used.push(spot);
+        (function (x, y) {
+          lobTo(x, y, "#6FBF5A", function () {
+            B.blast(x, y, 42 * area, B.dmg() * 1.0 * mult, { color: "#9BE08A", quiet: true });
+            B.addZone({
+              type: "fire", x: x, y: y, r: 46 * area, life: q ? 5.2 : 2.6, dps: B.dmg() * (q ? 1.0 : 0.7) * mult,
+              color: "#6FBF5A", core: "#C8F2B0"
+            });
+          });
+        })(spot.x, spot.y);
+      }
+    },
+    held: function (ctx, k) {
+      ctx.fillStyle = "rgba(221,244,255,0.9)";
+      ctx.fillRect(10 + k * 6, 0, 9, 11);
+      ctx.fillStyle = "#6FBF5A";
+      ctx.fillRect(10 + k * 6, 5, 9, 6);
+      ctx.fillStyle = WOOD;
+      ctx.fillRect(12 + k * 6, -3, 5, 3);
+    }
+  };
+
+  W.comet = {
+    cd: 1.1, range: 420,
+    countName: "Extra comet", countText: "+1 comet with every cast",
+    attack: function (aim, target, empowered, mult) {
+      var R = B.run;
+      var p = R.p;
+      var area = B.area();
+      var n = 1 + B.count() + (empowered ? 2 : 0);
+      var used = [];
+      for (var i = 0; i < n; i++) {
+        var spot = B.cluster(420, 90, used) || target;
+        used.push(spot);
+        (function (x, y) {
+          var r = 56 * area;
+          R.fx.push({ type: "ring", x: x, y: y, r0: r * 1.5, r1: r * 0.3, color: "#FFB84A", width: 3, t: 0, dur: 0.45 });
+          B.later(0.45, function () {
+            B.blast(x, y, r, B.dmg() * 2.2 * mult, { color: "#FFB84A", knock: 140 });
+            R.shake = Math.max(R.shake, 3);
+            if (p.fx.q) B.addZone({ type: "fire", x: x, y: y, r: r * 0.7, life: 3, dps: B.dmg() * 0.7 });
+          });
+        })(spot.x, spot.y);
+      }
+    },
+    held: function (ctx, k) { drawStaff(ctx, k, "#5C4A3A", "#FFD166", "#FFB84A"); }
+  };
+
+  function splitPip(shot, e) {
+    if (shot.split) return;
+    shot.split = true;
+    for (var i = 0; i < 2; i++) {
+      B.shoot({
+        x: shot.x, y: shot.y, angle: Math.random() * TAU, speed: 300, range: 300, r: 3.5, dmg: shot.dmg * 0.5,
+        homing: 5, sprite: "pip", color: "#FFD166", bounce: 0
+      }).seen.push(e);
+    }
+  }
+
+  W.hive = {
+    cd: 0.9, range: 380,
+    countName: "Bigger swarm", countText: "+2 pips with every blast",
+    attack: function (aim, target, empowered, mult) {
+      var p = B.run.p;
+      var n = 3 + 2 * B.count() + (empowered ? 7 : 0);
+      for (var i = 0; i < n; i++) {
+        B.shoot({
+          angle: aim + PS.rand(-0.9, 0.9), speed: 300, range: 520, r: 4, dmg: B.dmg() * 0.55 * mult,
+          homing: 6, pierce: B.pierce(), sprite: "pip", color: "#FFD166", bounce: 0, onHit: p.fx.q ? splitPip : null
+        });
+      }
+    },
+    held: function (ctx, k) {
+      ctx.fillStyle = "#E0A93B";
+      ctx.beginPath();
+      ctx.moveTo(6, 4);
+      ctx.lineTo(24 + k * 3, -3);
+      ctx.lineTo(24 + k * 3, 13);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#3A2A10";
+      ctx.fillRect(22 + k * 3, -4, 4, 18);
+    }
+  };
+
+  W.nova = {
+    cd: 1.3, reach: function () { return 150 * B.area(); },
+    countName: "Echo burst", countText: "Every burst repeats once more",
+    attack: function (aim, target, empowered, mult) {
+      var R = B.run;
+      var p = R.p;
+      var area = B.area();
+      var r = 110 * area * (empowered ? 1.7 : 1);
+      var dmg = B.dmg() * 2.4 * mult;
+      var burst = function (scale) {
+        B.blast(p.x, p.y, r * scale, dmg * scale, { knock: 380, color: "#FFF4B8", swat: true });
+        R.fx.push({ type: "ring", x: p.x, y: p.y, r0: 20, r1: r * scale, color: "#FFD166", width: 8, t: 0, dur: 0.45 });
+      };
+      burst(1);
+      for (var i = 1; i <= B.count(); i++) B.later(0.22 * i, function () { burst(0.8); });
+      if (p.fx.shards) {
+        for (var k = 0; k < 8; k++) {
+          B.shoot({ x: p.x, y: p.y, angle: (k / 8) * TAU, speed: 420, range: 280, r: 4.5, dmg: B.dmg() * 0.7 * mult, pierce: 2, sprite: "shard", bounce: 0 });
+        }
+      }
+      if (p.fx.q) {
+        for (var j = 0; j < 8; j++) {
+          var a = (j / 8) * TAU;
+          B.addZone({ type: "fire", x: p.x + Math.cos(a) * r * 0.75, y: p.y + Math.sin(a) * r * 0.75, r: 24, life: 3, dps: B.dmg() * 0.8 });
+        }
+      }
+    },
+    held: function (ctx, k) {
+      ctx.fillStyle = "#FFD166";
+      ctx.globalAlpha = 0.4 + k * 0.5;
+      ctx.beginPath();
+      ctx.arc(18, 4, 10 + k * 5, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#FFF9E6";
+      ctx.beginPath();
+      ctx.arc(18, 4, 5, 0, TAU);
+      ctx.fill();
+    }
+  };
+
+  W.geyser = {
+    cd: 1.0, range: 340,
+    countName: "More geysers", countText: "+2 geysers with every cast",
+    attack: function (aim, target, empowered, mult) {
+      var R = B.run;
+      var p = R.p;
+      var area = B.area();
+      var n = 3 + 2 * B.count() + (empowered ? 3 : 0);
+      var used = [];
+      for (var i = 0; i < n; i++) {
+        var e = B.nearest(p.x, p.y, 340, used);
+        if (!e) break;
+        used.push(e);
+        (function (x, y) {
+          R.fx.push({ type: "ring", x: x, y: y, r0: 40 * area, r1: 10, color: "#7FD4F5", width: 3, t: 0, dur: 0.35 });
+          B.later(0.35, function () {
+            B.blast(x, y, 44 * area, B.dmg() * 1.6 * mult, { knock: 260, color: "#DDF4FF" });
+            if (p.fx.q) {
+              B.later(0.3, function () { B.blast(x, y, 62 * area, B.dmg() * 2 * mult, { knock: 300, color: "#7FD4F5" }); });
+            }
+          });
+        })(e.x, e.y);
+      }
+    },
+    held: function (ctx, k) { drawStaff(ctx, k, "#3A5C7A", "#DDF4FF", "#7FD4F5"); }
+  };
+
   /* ------------------------------------------------------- held + flying */
 
   Object.keys(W).forEach(function (id) {
