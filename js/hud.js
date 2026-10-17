@@ -22,7 +22,7 @@
       '<div class="hud__top">' +
         '<button class="hud__btn" type="button" data-hud="pause" aria-label="Pause">' + PS.icon("pause") + "</button>" +
         '<button class="hud__btn" type="button" data-hud="meter" aria-label="Damage meter" aria-pressed="true" title="Damage meter (Tab)">' + PS.icon("chart") + "</button>" +
-        '<button class="hud__btn hud__btn--dev" type="button" data-hud="dev" aria-label="Dev menu" title="Dev menu" hidden>DEV</button>' +
+        '<button class="hud__btn hud__btn--dev" type="button" data-hud="dev" aria-label="Dev menu" title="Dev menu (`)" hidden>DEV</button>' +
         '<div class="hud__hp" role="img" aria-label="Health"><i class="hud__hp-fill"></i><i class="hud__hp-shield"></i><span></span></div>' +
         '<span class="hud__pill hud__lvl"></span>' +
         '<span class="hud__gap"></span>' +

@@ -201,18 +201,55 @@
   /* ---------------------------------------------------------- preferences */
   /* Small switches from the Settings pop-up. Each is saved on its own. */
 
-  var PREFS = { volume: 1, shake: true, numbers: true, autopause: true };
+  /* true / false switches, and numbers (vol 0 to 100, quality 0 to 2, fps 0 for
+     no limit or 30 / 60). `volume` is the old three-step volume: it is only read
+     to carry an earlier choice over to `vol`. */
+  var PREFS = {
+    volume: 1, vol: 55, quality: 2, fps: 0,
+    shake: true, numbers: true, autopause: true,
+    combatSfx: true, menuSfx: true, showFps: false, blur: true
+  };
+  var RANGES = { vol: [0, 100], quality: [0, 2], fps: [0, 60] };
 
   PS.VOLUMES = [{ name: "Low", gain: 0.25 }, { name: "Medium", gain: 0.5 }, { name: "High", gain: 0.85 }];
+  /* what each old volume step becomes on the 0 to 100 scale */
+  PS.VOLUME_STEPS = [28, 55, 94];
+
+  var prefCache = {}; // read many times a second in battle, so only storage is slow
+
+  function readPref(name) {
+    var fallback = PREFS[name];
+    if (name === "vol") {
+      var old = PS.store.get("lemon:pref:volume", null);
+      if (old === 0 || old === 1 || old === 2) fallback = PS.VOLUME_STEPS[old];
+    }
+    var value = PS.store.get("lemon:pref:" + name, fallback);
+    if (RANGES[name]) {
+      return typeof value === "number" && isFinite(value) ? PS.clamp(Math.round(value), RANGES[name][0], RANGES[name][1]) : fallback;
+    }
+    if (name === "volume") return value === 0 || value === 1 || value === 2 ? value : PREFS.volume;
+    return value !== false;
+  }
 
   PS.prefs = {
     get: function (name) {
-      var value = PS.store.get("lemon:pref:" + name, PREFS[name]);
-      if (name === "volume") return value === 0 || value === 1 || value === 2 ? value : PREFS.volume;
-      return value !== false;
+      if (!(name in prefCache)) prefCache[name] = readPref(name);
+      return prefCache[name];
     },
     set: function (name, value) {
       PS.store.set("lemon:pref:" + name, value);
+      delete prefCache[name];
+    },
+    /** The master gain for sound, from the 0 to 100 volume. */
+    gain: function () {
+      return (PS.prefs.get("vol") / 100) * 0.9;
+    },
+    /** Every setting from the Settings pop-up back to how it came. */
+    reset: function () {
+      Object.keys(PREFS).forEach(function (name) {
+        if (name === "volume") return;
+        PS.prefs.set(name, PREFS[name]);
+      });
     }
   };
 
@@ -230,16 +267,49 @@
   try { devLevel = Number(sessionStorage.getItem(KEY_DEV)) || 0; } catch (err) { /* blocked */ }
   if (devLevel !== 1 && devLevel !== 2) devLevel = 0;
 
+  /* The switches a battle can run with. Both the DEV panel inside a battle and
+     the lobby's "start the next battle with" card are drawn from these lists, so
+     a new cheat only has to be added here (and in the engine that reads it).
+     `admin` ones are only offered with the admin password. A multiplier row
+     shows `values`, and `more` as well for the admin. */
+  var TOGGLES = [
+    { key: "god", label: "Godmode", hint: "Nothing can hurt you" },
+    { key: "oneHit", label: "One-hit kills", hint: "Every hit kills, bosses too" },
+    { key: "freeze", label: "Freeze the pests", hint: "They stand still and never attack", admin: true },
+    { key: "noSpawn", label: "Stop spawning", hint: "No new pests, hordes or elites", admin: true },
+    { key: "vacuum", label: "Vacuum", hint: "Every gem and coin flies to you", admin: true }
+  ];
+  var MULTS = [
+    { key: "speed", label: "Game speed", values: [0.5, 1, 2, 4], more: [8] },
+    { key: "dmgMul", label: "Damage", values: [1], more: [2, 5, 10, 100, 1000], admin: true },
+    { key: "hasteMul", label: "Attack speed", values: [1], more: [2, 4, 8], admin: true },
+    { key: "moveMul", label: "Move speed", values: [1], more: [1.5, 2, 3], admin: true },
+    { key: "xpMul", label: "Experience gained", values: [1], more: [2, 5, 10, 50], admin: true }
+  ];
+  function cheatDefaults() {
+    var out = {};
+    TOGGLES.forEach(function (t) { out[t.key] = false; });
+    MULTS.forEach(function (m) { out[m.key] = 1; });
+    return out;
+  }
+  /* the admin can also start a battle already levelled up, or with every upgrade taken */
+  function buildDefaults() {
+    return { levels: 0, maxAll: false };
+  }
+
   PS.dev = {
     password: "3.1415925",
     adminPassword: "3.1415926",
     level: devLevel,
     unlocked: devLevel >= 1,
     admin: devLevel >= 2,
+    TOGGLES: TOGGLES,
+    MULTS: MULTS,
     // switches the battle looks at; they reset whenever a battle starts
-    cheats: { god: false, oneHit: false, speed: 1 },
+    cheats: cheatDefaults(),
     // what the next battle starts with (set in the lobby dev menu's Battle section)
-    startWith: { god: false, oneHit: false, speed: 1 },
+    startWith: cheatDefaults(),
+    startBuild: buildDefaults(),
     /** level 1 (dev) or 2 (admin); never lowers a level that is already open */
     unlock: function (level) {
       level = level === 2 ? 2 : 1;
@@ -254,6 +324,10 @@
       PS.dev.level = 0;
       PS.dev.unlocked = false;
       PS.dev.admin = false;
+      // nothing the admin switched on may carry over into ordinary play
+      PS.dev.cheats = cheatDefaults();
+      PS.dev.startWith = cheatDefaults();
+      PS.dev.startBuild = buildDefaults();
       try { sessionStorage.removeItem(KEY_DEV); } catch (err) { /* blocked */ }
       PS.emit("dev");
     }

@@ -876,11 +876,12 @@
     return count >= PS.CHEST_BULK.count ? Math.round(cost * PS.CHEST_BULK.discount) : cost;
   }
 
-  function openChest(kind, count) {
+  /** `free` is for the dev menu: it opens the chests without taking the gems. */
+  function openChest(kind, count, free) {
     var chest = PS.CHESTS[kind];
     var cost = chestCost(kind, count);
-    if (!chest || S.gems < cost) return null;
-    S.gems -= cost;
+    if (!chest || (!free && S.gems < cost)) return null;
+    if (!free) S.gems -= cost;
 
     var out = [];
     var shards = 0;
@@ -912,6 +913,42 @@
     S.stats.chests += count;
     commit();
     out.shards = shards;
+    return out;
+  }
+
+  /** Dev menu: open `count` chests on paper. Uses the real odds and pity rules but
+   *  changes nothing in the save and gives nothing. Returns the tallies. */
+  function simulateChests(kind, count) {
+    var chest = PS.CHESTS[kind];
+    if (!chest) return null;
+    var pityS = S.shop.pityS;
+    var pitySS = S.shop.pitySS;
+    var out = { kind: kind, count: count, rarity: [], S: 0, SS: 0, shards: 0 };
+    for (var i = 0; i < count; i++) {
+      if (chest.shard && Math.random() < chest.shard) out.shards++;
+      var forced = null;
+      if (chest.pityS) {
+        pityS++;
+        pitySS++;
+        if (pitySS >= chest.pitySS) forced = "SS";
+        else if (pityS >= chest.pityS) forced = "S";
+      }
+      var roll;
+      if (chest.special && Math.random() < chest.special.chance) {
+        roll = rollItem(0, { grade: chest.special.grade, odds: chest.odds });
+        roll.r = chest.special.rarity;
+      } else {
+        roll = rollItem(0, { s: chest.s, ss: chest.ss, grade: forced, odds: chest.odds });
+      }
+      var grade = PS.ITEMS[roll.id].grade;
+      if (chest.pityS) {
+        if (grade === "SS") pitySS = 0;
+        if (grade !== "A") pityS = 0;
+      }
+      out.rarity[roll.r] = (out.rarity[roll.r] || 0) + 1;
+      if (grade === "S") out.S++;
+      if (grade === "SS") out.SS++;
+    }
     return out;
   }
 
@@ -1042,6 +1079,92 @@
     S.gems += info.gems;
     commit();
     return info.gems;
+  }
+
+  /* ------------------------------------------------- dev menu (admin) tools */
+
+  function raiseQuestStat(quest, target) {
+    if (quest.stat === "best") S.best = Math.max(S.best, Math.min(PS.BAL.CHAPTERS, target));
+    else S.stats[quest.stat] = Math.max(S.stats[quest.stat] || 0, target);
+  }
+
+  function questById(id) {
+    var found = null;
+    PS.QUESTS.forEach(function (quest) { if (quest.id === id) found = quest; });
+    return found;
+  }
+
+  /** Make a quest's current rung ready to claim by raising the number it counts. */
+  function devCompleteQuest(id) {
+    var quest = questById(id);
+    if (!quest) return false;
+    var info = questInfo(quest);
+    if (info.done) return false;
+    raiseQuestStat(quest, info.target);
+    commit();
+    return true;
+  }
+
+  /** Finish and claim every rung of every quest. Returns the gems paid. */
+  function devFinishQuests() {
+    var gems = 0;
+    PS.QUESTS.forEach(function (quest) {
+      for (;;) {
+        var info = questInfo(quest);
+        if (info.done) break;
+        raiseQuestStat(quest, info.target);
+        S.quests[quest.id] = info.tier + 1;
+        gems += info.gems;
+      }
+    });
+    S.gems += gems;
+    commit();
+    return gems;
+  }
+
+  /** One pet handed over directly. The game keeps one pet per species and rarity,
+   *  so giving a pet you have just raises its level. */
+  function devGivePet(sp, rarity, level) {
+    if (!PS.PET[sp]) return null;
+    var r = Math.floor(num(rarity, 0, 0, PS.PET_RARITY.length - 1));
+    var lv = Math.floor(num(level, 1, 1, PS.PET_RARITY[r].cap));
+    var have = null;
+    S.pets.forEach(function (pet) { if (pet.sp === sp && pet.r === r) have = pet; });
+    if (have) {
+      have.lv = Math.max(have.lv, lv);
+    } else {
+      have = { u: S.petUid++, sp: sp, r: r, lv: lv };
+      S.pets.push(have);
+      if (S.petTeam.length < S.petSlots) S.petTeam.push(have.u);
+    }
+    commit();
+    return have;
+  }
+
+  function devRemovePet(u) {
+    var at = -1;
+    S.pets.forEach(function (pet, i) { if (pet.u === u) at = i; });
+    if (at === -1) return false;
+    S.pets.splice(at, 1);
+    var onTeam = S.petTeam.indexOf(u);
+    if (onTeam !== -1) S.petTeam.splice(onTeam, 1);
+    commit();
+    return true;
+  }
+
+  /** Fill the team with the strongest pets (rarest, then highest level). */
+  function devFillTeam() {
+    var best = S.pets.slice().sort(function (a, b) { return b.r - a.r || b.lv - a.lv; });
+    S.petTeam = best.slice(0, S.petSlots).map(function (pet) { return pet.u; });
+    commit();
+  }
+
+  /** Remove every item that is not worn and is below a rarity. Returns how many went. */
+  function devCleanBag(belowRarity) {
+    var doomed = S.items.filter(function (item) { return !isEquipped(item) && item.r < belowRarity; });
+    doomed.forEach(function (item) { remove(item.u); });
+    if (doomed.length) commit();
+    return doomed.length;
   }
 
   /* ------------------------------------------------------------- badges */
@@ -1210,6 +1333,80 @@
       S.shop.bought = [];
       commit();
     },
+    /** The free gift comes due this many seconds from now (0 = ready). */
+    devSetGiftWait: function (seconds) {
+      S.shop.freeAt = seconds > 0 ? Date.now() + Math.floor(num(seconds, 0, 0, 1e7)) * 1000 : 0;
+      commit();
+    },
+    /** Open chests without paying. Returns the items, like a real open. */
+    devSimulateChests: simulateChests,
+    devOpenChest: function (kind, count) {
+      return openChest(kind, count, true);
+    },
+    /** How many chests since the last S-grade and SS-grade (the pity counters). */
+    devSetPity: function (s, ss) {
+      S.shop.pityS = Math.floor(num(s, 0, 0, 1e6));
+      S.shop.pitySS = Math.floor(num(ss, 0, 0, 1e6));
+      commit();
+    },
+    devSetRarity: function (u, rarity) {
+      var item = byUid(u);
+      if (!item) return false;
+      item.r = Math.floor(num(rarity, 0, 0, PS.MAX_RARITY));
+      commit();
+      return true;
+    },
+    devSetSlotLevel: function (slot, level) {
+      if (!(slot in S.lv)) return false;
+      S.lv[slot] = Math.floor(num(level, 1, 1, PS.RARITY[PS.MAX_RARITY].cap));
+      commit();
+      return true;
+    },
+    /** Set the lifetime counters the quests and records read. */
+    devSetStats: function (values) {
+      Object.keys(S.stats).forEach(function (key) {
+        if (values && values[key] !== undefined) S.stats[key] = Math.floor(num(values[key], 0, 0, 1e12));
+      });
+      commit();
+    },
+    devCompleteQuest: devCompleteQuest,
+    devFinishQuests: devFinishQuests,
+    devGivePet: devGivePet,
+    devGiveAllPets: function () {
+      PS.PET_SPECIES.forEach(function (sp) {
+        PS.PET_RARITY.forEach(function (def, r) {
+          var have = null;
+          S.pets.forEach(function (pet) { if (pet.sp === sp.id && pet.r === r) have = pet; });
+          if (have) {
+            have.lv = def.cap;
+          } else {
+            have = { u: S.petUid++, sp: sp.id, r: r, lv: def.cap };
+            S.pets.push(have);
+            if (S.petTeam.length < S.petSlots) S.petTeam.push(have.u);
+          }
+        });
+      });
+      commit();
+    },
+    devRemovePet: devRemovePet,
+    devFillTeam: devFillTeam,
+    devSetPetLevel: function (u, level) {
+      var pet = petByUid(u);
+      if (!pet) return false;
+      pet.lv = Math.floor(num(level, 1, 1, PS.PET_RARITY[pet.r].cap));
+      commit();
+      return true;
+    },
+    devMaxPets: function () {
+      S.pets.forEach(function (pet) { pet.lv = PS.PET_RARITY[pet.r].cap; });
+      commit();
+    },
+    devSetPetSlots: function (n) {
+      S.petSlots = Math.floor(num(n, PS.PET_SLOTS.start, PS.PET_SLOTS.start, PS.PET_SLOTS.max));
+      S.petTeam = S.petTeam.slice(0, S.petSlots);
+      commit();
+    },
+    devCleanBag: devCleanBag,
     exportSave: function () { return JSON.stringify(S); },
     importSave: function (text) {
       var raw;

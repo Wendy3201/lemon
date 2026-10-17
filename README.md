@@ -91,9 +91,10 @@ S-grade. **Chests never hold an SS-grade item.** Chest odds are fixed for the
 whole game: a Seed Crate is 79% Common, 15% Uncommon, 6% Rare; a Gilded Chest
 is 62.35% Common, 25% Uncommon, 9% Rare, 3% Epic, and 0.65% of the time an
 S-grade Uncommon. Neither chest gives Legendary or Mythic. A Gilded Chest also
-has a 0.02% chance of an **SS shard**, and
-6 shards craft one Uncommon SS-grade item in the Shop. The boss of every fourth
-chapter drops an S or SS item the first time you beat it.
+has a 0.4% chance of an **SS shard**, and
+6 shards craft one Uncommon SS-grade item in the Shop. Beating a chapter never
+gives an SS-grade item by chance, but the boss of every fourth chapter drops an
+S or SS item the first time you beat it.
 
 **Levels belong to the slot, not the item**, so nothing is lost when you swap
 gear. Each level is +3.5% of the item's main stat.
@@ -162,7 +163,7 @@ lemon/
 │   ├── enemies.js    pests, bosses, and who turns up when
 │   ├── upgrades.js   the level-up cards and the abilities they add
 │   ├── hud.js        health bar, timer, level-up cards, pause screen
-│   ├── dev.js        the DEV panel inside a battle (godmode, upgrades, run controls)
+│   ├── dev.js        the DEV / admin panel inside a battle (cheats, upgrades, spawning, stats)
 │   └── ui.js         the menus: Battle, Equipment, Forge, Shop, Talents, Quests
 ├── assets/icons/lemon.svg
 ├── games/survivor/index.html   the old address; it forwards to index.html
@@ -194,13 +195,15 @@ Most tweaks are one line in `js/data.js`.
   naturally has by each chapter, so if you make gear or gold much more
   generous, raise them to match.
 - **A new upgrade card:** add it to `UPGRADES` in `js/upgrades.js`.
-- **Two passwords.** The dev password (`PS.dev.password` in `js/core.js`) opens the battle tools only: the Battle section of the lobby dev menu and the DEV panel in a battle. The admin password (`PS.dev.adminPassword`) opens everything, including a full admin menu in the lobby and an extra Admin tab in battle. The admin prompt is hidden: type the key code up, up, down, down, left, right, left, right, B, A anywhere in the menus to open it.
+- **Two passwords.** The dev password (`PS.dev.password` in `js/core.js`) opens the battle tools only: the Battle section of the lobby dev menu and the DEV panel in a battle (Cheats, Upgrades, Run). The admin password (`PS.dev.adminPassword`) opens everything. The admin prompt is hidden: click the lemon logo at the top twice, then type the key code up, up, down, down, left, right, left, right, B, A anywhere in the menus, then enter the password. (Once the admin is unlocked for the tab, the key code alone reopens the menu.)
+- **The admin menu in the lobby** has twelve sections down the left. *Overview* (every computed stat), *Gear* (give items, set each slot's level), *Owned* (change an item's rarity, wear it, remove it, clean out the bag), *Pets* (give any pet at any level, fill the team, open the slots), *Money*, *Shop* (open chests without paying, set the pity counters, set the gift timer), *Progress* (chapters and talents), *Quests* (complete or claim any quest, set the counters they read), *Chapters* (every chapter with Play and Clear to here), *Battle* (start any chapter or swarm mode with cheats and a built-up lemon), *Settings* and *Save*. Every change it makes is remembered: the **Undo** button at the top takes back the last one, and the Save section lists the last thirty so you can go back to any of them. The Save section also keeps named **snapshots** of the save in this browser and can download the save as a file or load one.
+- **The DEV / admin panel in a battle** opens from the DEV button or the ` key. As admin it has six tabs: *Cheats* (godmode, one-hit kills, freeze the pests, stop spawning, vacuum, and multipliers for damage, attack speed, move speed, XP and game speed), *Upgrades* (search, filter by tier, take or max any card), *Player* (health, stat boosts, auto-levelling, swap weapon, build presets), *Spawn* (any pest, elites, the boss, a training dummy for reading damage per second, status effects on every pest, pickups), *Run* (skip the clock, set the boss's health, restart on any chapter) and *Stats* (a read-out of the whole run). The switches themselves are listed in `PS.dev` in `js/core.js`, so adding one there adds it to the lobby and the battle panel together.
 - **The password on the `?` button** is the dev password. It is
   checked in the browser, so anyone who reads the file can see it. Entering it
   once (here or on the construction page) unlocks developer tools for that tab:
   a **DEV button in every battle** (godmode, one-hit kills, game speed, take or
   max any upgrade, level up, skip to the boss) and a tabbed dev menu in the
-  lobby with a section list down the left (Overview, Gear, Money, Progress, Battle, Owned, Settings, Save).
+  lobby (the admin password opens all of it, see above).
   The lobby menu can give or remove any item, set gold and
   gems to an exact figure, and start **Swarm mode**, an endless battle with no
   boss and a swarm that keeps growing, with pests as tough as the chapter you

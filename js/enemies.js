@@ -141,6 +141,12 @@
     // attack felling the boss): nothing more may spawn after that
     if (R.phase !== "swarm" && R.phase !== "boss") return;
     R.spawnIn -= dt;
+    if (PS.dev.cheats.noSpawn) {
+      // the admin's "stop spawning": only the boss still turns up on time
+      R.spawnIn = Math.max(R.spawnIn, 0.5);
+      if (R.mode !== "swarm" && R.phase === "swarm" && R.t >= R.dur) startBoss();
+      return;
+    }
     if (R.mode === "swarm") return swarmDirector(dt);
 
     if (R.phase === "boss") {
@@ -185,6 +191,7 @@
     if (R.t >= R.dur) startBoss();
   };
 
+  B.startBoss = startBoss; // the admin panel can call the boss in early
   function startBoss() {
     var R = B.run;
     var def = BOSSES[R.ch.boss];

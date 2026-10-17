@@ -864,7 +864,7 @@
   PS.CHESTS = {
     crate: { key: "crate", name: "Seed Crate", gems: 10, odds: [0.79, 0.15, 0.06, 0, 0, 0], s: 0.005, ss: 0, shard: 0,
       text: "One piece of gear: mostly Common, sometimes Uncommon or Rare." },
-    gilded: { key: "gilded", name: "Gilded Chest", gems: 40, odds: [0.6235, 0.25, 0.09, 0.03, 0, 0], s: 0, ss: 0, shard: 0.0002,
+    gilded: { key: "gilded", name: "Gilded Chest", gems: 40, odds: [0.6235, 0.25, 0.09, 0.03, 0, 0], s: 0, ss: 0, shard: 0.004,
       special: { chance: 0.0065, grade: "S", rarity: 1 },
       text: "One piece of gear, up to Epic, with a small chance of an S-grade Uncommon and a tiny chance of an SS shard." }
   };
@@ -877,7 +877,7 @@
     grade: { S: 10000, SS: 100000 }
   };
   PS.CHEST_BULK = { count: 10, big: 100, discount: 0.9 }; // 10 and 100 at once, both 10% off
-  PS.DROP_GRADE = { s: 0.04, sFrom: 3, ss: 0.004, ssFrom: 10 };
+  PS.DROP_GRADE = { s: 0.04, sFrom: 3, ss: 0, ssFrom: 10 };
   /* Pets. A pet egg costs gems and hatches one pet: a species and a rarity.
      The rarities are Common, Uncommon, Rare and Epic, and there is no S or SS
      grade. Hatching a pet you already have levels it up; gold

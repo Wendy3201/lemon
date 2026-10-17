@@ -4634,3 +4634,550 @@ body::before {
 .devshell__main--solo {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* ------------------------------------------------------- admin panel extras */
+
+/* the lobby menu: title with the Undo button beside it */
+.devshell__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 40px;
+}
+
+.devshell__head h2 {
+  margin: 0;
+}
+
+.devshell__head .btn {
+  max-width: min(60%, 320px);
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* list rows with a name over a small line, and buttons that sit together at the end */
+.dev__row {
+  flex-wrap: wrap;
+}
+
+.dev__name {
+  display: flex;
+  flex: 1 1 180px;
+  flex-direction: column;
+  min-width: 0;
+  font-weight: 800;
+}
+
+.dev__name small {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.dev__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.dev__row .dev__acts .btn {
+  margin-left: 0;
+}
+
+.dev__no {
+  min-width: 28px;
+  font-family: var(--font-mono);
+  text-align: center;
+}
+
+.dev__row--chapter.is-locked {
+  opacity: 0.65;
+}
+
+.dev__row--chapter.is-cleared .dev__no {
+  color: var(--good, #4c9a3f);
+}
+
+.devcard .dev__list.dev__list--tall {
+  max-height: 52vh;
+}
+
+@media (max-width: 520px) {
+  /* on a phone the Undo button is just "Undo"; its title still says what it undoes */
+  .devshell__what {
+    display: none;
+  }
+}
+
+.dev__pet {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+}
+
+.dev__pet svg {
+  width: 30px;
+  height: 30px;
+}
+
+.dev__give--grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+
+.dev__give--grid label {
+  min-width: 0;
+}
+
+.dev__give--grid input {
+  width: 100%;
+}
+
+.dev input[type="text"],
+.dev input[type="file"] {
+  font: inherit;
+  max-width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+  color: var(--ink);
+}
+
+/* the DEV panel inside a battle */
+.devbox__note {
+  margin: 8px 0 0;
+  padding: 7px 12px;
+  border: 1px solid var(--rind);
+  border-radius: var(--radius-sm);
+  background: var(--lemon-pale);
+  color: var(--charcoal);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+:root[data-theme="dark"] .devbox__note {
+  background: #4a4020;
+  color: var(--ink);
+}
+
+.devbox__facts {
+  margin-top: 4px;
+}
+
+.devbox__field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.devbox__field label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.devbox__field input,
+.devbox__field select,
+.devbox__search {
+  font: inherit;
+  max-width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+  color: var(--ink);
+}
+
+.devbox__field input[type="number"] {
+  width: 9.5em;
+}
+
+.devbox__search {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.devbox .hint {
+  margin-top: 8px;
+}
+
+/* =========================================================================
+   SOFTNESS PASS
+   Rounder corners, light and wide shadows instead of hard bottom edges,
+   softer outlines, and slower, smoother movement. It only changes how things
+   look. Delete this whole block and the earlier look is back exactly.
+   ========================================================================= */
+
+:root {
+  --radius-sm: 14px;
+  --radius: 20px;
+  --radius-lg: 30px;
+  --soft-ease: cubic-bezier(0.22, 0.8, 0.3, 1);
+  --line: #f1e8cb;
+  --line-strong: #e8dcb4;
+  --shadow-sm: 0 2px 6px -2px rgba(41, 38, 31, 0.1), 0 8px 18px -10px rgba(41, 38, 31, 0.2);
+  --shadow: 0 4px 10px -4px rgba(41, 38, 31, 0.1), 0 20px 38px -20px rgba(41, 38, 31, 0.28);
+  --shadow-lift: 0 6px 14px -6px rgba(41, 38, 31, 0.12), 0 28px 50px -22px rgba(41, 38, 31, 0.34);
+}
+
+:root[data-theme="dark"] {
+  --line: #373126;
+  --line-strong: #453d2e;
+  --shadow-sm: 0 2px 6px -2px rgba(0, 0, 0, 0.35), 0 8px 18px -10px rgba(0, 0, 0, 0.6);
+  --shadow: 0 4px 10px -4px rgba(0, 0, 0, 0.35), 0 20px 38px -20px rgba(0, 0, 0, 0.75);
+  --shadow-lift: 0 6px 14px -6px rgba(0, 0, 0, 0.4), 0 28px 50px -22px rgba(0, 0, 0, 0.85);
+}
+
+/* ------------------------------------------------------------- buttons */
+
+.btn {
+  border-color: color-mix(in srgb, var(--line-strong) 75%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 4px 10px -5px rgba(41, 38, 31, 0.22);
+  transition: transform 0.3s var(--soft-ease), box-shadow 0.3s var(--soft-ease), filter 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 12px 22px -10px rgba(41, 38, 31, 0.3);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: inset 0 1px 3px rgba(41, 38, 31, 0.1), 0 2px 6px -3px rgba(41, 38, 31, 0.2);
+}
+
+.btn--primary {
+  border-color: color-mix(in srgb, var(--sun-deep) 55%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 6px 14px -6px rgba(214, 150, 10, 0.55);
+}
+
+.btn--primary:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 14px 24px -10px rgba(214, 150, 10, 0.6);
+}
+
+.btn--primary:active:not(:disabled) {
+  box-shadow: inset 0 1px 3px rgba(150, 100, 0, 0.18), 0 2px 6px -3px rgba(214, 150, 10, 0.45);
+}
+
+.btn--xl {
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 12px 24px -10px rgba(214, 150, 10, 0.6);
+}
+
+.btn--xl:hover:not(:disabled) {
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.8), 0 18px 32px -12px rgba(214, 150, 10, 0.65);
+}
+
+.btn--xl:active:not(:disabled) {
+  transform: translateY(1px) scale(0.985);
+  box-shadow: inset 0 2px 4px rgba(150, 100, 0, 0.2), 0 4px 10px -5px rgba(214, 150, 10, 0.45);
+}
+
+.btn--danger {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 4px 10px -5px color-mix(in srgb, var(--bad) 40%, transparent);
+}
+
+.btn:disabled {
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .btn {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 4px 12px -5px rgba(0, 0, 0, 0.6);
+}
+
+:root[data-theme="dark"] .btn:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 12px 22px -10px rgba(0, 0, 0, 0.7);
+}
+
+:root[data-theme="dark"] .btn--primary {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 6px 14px -6px rgba(0, 0, 0, 0.6);
+}
+
+/* ------------------------------------------------- bars, pills and the dock */
+
+.pill {
+  border-color: color-mix(in srgb, var(--line-strong) 75%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 3px 8px -4px rgba(41, 38, 31, 0.2);
+}
+
+.pill--power {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 4px 14px -4px rgba(255, 190, 40, 0.65);
+}
+
+#top-gems {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 3px 10px -4px rgba(120, 190, 230, 0.55);
+}
+
+:root[data-theme="dark"] #top-gems {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 3px 10px -4px rgba(0, 0, 0, 0.6);
+}
+
+.status {
+  border-radius: 18px;
+  border-color: color-mix(in srgb, var(--rind) 60%, transparent);
+}
+
+.topbar {
+  border-radius: 26px;
+}
+
+.tabbar {
+  border-radius: 32px;
+  box-shadow: 0 20px 40px -22px rgba(41, 38, 31, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.tab {
+  border-radius: 24px;
+  transition: background-color 0.3s var(--soft-ease), box-shadow 0.3s var(--soft-ease), transform 0.3s var(--soft-ease);
+}
+
+.tab--main {
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.75), 0 10px 20px -8px rgba(210, 140, 0, 0.6);
+}
+
+/* ------------------------------------------------------ cards and panels */
+
+.panel {
+  border-radius: 28px;
+  border-color: color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.slot,
+.deal,
+.dev__row {
+  border-radius: 22px;
+  border-color: color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.facts > div {
+  border-radius: 18px;
+}
+
+.tile {
+  border-radius: 22px;
+}
+
+.tile::after {
+  border-radius: 18px 18px 44px 44px;
+}
+
+.devcard {
+  border-radius: 24px;
+  border-color: color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.devnav__item,
+.devbox__toggle {
+  border-radius: 18px;
+}
+
+.devbox__tab,
+.devtabs__tab {
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.section::before {
+  border-radius: 8px;
+  box-shadow: 0 3px 8px -3px rgba(214, 150, 10, 0.6);
+}
+
+.talent__icon,
+.ascend__art {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 5px 10px -5px rgba(214, 150, 10, 0.5);
+}
+
+:root[data-theme="dark"] .talent__icon,
+:root[data-theme="dark"] .ascend__art {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 5px 10px -5px rgba(0, 0, 0, 0.6);
+}
+
+.talent,
+.quest,
+.chest,
+.deal,
+.gift,
+.pet,
+.slot {
+  transition: transform 0.35s var(--soft-ease), box-shadow 0.35s var(--soft-ease), border-color 0.25s ease;
+}
+
+@media (hover: hover) {
+  .talent:hover,
+  .quest:hover,
+  .chest:hover,
+  .deal:hover,
+  .gift:hover,
+  .pet:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--sun-deep) 55%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 22px 36px -22px rgba(150, 100, 0, 0.5);
+  }
+}
+
+.bar {
+  box-shadow: inset 0 1px 3px rgba(41, 38, 31, 0.12);
+}
+
+.bar i {
+  box-shadow: 0 0 14px -3px rgba(255, 190, 40, 0.6);
+}
+
+/* ------------------------------------------------------------- pop-ups */
+
+.modal {
+  border-radius: 34px;
+  box-shadow: 0 46px 90px -34px rgba(41, 38, 31, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.modal::backdrop {
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+
+.modal__close {
+  box-shadow: 0 4px 10px -4px rgba(41, 38, 31, 0.3);
+  transition: transform 0.3s var(--soft-ease), box-shadow 0.3s var(--soft-ease);
+}
+
+.modal__close:hover {
+  transform: scale(1.06);
+}
+
+.toast {
+  border-radius: 99px;
+  box-shadow: 0 18px 34px -16px rgba(41, 38, 31, 0.6);
+}
+
+/* ------------------------------------------------------ the battle HUD */
+
+.hud__btn,
+.hud__pill,
+.hud__hp,
+.hud__boss div,
+.hud__toast {
+  border-color: rgba(255, 252, 242, 0.14);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.6);
+}
+
+.hud__btn {
+  transition: background-color 0.25s ease, border-color 0.25s ease, transform 0.3s var(--soft-ease);
+}
+
+.hud__btn:hover {
+  transform: scale(1.06);
+}
+
+.chip {
+  border-radius: 14px;
+  border-width: 1px;
+  box-shadow: 0 3px 10px -5px rgba(0, 0, 0, 0.6);
+}
+
+.chip b {
+  border-radius: 99px;
+}
+
+.sheet {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.upcard {
+  padding-top: 22px;
+  border-top: 0;
+  border-radius: 26px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tier) 11%, #fff9e6), #fff9e6 55%);
+  box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transition: transform 0.35s var(--soft-ease), box-shadow 0.35s var(--soft-ease);
+}
+
+.upcard:hover,
+.upcard:focus-visible {
+  transform: translateY(-6px);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tier) 55%, transparent), 0 0 30px -4px color-mix(in srgb, var(--tier) 60%, transparent), 0 22px 40px -16px rgba(0, 0, 0, 0.8);
+}
+
+.upcard__key {
+  border-radius: 9px;
+}
+
+/* the battle's own admin panel */
+
+.devup {
+  border-radius: 16px;
+  border-left-width: 3px;
+}
+
+.devbox__note,
+.devbox__search,
+.devbox__field input,
+.devbox__field select,
+.dev select,
+.dev input[type="number"],
+.dev input[type="text"],
+.dev input[type="file"] {
+  border-radius: 14px;
+}
+
+/* ------------------------------------------------------ settings, extra */
+
+.settings h3 {
+  margin: 22px 0 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.settings__row > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.settings__row small {
+  color: var(--ink-faint);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.settings__range {
+  width: min(46%, 220px);
+  accent-color: var(--sun-deep);
+  cursor: pointer;
+}
+
+/* the optional frame-rate counter in a battle */
+.hud__fps {
+  position: absolute;
+  right: 10px;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  z-index: 4;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: rgba(20, 18, 14, 0.6);
+  color: #fffcf2;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+/* Settings > Glass blur off: no frosted backgrounds anywhere */
+:root[data-blur="off"] *,
+:root[data-blur="off"] *::before,
+:root[data-blur="off"] *::after,
+:root[data-blur="off"] .modal::backdrop {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}

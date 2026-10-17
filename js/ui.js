@@ -22,13 +22,16 @@
     tab: "battle",
     filter: "all",
     forge: null, // { main: uid, mats: [uid, uid] } while the forge is open
-    dev: { id: "sling", r: 0 }, // the dev menu's picker
+    dev: { id: "sling", r: 0, psp: "bumble", pr: 0, plv: 1, clean: 2, slot: "all" }, // the dev menu's pickers
     devTab: "gear", // which tab of the dev menu is showing
+    devSim: null, // the admin menu's last chest simulation
+    devHistory: [], // the admin menu's undo list: { label, save, at }, oldest first
     entering: true, // the next render should play the screen's entrance animation
     slide: 0, // -1 / 1 while the chapter title slides in from a side
     modal: null, // { type, ... } while a pop-up is open
     results: null
   };
+  var logoArmedUntil = 0; // when the double-clicked logo stops unlocking the admin key code
   var toastTimer = 0;
   var tickTimer = 0;
 
@@ -927,6 +930,33 @@
     );
   }
 
+  /* one row of the Settings pop-up: a name, a small line under it, and a control */
+  function settingsToggle(name, hint, control) {
+    return '<div class="settings__row"><span>' + name + "<small>" + hint + "</small></span>" + control + "</div>";
+  }
+
+  function settingsPref(name, label, hint) {
+    return settingsToggle(label, hint, '<button class="btn btn--sm" type="button" data-act="pref" data-pref="' + name + '" data-key="pref-' + name + '">' + (PS.prefs.get(name) ? "On" : "Off") + "</button>");
+  }
+
+  /* settings that step through a short list when pressed */
+  var CYCLES = {
+    quality: [[0, "Low"], [1, "Medium"], [2, "High"]],
+    fps: [[0, "No limit"], [60, "60 FPS"], [30, "30 FPS"]]
+  };
+
+  function settingsCycle(name, label, hint) {
+    var now = PS.prefs.get(name);
+    var pick = CYCLES[name].filter(function (o) { return o[0] === now; })[0] || CYCLES[name][0];
+    return settingsToggle(label, hint, '<button class="btn btn--sm" type="button" data-act="cycle" data-pref="' + name + '" data-key="cycle-' + name + '">' + pick[1] + "</button>");
+  }
+
+  /** The glass blur switch is a page-wide attribute, so it is applied here and at start-up. */
+  function applyBlur() {
+    if (PS.prefs.get("blur")) document.documentElement.removeAttribute("data-blur");
+    else document.documentElement.setAttribute("data-blur", "off");
+  }
+
   function settingsModal(modal) {
     var S = st.get();
     var dark = document.documentElement.getAttribute("data-theme") === "dark";
@@ -935,20 +965,27 @@
       '<div class="settings">' +
         '<button class="modal__close" type="button" data-act="close" aria-label="Close">' + PS.icon("close") + "</button>" +
         '<h2 id="modal-title">Settings</h2>' +
-        '<div class="settings__row"><span>Sound effects</span>' +
-          '<button class="btn btn--sm" type="button" data-act="sound" data-key="sound">' + (PS.sfx.on() ? "On" : "Off") + "</button></div>" +
-        '<div class="settings__row"><span>Sound volume</span>' +
-          '<button class="btn btn--sm" type="button" data-act="volume" data-key="volume">' + PS.VOLUMES[PS.prefs.get("volume")].name + "</button></div>" +
-        '<div class="settings__row"><span>Screen shake</span>' +
-          '<button class="btn btn--sm" type="button" data-act="pref" data-pref="shake" data-key="pref-shake">' + (PS.prefs.get("shake") ? "On" : "Off") + "</button></div>" +
-        '<div class="settings__row"><span>Damage numbers</span>' +
-          '<button class="btn btn--sm" type="button" data-act="pref" data-pref="numbers" data-key="pref-numbers">' + (PS.prefs.get("numbers") ? "On" : "Off") + "</button></div>" +
-        '<div class="settings__row"><span>Pause when you leave the tab</span>' +
-          '<button class="btn btn--sm" type="button" data-act="pref" data-pref="autopause" data-key="pref-autopause">' + (PS.prefs.get("autopause") ? "On" : "Off") + "</button></div>" +
-        '<div class="settings__row"><span>Animations</span>' +
+        "<h3>Sound</h3>" +
+        settingsToggle("Sound effects", "Switches every sound on or off", '<button class="btn btn--sm" type="button" data-act="sound" data-key="sound">' + (PS.sfx.on() ? "On" : "Off") + "</button>") +
+        settingsToggle("Volume", '<span id="set-vol-label">' + PS.prefs.get("vol") + "%</span>",
+          '<input class="settings__range" id="set-vol" type="range" min="0" max="100" step="5" value="' + PS.prefs.get("vol") + '" aria-label="Volume" />') +
+        settingsPref("combatSfx", "Battle sounds", "Shots, hits, pests squashed and explosions") +
+        settingsPref("menuSfx", "Menu sounds", "Button clicks and tab changes") +
+        "<h3>Performance</h3>" +
+        settingsCycle("quality", "Graphics quality", "Low draws flat pests and fewer sparks, for slow devices") +
+        settingsCycle("fps", "Frame rate limit", "A lower limit saves battery and heat") +
+        settingsPref("showFps", "Show frame rate", "A small counter in the corner of a battle") +
+        settingsPref("blur", "Glass blur", "The frosted look behind menus; switch off if menus feel slow") +
+        '<div class="settings__row"><span>Animations<small>Menu and button movement</small></span>' +
           '<button class="btn btn--sm" type="button" data-act="motion" data-key="motion">' + { auto: "Auto (follow device)", on: "Always on", off: "Off" }[PS.motionMode()] + "</button></div>" +
-        '<div class="settings__row"><span>Colours</span>' +
+        "<h3>Gameplay</h3>" +
+        settingsPref("shake", "Screen shake", "Shake when things blow up") +
+        settingsPref("numbers", "Damage numbers", "Floating hit numbers") +
+        settingsPref("autopause", "Pause when you leave the tab", "So a battle waits while you are away") +
+        '<div class="settings__row"><span>Colours<small>Day or night</small></span>' +
           '<button class="btn btn--sm" type="button" data-act="theme" data-key="theme">' + (dark ? "Switch to day" : "Switch to night") + "</button></div>" +
+        '<div class="settings__row"><span>Put the settings back as they came</span>' +
+          '<button class="btn btn--sm" type="button" data-act="prefs-reset" data-key="prefs-reset">Restore defaults</button></div>' +
         "<h3>How to play</h3>" +
         '<ul class="howto">' +
           "<li>Move with WASD or the arrow keys, or drag on the screen. The lemon attacks by itself.</li>" +
@@ -991,18 +1028,73 @@
 
   /* ------------------------------------------------------------- dev menu */
   /* A list of sections down the left and the chosen one on the right. Every
-     section has its numbers at the top, then the switches and setters. */
+     section has its numbers at the top, then the switches and setters.
+
+     The admin menu also keeps an undo list: before any action named in
+     DEV_UNDO changes the save, a snapshot of the save is taken, and the Undo
+     button (or the Save section's history) puts it back. */
 
   var DEV_TABS = [
     ["overview", "Overview", "info"],
     ["gear", "Gear", "tabGear"],
-    ["money", "Money", "coin"],
-    ["progress", "Progress", "tabTalents"],
-    ["battle", "Battle", "tabBattle"],
     ["owned", "Owned", "tabShop"],
+    ["pets", "Pets", "tabPets"],
+    ["money", "Money", "coin"],
+    ["shop", "Shop", "gift"],
+    ["progress", "Progress", "tabTalents"],
+    ["quests", "Quests", "tabQuests"],
+    ["chapters", "Chapters", "chart"],
+    ["battle", "Battle", "tabBattle"],
     ["settings", "Settings", "gear"],
     ["save", "Save", "forge"]
   ];
+
+  /* every action that changes the save, and what the undo list calls it */
+  var DEV_UNDO = {
+    "dev-give": "Gave an item", "dev-give-bag": "Gave an item to the bag", "dev-give-all": "Gave one of every item",
+    "dev-set": "Gave a full set", "dev-remove": "Removed an item", "dev-max-slots": "Maxed the slot levels",
+    "dev-slot-levels": "Set the slot levels", "dev-equip-best": "Wore the best gear", "dev-owned-rarity": "Changed an item's rarity",
+    "dev-equip": "Wore an item", "dev-clean": "Cleaned out the bag",
+    "dev-pet-give": "Gave a pet", "dev-pet-all": "Gave every pet", "dev-pet-team": "Moved a pet", "dev-pet-up": "Levelled a pet",
+    "dev-pet-max": "Maxed a pet", "dev-pet-remove": "Removed a pet", "dev-pets-max": "Maxed every pet",
+    "dev-pets-fill": "Filled the pet team", "dev-pet-slots": "Set the pet slots",
+    "dev-add": "Added gold or gems", "dev-money": "Set gold and gems", "dev-shards": "Added SS shards", "dev-shards-set": "Set SS shards",
+    "dev-eggs": "Hatched free eggs", "dev-shop": "Restocked the shop", "dev-gift-wait": "Set the gift timer",
+    "dev-chest": "Opened free chests", "dev-pity": "Set the pity counters",
+    "dev-best": "Set the chapters cleared", "dev-unlock": "Opened every chapter", "dev-lockall": "Locked the chapters",
+    "dev-chapter": "Moved the Battle screen", "dev-clear-to": "Cleared up to a chapter",
+    "dev-max-talents": "Maxed the talents", "dev-ascend": "Ascended a tier", "dev-reset-talents": "Forgot the talents",
+    "dev-claim-quests": "Claimed ready quests", "dev-quest-done": "Completed a quest", "dev-quest-claim": "Claimed a quest",
+    "dev-quests-all": "Finished every quest", "dev-stats-set": "Set the counters",
+    "dev-snap-load": "Loaded a snapshot", "dev-file-load": "Loaded a save file", "dev-import": "Loaded a pasted save",
+    "dev-reset": "Reset the save"
+  };
+  var HISTORY_MAX = 30;
+  var KEY_SNAPS = "lemon:dev:snapshots";
+
+  var STAT_NAMES = {
+    kills: "Pests squashed", runs: "Battles", wins: "Wins", forges: "Forges", chests: "Chests opened",
+    upgrades: "Gear levels bought", talents: "Talent levels", bestLevel: "Best battle level", bestPower: "Best Power",
+    maxRarity: "Best rarity owned (number)", grade: "Best grade owned (0 A, 1 S, 2 SS)", time: "Seconds played",
+    earned: "Gold earned", eggs: "Eggs hatched"
+  };
+
+  function devSnapshot(label) {
+    var list = view.devHistory;
+    list.push({ label: label, save: st.exportSave(), at: Date.now() });
+    if (list.length > HISTORY_MAX) list.shift();
+  }
+
+  function devClock(at) {
+    var d = new Date(at);
+    function two(n) { return (n < 10 ? "0" : "") + n; }
+    return two(d.getHours()) + ":" + two(d.getMinutes()) + ":" + two(d.getSeconds());
+  }
+
+  function devSnaps() {
+    var list = PS.store.get(KEY_SNAPS, []);
+    return Array.isArray(list) ? list.filter(function (s) { return s && typeof s.save === "string"; }) : [];
+  }
 
   function devButton(act, label, attrs, cls) {
     return '<button class="btn btn--sm' + (cls ? " " + cls : "") + '" type="button" data-act="' + act + '"' + (attrs || "") + ">" + label + "</button>";
@@ -1036,6 +1128,17 @@
     return '<label>' + label + '<input id="' + id + '" type="number" min="' + min + '"' + (max ? ' max="' + max + '"' : "") + ' step="1" value="' + value + '" /></label>';
   }
 
+  /** A drop-down. `options` is a list of [value, text]. */
+  function devSelect(id, label, options, current) {
+    return '<label>' + label + '<select id="' + id + '">' + options.map(function (o) {
+      return '<option value="' + o[0] + '"' + (String(o[0]) === String(current) ? " selected" : "") + ">" + esc(o[1]) + "</option>";
+    }).join("") + "</select></label>";
+  }
+
+  function rarityOptions(count) {
+    return PS.RARITY.slice(0, count).map(function (r, i) { return [i, r.name]; });
+  }
+
   function devOverview(S, calc) {
     var minutes = Math.round(S.stats.time / 60);
     var open = st.unlockedTalents();
@@ -1050,9 +1153,27 @@
         ["SS shards", S.shards + "/" + PS.SHARDS.needed],
         ["Chapters cleared", S.best + " / " + PS.BAL.CHAPTERS],
         ["Items owned", S.items.length],
+        ["Pets owned", S.pets.length],
         ["Talents maxed", maxed + " / " + open.length],
         ["Talent tier", st.ascendInfo().tier + " of " + PS.TALENT_TIERS],
         ["Quests ready", ready]
+      ]) +
+      devCard("Computed stats", "", [
+        ["Weapon", esc(PS.ITEMS[calc.weapon].name)],
+        ["Attack", fmt(calc.atk)],
+        ["Health", fmt(calc.hp)],
+        ["Crit chance", PS.pct(calc.crit)],
+        ["Crit damage", PS.pct(calc.critDmg)],
+        ["Attack speed", "+" + PS.pct(calc.haste)],
+        ["Move speed", "+" + PS.pct(calc.speed)],
+        ["Damage reduction", PS.pct(calc.armor)],
+        ["Regeneration", PS.pct(calc.regen) + " a second"],
+        ["Pickup range", "+" + PS.pct(calc.magnet)],
+        ["Gold bonus", "+" + PS.pct(calc.gold)],
+        ["XP bonus", "+" + PS.pct(calc.xp)],
+        ["Luck", "+" + PS.pct(calc.luck)],
+        ["Attack size", "+" + PS.pct(calc.area)],
+        ["Boss damage", "+" + PS.pct(calc.bossDmg)]
       ]) +
       devCard("Record", "", [
         ["Battles", fmt(S.stats.runs)],
@@ -1067,7 +1188,7 @@
       devCard("This browser", "", [
         ["Save size", (bytes / 1024).toFixed(1) + " KB"],
         ["Saving works", PS.store.available ? "yes" : "no"],
-        ["Dev tools", PS.dev.unlocked ? "unlocked" : "locked"],
+        ["Dev tools", PS.dev.admin ? "admin" : PS.dev.unlocked ? "dev" : "locked"],
         ["Theme", document.documentElement.getAttribute("data-theme") === "dark" ? "night" : "day"],
         ["Free gift", st.giftWait() ? PS.countdown(st.giftWait()) : "ready"]
       ])
@@ -1089,6 +1210,7 @@
       var item = st.equipped(slot.key);
       return [slot.name, item ? esc(PS.RARITY[item.r].name + " " + st.def(item).name) + " · Lv " + S.lv[slot.key] : "nothing"];
     });
+    var maxLevel = PS.RARITY[PS.MAX_RARITY].cap;
     return (
       devCard("Wearing", "", worn.concat([["Power", fmt(calc.power)]])) +
       devCard("Give an item",
@@ -1106,8 +1228,18 @@
         devRow(
           devButton("dev-set", "Full set of basics at this rarity") +
           devButton("dev-give-all", "One of every item at this rarity") +
+          devButton("dev-equip-best", "Wear the best of what I own")
+        ) + '<p class="hint">Rarity comes from the picker above.</p>'
+      ) +
+      devCard("Slot levels",
+        '<div class="dev__give">' + PS.SLOTS.map(function (slot) {
+          return devNumber("dev-lv-" + slot.key, slot.name, S.lv[slot.key], 1, maxLevel);
+        }).join("") + "</div>" +
+        devRow(
+          devButton("dev-slot-levels", "Set these levels", "", "btn--primary") +
           devButton("dev-max-slots", "Max every slot's level")
-        ) + '<p class="hint">Rarity comes from the picker above. Slot levels stop at what the worn item\'s rarity allows.</p>'
+        ) +
+        '<p class="hint">A slot only shows its level up to what the worn item\'s rarity allows. The highest level is ' + maxLevel + ".</p>"
       )
     );
   }
@@ -1132,22 +1264,83 @@
         devRow(
           devButton("dev-add", "+10K gold", ' data-gold="10000" data-gems="0"') +
           devButton("dev-add", "+1M gold", ' data-gold="1000000" data-gems="0"') +
-          devButton("dev-add", "+1B gold", ' data-gold="1000000000" data-gems="0"')
+          devButton("dev-add", "+1B gold", ' data-gold="1000000000" data-gems="0"') +
+          devButton("dev-add", "+1T gold", ' data-gold="1000000000000" data-gems="0"')
         ) +
         devRow(
           devButton("dev-add", "+100 gems", ' data-gold="0" data-gems="100"') +
           devButton("dev-add", "+1K gems", ' data-gold="0" data-gems="1000"') +
-          devButton("dev-add", "+100K gems", ' data-gold="0" data-gems="100000"')
+          devButton("dev-add", "+100K gems", ' data-gold="0" data-gems="100000"') +
+          devButton("dev-add", "+10M gems", ' data-gold="0" data-gems="10000000"')
         )
       ) +
-      devCard("Shards and shop",
+      devCard("SS shards",
         '<div class="dev__give">' + devNumber("dev-shards", "SS shards", S.shards, 0) + devButton("dev-shards-set", "Set") + "</div>" +
-        devRow(
-          devButton("dev-shards", "+" + PS.SHARDS.needed + " shards") +
-          devButton("dev-eggs", "Hatch 10 eggs free") +
-          devButton("dev-shop", "Free gift ready, deals restocked")
-        )
+        devRow(devButton("dev-shards", "+" + PS.SHARDS.needed + " shards"))
       )
+    );
+  }
+
+  /** The tallies from the last chest simulation, as a list of facts. */
+  function devSimResult() {
+    var sim = view.devSim;
+    if (!sim) return "";
+    function share(n) { return fmt(n) + " (" + (Math.round((n / sim.count) * 10000) / 100) + "%)"; }
+    var rows = [];
+    for (var r = 0; r < PS.RARITY.length; r++) {
+      if (sim.rarity[r]) rows.push([PS.RARITY[r].name, share(sim.rarity[r])]);
+    }
+    rows.push(["S-grade items", share(sim.S)], ["SS-grade items", share(sim.SS)], ["SS shards", fmt(sim.shards) + " (" + Math.floor(sim.shards / PS.SHARDS.needed) + " items' worth)"]);
+    return '<p class="devbox__label">' + esc(PS.CHESTS[sim.kind].name) + " × " + fmt(sim.count) + "</p>" +
+      '<dl class="facts facts--tight devfacts">' + rows.map(function (row) {
+        return "<div><dt>" + row[0] + "</dt><dd>" + row[1] + "</dd></div>";
+      }).join("") + "</dl>";
+  }
+
+  function devShop(S) {
+    var wait = st.giftWait();
+    var deals = st.deals();
+    var dealRows = deals.map(function (deal) {
+      return (
+        '<li class="dev__row"><span class="rname r' + deal.r + '">' + esc(PS.RARITY[deal.r].name + " " + PS.ITEMS[deal.id].name) + "</span>" +
+        "<span>" + fmt(deal.price) + " " + deal.cur + (deal.bought ? " · bought" : "") + "</span></li>"
+      );
+    }).join("");
+    function chestRow(kind) {
+      var chest = PS.CHESTS[kind];
+      return '<div class="devbox__label">' + esc(chest.name) + "</div>" + devRow([1, 10, 100].map(function (n) {
+        return devButton("dev-chest", "Open ×" + n, ' data-kind="' + kind + '" data-count="' + n + '"');
+      }).join(""));
+    }
+    return (
+      devCard("Free chests",
+        chestRow("crate") + chestRow("gilded") +
+        '<p class="hint">Opens them without taking gems, with the real odds and the pity counters. The results show as a message, so this menu stays open.</p>',
+        [["Chests opened", fmt(S.stats.chests)], ["Since the last S-grade", S.shop.pityS], ["Since the last SS-grade", S.shop.pitySS]]
+      ) +
+      devCard("Simulate 1000 chests",
+        devRow(Object.keys(PS.CHESTS).map(function (kind) {
+          return devButton("dev-sim", esc(PS.CHESTS[kind].name) + " ×1000", ' data-kind="' + kind + '"');
+        }).join("")) +
+        devSimResult() +
+        '<p class="hint">Opens them on paper with the real odds. You get no gear, and nothing in your save changes.</p>'
+      ) +
+      devCard("Pity counters",
+        '<div class="dev__give">' +
+          devNumber("dev-pity-s", "Since S-grade", S.shop.pityS, 0) +
+          devNumber("dev-pity-ss", "Since SS-grade", S.shop.pitySS, 0) +
+          devButton("dev-pity", "Set") +
+        "</div>"
+      ) +
+      devCard("Free gift and deals",
+        devRow(
+          devButton("dev-shop", "Gift ready now, deals restocked") +
+          devButton("dev-gift-wait", "Gift in 10 seconds", ' data-seconds="10"') +
+          devButton("dev-gift-wait", "Gift in an hour", ' data-seconds="3600"')
+        ),
+        [["Free gift", wait ? PS.countdown(wait) : "ready"], ["Deals bought today", S.shop.bought.filter(Boolean).length + " of " + PS.DEAL_COUNT]]
+      ) +
+      devCard("Today's deals", '<ul class="dev__list">' + dealRows + "</ul>")
     );
   }
 
@@ -1156,9 +1349,6 @@
     var asc = st.ascendInfo();
     var maxed = open.filter(function (t) { return (S.talents[t.id] || 0) >= t.max; }).length;
     var learned = PS.TALENTS.reduce(function (n, t) { return n + (S.talents[t.id] || 0); }, 0);
-    var quests = st.quests();
-    var ready = quests.filter(function (q) { return q.ready; }).length;
-    var finished = quests.filter(function (q) { return q.done; }).length;
     return (
       devCard("Chapters",
         '<div class="dev__give">' +
@@ -1182,19 +1372,89 @@
           devButton("dev-reset-talents", "Forget all talents", "", "btn--danger")
         ),
         [["Tier", asc.tier + " of " + PS.TALENT_TIERS], ["Maxed", maxed + " / " + open.length], ["Levels learned", learned]]
-      ) +
-      devCard("Quests",
-        devRow(devButton("dev-claim-quests", "Claim everything that is ready")),
-        [["Ready to claim", ready], ["Ladders finished", finished + " / " + quests.length]]
       )
     );
   }
 
+  function devQuests(S) {
+    var quests = st.quests();
+    var ready = quests.filter(function (q) { return q.ready; }).length;
+    var finished = quests.filter(function (q) { return q.done; }).length;
+    var rows = quests.map(function (q) {
+      var state = q.done ? "all done" : q.ready ? "ready to claim" : fmt(q.value) + " / " + fmt(q.target);
+      return (
+        '<li class="dev__row"><span class="dev__name">' + esc(q.name) + "<small>" + esc(q.text) + "</small></span>" +
+        "<span>Rung " + (q.done ? q.tiers : q.tier + 1) + " of " + q.tiers + " · " + state + "</span>" +
+        '<span class="dev__acts">' +
+          (q.done ? "" : q.ready
+            ? devButton("dev-quest-claim", "Claim " + q.gems, ' data-id="' + q.id + '"', "btn--primary")
+            : devButton("dev-quest-done", "Complete", ' data-id="' + q.id + '"')) +
+        "</span></li>"
+      );
+    }).join("");
+    var counters = Object.keys(S.stats).map(function (key) {
+      return devNumber("dev-stat-" + key, STAT_NAMES[key] || key, Math.floor(S.stats[key]), 0);
+    }).join("");
+    return (
+      devCard("Quests",
+        devRow(
+          devButton("dev-claim-quests", "Claim everything that is ready") +
+          devButton("dev-quests-all", "Finish and claim every quest", "", "btn--primary")
+        ) + '<ul class="dev__list">' + rows + "</ul>",
+        [["Ready to claim", ready], ["Ladders finished", finished + " / " + quests.length]]
+      ) +
+      devCard("Counters",
+        '<p class="hint">The numbers the quests and the record read. Setting them is how to test a quest at its limit.</p>' +
+        '<div class="dev__give dev__give--grid">' + counters + "</div>" +
+        devRow(devButton("dev-stats-set", "Set these counters", "", "btn--primary"))
+      )
+    );
+  }
+
+  function devChapters(S) {
+    var rows = "";
+    for (var n = 1; n <= PS.BAL.CHAPTERS; n++) {
+      var ch = PS.chapter(n);
+      var rec = S.clears[n];
+      var state = n <= S.best ? "cleared" : n === S.best + 1 ? "open" : "locked";
+      rows +=
+        '<li class="dev__row dev__row--chapter is-' + state + '"><b class="dev__no">' + n + "</b>" +
+        '<span class="dev__name">' + esc(ch.name) + "<small>" + esc(PS.ZONES[ch.zone].name) + " · " + esc(ch.bossName) + " · " + PS.clock(ch.duration) + " · Power " + fmt(ch.rec) + "</small></span>" +
+        "<span>" + state + (rec ? " · best " + PS.clock(rec.time) + " · " + rec.n + "×" : "") + "</span>" +
+        '<span class="dev__acts">' +
+          devButton("dev-play", "Play", ' data-n="' + n + '"') +
+          devButton("dev-clear-to", n === S.best ? "Cleared" : "Clear to here", ' data-n="' + n + '"' + (n === S.best ? " disabled" : "")) +
+        "</span></li>";
+    }
+    return devCard("Every chapter", '<ul class="dev__list dev__list--tall">' + rows + "</ul>" +
+      '<p class="hint">Play starts the chapter even if it is locked: a win is saved like any other. Clear to here marks it, and every chapter before it, as cleared.</p>',
+      [["Cleared", S.best + " / " + PS.BAL.CHAPTERS], ["Your Power", fmt(st.calc().power)]]);
+  }
+
   function devBattle(S) {
     var sw = PS.dev.startWith;
+    var admin = PS.dev.admin;
     var ch = PS.chapter(S.chapter);
     var rec = S.clears[S.chapter];
-    var speeds = [0.5, 1, 2, 4];
+    var build = PS.dev.startBuild;
+    var toggles = PS.dev.TOGGLES.filter(function (t) { return admin || !t.admin; });
+    var mults = PS.dev.MULTS.filter(function (m) { return admin || !m.admin; });
+    var multRows = mults.map(function (m) {
+      var values = m.values.concat(admin && m.more ? m.more : []);
+      return '<p class="devbox__label">' + m.label + "</p>" + devRow(values.map(function (v) {
+        return '<button class="btn btn--sm' + (sw[m.key] === v ? " btn--primary" : "") + '" type="button" data-act="dev-start-mult" data-key="' + m.key + '" data-value="' + v + '">' + v + "×</button>";
+      }).join(""));
+    }).join("");
+    var buildCard = admin
+      ? devCard("Start the next battle built up",
+          '<p class="devbox__label">Levels to start with</p>' +
+          devRow([0, 5, 10, 25, 50, 100].map(function (v) {
+            return '<button class="btn btn--sm' + (build.levels === v ? " btn--primary" : "") + '" type="button" data-act="dev-start-levels" data-value="' + v + '">' + (v ? "+" + v : "None") + "</button>";
+          }).join("")) +
+          '<div class="devbox__toggles">' + devToggle("dev-start-maxall", "", "Every upgrade maxed", "Takes the whole upgrade list at the start", build.maxAll) + "</div>" +
+          '<p class="hint">Levels come with a random upgrade each, picked for you. Applies to the next battle you start from anywhere.</p>'
+        )
+      : "";
     return (
       devCard("Chapter " + ch.n + ": " + esc(ch.name),
         '<div class="dev__give">' +
@@ -1208,6 +1468,9 @@
           ["Boss", esc(ch.bossName)],
           ["Recommended", fmt(ch.rec)],
           ["Gold", fmt(ch.gold)],
+          ["Pest health ×", ch.hpScale.toFixed(2)],
+          ["Pest damage ×", ch.dmgScale.toFixed(2)],
+          ["Boss ×", ch.bossScale.toFixed(2)],
           ["Best clear", rec ? PS.clock(rec.time) : "none"]
         ]
       ) +
@@ -1219,21 +1482,19 @@
         '<p class="hint">Endless, no boss. Pays 1.2× the usual gold for the chapter you pick and keeps nothing else.</p>'
       ) +
       devCard("Start the next battle with",
-        '<div class="devbox__toggles">' +
-          devToggle("dev-start-toggle", ' data-key="god"', "Godmode", "Nothing can hurt you", sw.god) +
-          devToggle("dev-start-toggle", ' data-key="oneHit"', "One-hit kills", "Every hit kills, bosses too", sw.oneHit) +
-        "</div>" +
-        '<p class="devbox__label">Game speed</p>' +
-        devRow(speeds.map(function (v) {
-          return '<button class="btn btn--sm' + (sw.speed === v ? " btn--primary" : "") + '" type="button" data-act="dev-start-speed" data-value="' + v + '">' + v + "×</button>";
-        }).join("")) +
-        '<p class="hint">Inside any battle the DEV button changes these live and adds every upgrade to pick or max.</p>'
+        '<div class="devbox__toggles">' + toggles.map(function (t) {
+          return devToggle("dev-start-toggle", ' data-key="' + t.key + '"', t.label, t.hint, sw[t.key]);
+        }).join("") + "</div>" +
+        multRows +
+        (admin ? devRow(devButton("dev-start-reset", "Switch all of these off")) : "") +
+        '<p class="hint">Inside any battle the DEV button (or the ` key) changes these live' + (admin ? " and has a lot more" : "") + ".</p>"
       ) +
-      (PS.dev.admin ? "" : devCard("Done?", devRow(devButton("dev-lock", "Lock the dev menu again"))))
+      buildCard +
+      (admin ? "" : devCard("Done?", devRow(devButton("dev-lock", "Lock the dev menu again"))))
     );
   }
 
-  function devOwned(S) {
+  function devOwned(S, d) {
     var counts = [];
     S.items.forEach(function (item) { counts[item.r] = (counts[item.r] || 0) + 1; });
     var grades = { S: 0, SS: 0 };
@@ -1243,18 +1504,85 @@
     });
     var info = [["Items", S.items.length], ["S-grade", grades.S], ["SS-grade", grades.SS]];
     counts.forEach(function (n, r) { if (n) info.push([PS.RARITY[r].name, n]); });
-    var owned = st.sorted(S.items).map(function (item) {
+    var slot = d.slot || "all";
+    var shown = st.sorted(S.items).filter(function (item) { return slot === "all" || st.def(item).slot === slot; });
+    var owned = shown.map(function (item) {
       var worn = st.isEquipped(item);
+      var def = st.def(item);
       // worn gear is only taken off, never deleted, so nothing can be lost by accident
       return (
-        '<li class="dev__row"><span class="rname r' + item.r + '">' + esc(st.def(item).name) + "</span>" +
-        "<span>" + PS.RARITY[item.r].name + (st.def(item).grade !== "A" ? " · " + st.def(item).grade : "") + (worn ? " · equipped" : "") + "</span>" +
-        (worn
-          ? (st.def(item).slot === "weapon" ? "" : '<button class="btn btn--sm" type="button" data-act="unequip" data-slot="' + st.def(item).slot + '">Take off</button>')
-          : '<button class="btn btn--sm" type="button" data-act="dev-remove" data-u="' + item.u + '">Remove</button>') + "</li>"
+        '<li class="dev__row"><span class="rname r' + item.r + '">' + esc(def.name) + "</span>" +
+        "<span>" + PS.RARITY[item.r].name + (def.grade !== "A" ? " · " + def.grade : "") + (worn ? " · equipped" : "") + "</span>" +
+        '<span class="dev__acts">' +
+          devButton("dev-owned-rarity", "−", ' data-u="' + item.u + '" data-dir="-1" aria-label="One rarity lower"' + (item.r <= 0 ? " disabled" : "")) +
+          devButton("dev-owned-rarity", "+", ' data-u="' + item.u + '" data-dir="1" aria-label="One rarity higher"' + (item.r >= PS.MAX_RARITY ? " disabled" : "")) +
+          (worn ? "" : devButton("dev-equip", "Wear", ' data-u="' + item.u + '"')) +
+          (worn
+            ? (def.slot === "weapon" ? "" : devButton("unequip", "Take off", ' data-slot="' + def.slot + '"'))
+            : devButton("dev-remove", "Remove", ' data-u="' + item.u + '"')) +
+        "</span></li>"
       );
     }).join("");
-    return devCard("Everything you own", '<ul class="dev__list">' + owned + "</ul>", info);
+    var slotOptions = [["all", "Everything"]].concat(PS.SLOTS.map(function (s) { return [s.key, s.plural]; }));
+    return (
+      devCard("Clean out the bag",
+        '<div class="dev__give">' +
+          devSelect("dev-clean-r", "Remove unworn items below", rarityOptions(PS.MAX_RARITY + 1), d.clean === undefined ? 2 : d.clean) +
+          devButton("dev-clean", "Remove them", "", "btn--danger") +
+        "</div>" +
+        '<p class="hint">Worn gear is never touched.</p>'
+      ) +
+      devCard("Everything you own",
+        '<div class="dev__give">' + devSelect("dev-owned-filter", "Show", slotOptions, slot) + "</div>" +
+        '<ul class="dev__list">' + (owned || '<li class="dev__row">Nothing here.</li>') + "</ul>",
+        info
+      )
+    );
+  }
+
+  function devPets(S, d) {
+    var species = PS.PET_SPECIES.map(function (sp) { return [sp.id, sp.name + " (" + PS.STATS[sp.stat].name + ")"]; });
+    var rarities = PS.PET_RARITY.map(function (def, i) { return [i, PS.RARITY[i].name + " (up to Lv " + def.cap + ")"]; });
+    var cap = PS.PET_RARITY[d.pr || 0].cap;
+    var total = PS.PET_SPECIES.length * PS.PET_RARITY.length;
+    var owned = S.pets.slice().sort(function (a, b) { return b.r - a.r || b.lv - a.lv || (a.sp < b.sp ? -1 : 1); }).map(function (pet) {
+      var inf = st.petInfo(pet.u);
+      return (
+        '<li class="dev__row"><span class="dev__pet">' + PS.petArt(pet.sp, pet.r) + "</span>" +
+        '<span class="rname r' + pet.r + '">' + esc(inf.def.name) + "</span>" +
+        "<span>" + PS.RARITY[pet.r].name + " · Lv " + pet.lv + "/" + inf.cap + " · " + petBonusText(pet.sp, pet.r, pet.lv) + (inf.equipped ? " · with you" : "") + "</span>" +
+        '<span class="dev__acts">' +
+          devButton("dev-pet-team", inf.equipped ? "Send home" : "Bring", ' data-u="' + pet.u + '"') +
+          devButton("dev-pet-up", "+1", ' data-u="' + pet.u + '"' + (inf.maxed ? " disabled" : "")) +
+          devButton("dev-pet-max", "Max", ' data-u="' + pet.u + '"' + (inf.maxed ? " disabled" : "")) +
+          devButton("dev-pet-remove", "Remove", ' data-u="' + pet.u + '"', "btn--danger") +
+        "</span></li>"
+      );
+    }).join("");
+    return (
+      devCard("Your team",
+        devRow(
+          devButton("dev-pet-slots", "Open every slot", ' data-n="' + PS.PET_SLOTS.max + '"') +
+          devButton("dev-pet-slots", "Back to one slot", ' data-n="' + PS.PET_SLOTS.start + '"') +
+          devButton("dev-pets-fill", "Fill the team with my best") +
+          devButton("dev-pets-max", "Max every pet's level")
+        ),
+        [["Team slots", S.petSlots + " of " + PS.PET_SLOTS.max], ["With you", S.petTeam.length], ["Pets owned", S.pets.length + " of " + total], ["Eggs hatched", fmt(S.stats.eggs)]]
+      ) +
+      devCard("Give a pet",
+        '<div class="dev__give">' +
+          devSelect("dev-psp", "Species", species, d.psp || "bumble") +
+          devSelect("dev-pr", "Rarity", rarities, d.pr || 0) +
+          devNumber("dev-plv", "Level", d.plv || 1, 1, cap) +
+        "</div>" +
+        devRow(
+          devButton("dev-pet-give", "Give it", "", "btn--primary") +
+          devButton("dev-pet-all", "Every species at every rarity, max level")
+        ) +
+        '<p class="hint">The game keeps one pet per species and rarity, so giving one you already have raises its level.</p>'
+      ) +
+      devCard("Everything you have", '<ul class="dev__list">' + (owned || '<li class="dev__row">No pets yet.</li>') + "</ul>")
+    );
   }
 
   function devSettings() {
@@ -1273,7 +1601,7 @@
         "</div>" +
         '<p class="devbox__label">Volume</p>' +
         devRow(PS.VOLUMES.map(function (v, i) {
-          return '<button class="btn btn--sm' + (PS.prefs.get("volume") === i ? " btn--primary" : "") + '" type="button" data-act="dev-volume" data-value="' + i + '">' + v.name + "</button>";
+          return '<button class="btn btn--sm' + (PS.prefs.get("vol") === PS.VOLUME_STEPS[i] ? " btn--primary" : "") + '" type="button" data-act="dev-volume" data-value="' + i + '">' + v.name + "</button>";
         }).join(""))
       ) +
       devCard("Messages",
@@ -1286,7 +1614,38 @@
   }
 
   function devSave(modal, S) {
+    var snaps = devSnaps();
+    var snapRows = snaps.map(function (snap, i) {
+      return (
+        '<li class="dev__row"><span class="dev__name">' + esc(snap.name || "Snapshot") + "<small>" + new Date(snap.at).toLocaleString() + " · " + (snap.save.length / 1024).toFixed(1) + " KB</small></span>" +
+        '<span class="dev__acts">' +
+          devButton("dev-snap-load", "Load", ' data-i="' + i + '"') +
+          devButton("dev-snap-delete", "Delete", ' data-i="' + i + '"', "btn--danger") +
+        "</span></li>"
+      );
+    }).join("");
+    var history = view.devHistory.map(function (entry, i) {
+      return (
+        '<li class="dev__row"><span class="dev__name">' + esc(entry.label) + "<small>" + devClock(entry.at) + "</small></span>" +
+        '<span class="dev__acts">' + devButton("dev-restore", "Go back to before this", ' data-i="' + i + '"') + "</span></li>"
+      );
+    }).reverse().join("");
     return (
+      (PS.dev.admin
+        ? devCard("Undo list",
+            '<p class="hint">Every change made from this menu is remembered (the last ' + HISTORY_MAX + "), so it can be taken back. The list is gone when the page is closed.</p>" +
+            '<ul class="dev__list">' + (history || '<li class="dev__row">Nothing changed yet.</li>') + "</ul>",
+            [["Steps remembered", view.devHistory.length]]
+          ) +
+          devCard("Snapshots",
+            '<div class="dev__give">' +
+              '<label>Name<input id="dev-snap-name" type="text" maxlength="40" placeholder="Before the boss test" autocomplete="off" /></label>' +
+              devButton("dev-snap-save", "Save a snapshot", "", "btn--primary") +
+            "</div>" +
+            '<ul class="dev__list">' + (snapRows || '<li class="dev__row">No snapshots yet.</li>') + "</ul>" +
+            '<p class="hint">Named copies of the save, kept in this browser. Loading one can be undone.</p>'
+          )
+        : "") +
       devCard("Backup",
         '<p class="hint">Copy the save to keep a backup or move it to another browser, or paste one in and load it.</p>' +
         '<textarea class="dev__save" id="dev-save" rows="6" spellcheck="false" aria-label="Save data">' + esc(modal.exported || "") + "</textarea>" +
@@ -1297,9 +1656,15 @@
         ),
         [["Size", (JSON.stringify(S).length / 1024).toFixed(1) + " KB"]]
       ) +
+      (PS.dev.admin
+        ? devCard("Save file",
+            devRow(devButton("dev-download", "Download the save as a file")) +
+            '<div class="dev__give"><label>Load a save file<input id="dev-file" type="file" accept=".json,.txt,application/json,text/plain" /></label></div>'
+          )
+        : "") +
       devCard("Start again",
         devRow(devButton("dev-reset", modal.resetArmed ? "Yes, wipe this save" : "Reset this save", "", "btn--danger")) +
-        '<p class="hint">Only this browser\'s save. Everything goes back to a new game.</p>'
+        '<p class="hint">Only this browser\'s save. Everything goes back to a new game.' + (PS.dev.admin ? " This can be undone from the undo list." : "") + "</p>"
       )
     );
   }
@@ -1308,21 +1673,28 @@
     var S = st.get();
     var tab = view.devTab;
     var calc = st.calc();
+    var admin = PS.dev.admin;
     // the dev password only gets the Battle section; the admin password gets all of it
-    var tabs = PS.dev.admin ? DEV_TABS : DEV_TABS.filter(function (t) { return t[0] === "battle"; });
+    var tabs = admin ? DEV_TABS : DEV_TABS.filter(function (t) { return t[0] === "battle"; });
     if (!tabs.some(function (t) { return t[0] === tab; })) tab = view.devTab = tabs[0][0];
     var body = tab === "gear" ? devGear(S, view.dev, calc)
       : tab === "money" ? devMoney(S)
+      : tab === "shop" ? devShop(S)
       : tab === "progress" ? devProgress(S)
+      : tab === "quests" ? devQuests(S)
+      : tab === "chapters" ? devChapters(S)
       : tab === "battle" ? devBattle(S)
-      : tab === "owned" ? devOwned(S)
+      : tab === "owned" ? devOwned(S, view.dev)
+      : tab === "pets" ? devPets(S, view.dev)
       : tab === "settings" ? devSettings()
       : tab === "save" ? devSave(modal, S)
       : devOverview(S, calc);
+    var last = view.devHistory[view.devHistory.length - 1];
     return (
       '<div class="dev devshell">' +
         '<button class="modal__close" type="button" data-act="close" aria-label="Close">' + PS.icon("close") + "</button>" +
-        '<h2 id="modal-title">' + (PS.dev.admin ? "Admin menu" : "Dev menu") + "</h2>" +
+        '<div class="devshell__head"><h2 id="modal-title">' + (admin ? "Admin menu" : "Dev menu") + "</h2>" +
+          (admin ? devButton("dev-undo", "Undo" + (last ? '<span class="devshell__what"> · ' + esc(last.label) + "</span>" : ""), (last ? ' title="Undo: ' + esc(last.label) + '"' : " disabled")) : "") + "</div>" +
         '<p class="hint">For testing. Changes only touch this browser\'s save.</p>' +
         '<div class="devshell__main' + (tabs.length === 1 ? " devshell__main--solo" : "") + '">' +
           (tabs.length === 1 ? "" : '<nav class="devnav" role="tablist" aria-label="Dev menu sections">' + tabs.map(function (t) {
@@ -1609,15 +1981,26 @@
       PS.sfx.toggle();
       renderModal();
     },
-    volume: function () {
-      PS.prefs.set("volume", (PS.prefs.get("volume") + 1) % PS.VOLUMES.length);
-      PS.sfx.refreshVolume();
+    cycle: function (node) {
+      var name = node.getAttribute("data-pref");
+      var list = CYCLES[name];
+      if (!list) return;
+      var at = 0;
+      list.forEach(function (o, i) { if (o[0] === PS.prefs.get(name)) at = i; });
+      PS.prefs.set(name, list[(at + 1) % list.length][0]);
       renderModal();
-      PS.sfx.play("coin");
+    },
+    "prefs-reset": function () {
+      PS.prefs.reset();
+      PS.sfx.refreshVolume();
+      applyBlur();
+      renderModal();
+      toast("Settings restored");
     },
     pref: function (node) {
       var name = node.getAttribute("data-pref");
       PS.prefs.set(name, !PS.prefs.get(name));
+      if (name === "blur") applyBlur();
       renderModal();
     },
     motion: function () {
@@ -1937,8 +2320,12 @@
     },
     "dev-import": function () {
       var box = $("#dev-save");
-      if (box && st.importSave(box.value.trim())) toast("Save loaded");
-      else toast("That is not a save this game can read");
+      if (box && st.importSave(box.value.trim())) {
+        toast("Save loaded");
+      } else {
+        view.devHistory.pop(); // nothing changed, so there is nothing to undo
+        toast("That is not a save this game can read");
+      }
     },
     "dev-chapter": function () {
       st.devSetChapter(Number($("#dev-chapter").value));
@@ -1969,12 +2356,217 @@
       PS.dev.startWith[key] = !PS.dev.startWith[key];
       renderModal();
     },
-    "dev-start-speed": function (node) {
-      PS.dev.startWith.speed = Number(node.getAttribute("data-value"));
+    "dev-start-mult": function (node) {
+      PS.dev.startWith[node.getAttribute("data-key")] = Number(node.getAttribute("data-value"));
       renderModal();
     },
+    "dev-start-levels": function (node) {
+      PS.dev.startBuild.levels = Number(node.getAttribute("data-value"));
+      renderModal();
+    },
+    "dev-start-maxall": function () {
+      PS.dev.startBuild.maxAll = !PS.dev.startBuild.maxAll;
+      renderModal();
+    },
+    "dev-start-reset": function () {
+      PS.dev.TOGGLES.forEach(function (t) { PS.dev.startWith[t.key] = false; });
+      PS.dev.MULTS.forEach(function (m) { PS.dev.startWith[m.key] = 1; });
+      PS.dev.startBuild.levels = 0;
+      PS.dev.startBuild.maxAll = false;
+      renderModal();
+    },
+
+    /* gear */
+    "dev-equip-best": function () {
+      var changed = st.equipBest();
+      toast(changed ? "Swapped " + changed + (changed === 1 ? " slot" : " slots") + " for something better" : "You are already wearing your best");
+    },
+    "dev-slot-levels": function () {
+      // read every box first: each change redraws this menu and would reset the rest
+      var levels = PS.SLOTS.map(function (slot) {
+        var box = $("#dev-lv-" + slot.key);
+        return [slot.key, box ? Number(box.value) : st.get().lv[slot.key]];
+      });
+      levels.forEach(function (pair) { st.devSetSlotLevel(pair[0], pair[1]); });
+      toast("Slot levels set");
+    },
+    "dev-equip": function (node) {
+      var item = st.item(Number(node.getAttribute("data-u")));
+      if (!item) return;
+      st.equip(item.u);
+      toast(fullName(item) + " equipped");
+    },
+    "dev-owned-rarity": function (node) {
+      var item = st.item(Number(node.getAttribute("data-u")));
+      if (!item) return;
+      var r = item.r + Number(node.getAttribute("data-dir"));
+      if (r < 0 || r > PS.MAX_RARITY) return;
+      st.devSetRarity(item.u, r);
+      toast(fullName(item));
+    },
+    "dev-clean": function () {
+      var removed = st.devCleanBag(view.dev.clean);
+      toast(removed ? "Removed " + removed + (removed === 1 ? " item" : " items") : "Nothing to remove");
+    },
+
+    /* pets */
+    "dev-pet-give": function () {
+      var sp = $("#dev-psp").value;
+      var r = Number($("#dev-pr").value);
+      var lv = Number($("#dev-plv").value);
+      view.dev.psp = sp;
+      view.dev.pr = r;
+      view.dev.plv = lv;
+      var pet = st.devGivePet(sp, r, lv);
+      if (pet) toast(PS.RARITY[pet.r].name + " " + PS.PET[pet.sp].name + " at level " + pet.lv);
+    },
+    "dev-pet-all": function () {
+      st.devGiveAllPets();
+      toast("Every pet at every rarity, at the top level");
+    },
+    "dev-pet-team": function (node) {
+      if (!st.togglePet(Number(node.getAttribute("data-u")))) toast("The team is full. Open another slot or send one home");
+    },
+    "dev-pet-up": function (node) {
+      var u = Number(node.getAttribute("data-u"));
+      var pet = st.petInfo(u);
+      if (pet) st.devSetPetLevel(u, pet.pet.lv + 1);
+    },
+    "dev-pet-max": function (node) {
+      st.devSetPetLevel(Number(node.getAttribute("data-u")), 999);
+    },
+    "dev-pet-remove": function (node) {
+      if (st.devRemovePet(Number(node.getAttribute("data-u")))) toast("Pet removed");
+    },
+    "dev-pets-max": function () {
+      st.devMaxPets();
+      toast("Every pet is at its top level");
+    },
+    "dev-pets-fill": function () {
+      st.devFillTeam();
+      toast("Your best pets are on the team");
+    },
+    "dev-pet-slots": function (node) {
+      st.devSetPetSlots(Number(node.getAttribute("data-n")));
+      toast("Team slots: " + st.get().petSlots);
+    },
+
+    /* shop */
+    "dev-chest": function (node) {
+      var kind = node.getAttribute("data-kind");
+      var count = Number(node.getAttribute("data-count"));
+      var items = st.devOpenChest(kind, count);
+      if (!items) return;
+      var byRarity = [];
+      var graded = { S: 0, SS: 0 };
+      items.forEach(function (item) {
+        byRarity[item.r] = (byRarity[item.r] || 0) + 1;
+        var grade = st.def(item).grade;
+        if (grade !== "A") graded[grade]++;
+      });
+      var parts = [];
+      byRarity.forEach(function (n, r) { if (n) parts.push(n + " " + PS.RARITY[r].name); });
+      if (graded.S) parts.push(graded.S + " S-grade");
+      if (graded.SS) parts.push(graded.SS + " SS-grade");
+      if (items.shards) parts.push(items.shards + " SS shard" + (items.shards === 1 ? "" : "s"));
+      toast(PS.CHESTS[kind].name + " × " + count + ": " + parts.join(", "));
+    },
+    "dev-sim": function (node) {
+      view.devSim = st.devSimulateChests(node.getAttribute("data-kind"), 1000);
+      renderModal();
+    },
+    "dev-pity": function () {
+      var s = Number($("#dev-pity-s").value);
+      var ss = Number($("#dev-pity-ss").value);
+      st.devSetPity(s, ss);
+      toast("Pity counters set");
+    },
+    "dev-gift-wait": function (node) {
+      var seconds = Number(node.getAttribute("data-seconds"));
+      st.devSetGiftWait(seconds);
+      toast("The free gift is ready in " + PS.countdown(seconds * 1000));
+    },
+
+    /* quests and counters */
+    "dev-quest-done": function (node) {
+      if (st.devCompleteQuest(node.getAttribute("data-id"))) toast("Ready to claim");
+    },
+    "dev-quest-claim": function (node) {
+      var gems = st.claimQuest(node.getAttribute("data-id"));
+      if (gems) toast("+" + gems + " gems");
+    },
+    "dev-quests-all": function () {
+      toast("Every quest finished: " + fmt(st.devFinishQuests()) + " gems claimed");
+    },
+    "dev-stats-set": function () {
+      var values = {};
+      Object.keys(st.get().stats).forEach(function (key) {
+        var box = $("#dev-stat-" + key);
+        if (box) values[key] = Number(box.value);
+      });
+      st.devSetStats(values);
+      toast("Counters set");
+    },
+
+    /* chapters */
+    "dev-play": function (node) {
+      startBattle(Number(node.getAttribute("data-n")));
+    },
+    "dev-clear-to": function (node) {
+      var n = Number(node.getAttribute("data-n"));
+      st.devSetBest(n);
+      toast("Chapters cleared: " + st.get().best);
+    },
+
+    /* undo, snapshots and files */
+    "dev-undo": function () {
+      var entry = view.devHistory.pop();
+      if (!entry) return;
+      if (st.importSave(entry.save)) toast("Undid: " + entry.label);
+      else toast("That step could not be restored");
+    },
+    "dev-restore": function (node) {
+      var i = Number(node.getAttribute("data-i"));
+      var entry = view.devHistory[i];
+      if (!entry) return;
+      view.devHistory.length = i; // everything after it is undone with it
+      if (st.importSave(entry.save)) toast("Back to before: " + entry.label);
+    },
+    "dev-snap-save": function () {
+      var box = $("#dev-snap-name");
+      var list = devSnaps();
+      var name = ((box && box.value) || "").trim() || "Snapshot " + (list.length + 1);
+      list.push({ name: name, at: Date.now(), save: st.exportSave() });
+      if (PS.store.set(KEY_SNAPS, list)) toast("Saved: " + name);
+      else toast("The browser has no room for another snapshot");
+      renderModal();
+    },
+    "dev-snap-load": function (node) {
+      var snap = devSnaps()[Number(node.getAttribute("data-i"))];
+      if (!snap) return;
+      if (st.importSave(snap.save)) toast("Loaded: " + snap.name);
+      else toast("That snapshot could not be read");
+    },
+    "dev-snap-delete": function (node) {
+      var list = devSnaps();
+      var at = Number(node.getAttribute("data-i"));
+      if (!list[at]) return;
+      list.splice(at, 1);
+      PS.store.set(KEY_SNAPS, list);
+      renderModal();
+    },
+    "dev-download": function () {
+      var stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19);
+      var link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob([st.exportSave()], { type: "application/json" }));
+      link.download = "pip-survivors-save-" + stamp + ".json";
+      el.modal.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(function () { URL.revokeObjectURL(link.href); }, 2000);
+    },
     "dev-volume": function (node) {
-      PS.prefs.set("volume", Number(node.getAttribute("data-value")));
+      PS.prefs.set("vol", PS.VOLUME_STEPS[Number(node.getAttribute("data-value"))]);
       PS.sfx.refreshVolume();
       renderModal();
       PS.sfx.play("coin");
@@ -2022,7 +2614,7 @@
   var SOUND = {
     tab: "tab", fight: "start", again: "start", equip: "equip", "equip-best": "equip", "dev-give": "equip", "dev-set": "equip",
     upgrade: "upgrade", "upgrade-max": "upgrade", talent: "talent", quest: "coin", deal: "coin", gold: "coin",
-    gift: null, chest: null, craft: null, ascend: null, egg: null, "pet-slot": null, sell: null, "forge-go": null, "quick-go": null, sound: null, volume: null
+    gift: null, chest: null, craft: null, ascend: null, egg: null, "pet-slot": null, sell: null, "forge-go": null, "quick-go": null, sound: null, cycle: null
   };
 
   function upgraded(slot, text) {
@@ -2047,7 +2639,28 @@
     if (!action) return;
     var sound = SOUND[name];
     if (sound !== null) PS.sfx.play(sound || "click");
+    // the admin menu can take back what it changes: remember the save first
+    // (the first click on "Reset this save" only arms the button)
+    var armed = name === "dev-reset" && !(view.modal && view.modal.resetArmed);
+    if (DEV_UNDO[name] && PS.dev.admin && !armed) devSnapshot(DEV_UNDO[name]);
     action(node);
+  }
+
+  /** The Save section's file picker: read the chosen file and load it as a save. */
+  function devLoadFile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      devSnapshot(DEV_UNDO["dev-file-load"]);
+      if (st.importSave(String(reader.result).trim())) {
+        toast("Loaded " + file.name);
+      } else {
+        view.devHistory.pop();
+        toast("That file is not a save this game can read");
+      }
+    };
+    reader.onerror = function () { toast("The file could not be read"); };
+    reader.readAsText(file);
   }
 
   function onSubmit(e) {
@@ -2102,6 +2715,7 @@
       var theme = PS.store.get(KEY_THEME, null);
       if (theme === "dark" || theme === "light") document.documentElement.setAttribute("data-theme", theme);
 
+      applyBlur();
       $("#open-settings").innerHTML = PS.icon("gear");
       var tabs = el.tabbar.querySelectorAll("[data-tab]");
       for (var i = 0; i < tabs.length; i++) {
@@ -2119,7 +2733,16 @@
       document.addEventListener("click", onClick);
       document.addEventListener("submit", onSubmit);
       el.modal.addEventListener("close", function () { view.modal = null; });
+      // the volume slider: move it and the sound changes at once, no redraw to interrupt the drag
+      el.modal.addEventListener("input", function (e) {
+        if (e.target.id !== "set-vol") return;
+        PS.prefs.set("vol", Number(e.target.value));
+        PS.sfx.refreshVolume();
+        var label = $("#set-vol-label");
+        if (label) label.textContent = PS.prefs.get("vol") + "%";
+      });
       el.modal.addEventListener("change", function (e) {
+        if (e.target.id === "set-vol") PS.sfx.play("coin"); // so the new level can be judged
         if (e.target.id === "quick-keep" && view.modal && view.modal.type === "quick") {
           view.modal.keep = e.target.checked;
           renderModal();
@@ -2127,6 +2750,19 @@
         if (e.target.id === "dev-id") view.dev.id = e.target.value;
         if (e.target.id === "dev-count") view.dev.count = Math.max(1, Math.min(100, Math.round(Number(e.target.value) || 1)));
         if (e.target.id === "dev-rarity") view.dev.r = Number(e.target.value);
+        if (e.target.id === "dev-psp") view.dev.psp = e.target.value;
+        if (e.target.id === "dev-pr") {
+          view.dev.pr = Number(e.target.value);
+          view.dev.plv = Math.min(view.dev.plv, PS.PET_RARITY[view.dev.pr].cap);
+          renderModal(); // the level box's limit depends on the rarity
+        }
+        if (e.target.id === "dev-plv") view.dev.plv = Math.max(1, Math.round(Number(e.target.value) || 1));
+        if (e.target.id === "dev-clean-r") view.dev.clean = Number(e.target.value);
+        if (e.target.id === "dev-owned-filter") {
+          view.dev.slot = e.target.value;
+          renderModal();
+        }
+        if (e.target.id === "dev-file" && view.modal && view.modal.type === "secret") devLoadFile(e.target.files && e.target.files[0]);
       });
       el.modal.addEventListener("click", function (e) {
         // a click on the dimmed backdrop lands on the dialog itself
@@ -2136,6 +2772,22 @@
       PS.on("change", function () {
         if (!el.app.hidden) render();
       });
+
+      // Step one of the hidden admin door: click the lemon logo twice. That
+      // arms the key code below for a minute; without it the code does nothing.
+      var logoClicks = [];
+      var mark = $(".brand__mark");
+      if (mark) {
+        mark.addEventListener("click", function () {
+          var now = Date.now();
+          logoClicks.push(now);
+          logoClicks = logoClicks.filter(function (t) { return now - t < 2000; });
+          if (logoClicks.length >= 2) {
+            logoClicks = [];
+            logoArmedUntil = now + 60000;
+          }
+        });
+      }
 
       // up, up, down, down, left, right, left, right, then B and A (either way round)
       var CODE = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright"];
@@ -2152,7 +2804,9 @@
           typed = [];
           if (PS.dev.admin) {
             openModal({ type: "secret", open: true, admin: true, wrong: false });
-          } else {
+          } else if (logoArmedUntil > Date.now()) {
+            // the logo was double-clicked first; now the password is asked for
+            logoArmedUntil = 0;
             openModal({ type: "secret", open: false, admin: true, wrong: false });
             var box = $("#secret-input");
             if (box) box.focus();

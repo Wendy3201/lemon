@@ -26,6 +26,29 @@
   var stick = { on: false, touch: false, id: -1, ox: 0, oy: 0, x: 0, y: 0 };
   var calm = false; // reduced motion: no screen shake
 
+  /* Performance settings, read once when a battle starts (Settings can only be
+     opened between battles). gfx is 0 low, 1 medium, 2 high. */
+  var gfx = 2;
+  var frameGap = 0; // least milliseconds between drawn frames; 0 means no limit
+  var fpsEl = null;
+  var fpsFrames = 0;
+  var fpsSince = 0;
+  var SPARK_CAP = [70, 150, 260];
+  var SPARK_SCALE = [0.35, 0.7, 1];
+  var TEXT_CAP = [10, 24, 40];
+  var DPR_CAP = [1, 1.5, 2];
+
+  function applyPrefs() {
+    gfx = PS.prefs.get("quality");
+    var cap = PS.prefs.get("fps");
+    frameGap = cap ? 1000 / cap : 0;
+    if (fpsEl) {
+      fpsEl.hidden = !PS.prefs.get("showFps");
+      fpsFrames = 0;
+      fpsSince = 0;
+    }
+  }
+
   B.run = null;
   B.autopilot = null; // tests can steer with function (run) -> { x, y }
 
@@ -62,6 +85,11 @@
     root.appendChild(canvas);
     ctx = canvas.getContext("2d");
     B.hud.mount(root);
+    fpsEl = document.createElement("div");
+    fpsEl.className = "hud__fps";
+    fpsEl.hidden = true;
+    fpsEl.setAttribute("aria-hidden", "true");
+    root.appendChild(fpsEl);
     if (B.devPanel) B.devPanel.mount(root);
     bindInput();
     window.addEventListener("resize", resize);
@@ -74,10 +102,9 @@
     var p = makePlayer(stats);
     p.outfit = B.outfitOf();
     calm = PS.reducedMotion() || !PS.prefs.get("shake");
+    applyPrefs();
     var cheats = PS.dev.cheats;
-    cheats.god = PS.dev.startWith.god;
-    cheats.oneHit = PS.dev.startWith.oneHit;
-    cheats.speed = PS.dev.startWith.speed;
+    for (var key in PS.dev.startWith) cheats[key] = PS.dev.startWith[key];
     R = B.run = {
       ch: ch, zone: PS.ZONES[ch.zone], weaponId: stats.weapon, weapon: B.WEAPONS[stats.weapon],
       src: stats.weapon, dmgBy: {}, mode: mode === "swarm" ? "swarm" : "normal",
@@ -96,6 +123,7 @@
     stick.on = false;
     resize();
     B.hud.begin(R);
+    if (PS.dev.admin && B.devStartBuild) B.devStartBuild(PS.dev.startBuild);
     if (!PS.state.get().stats.runs) B.toast("Move with WASD or drag. The lemon attacks by itself.", 6);
     if (R.pending) openChoices();
     cancelAnimationFrame(raf);
@@ -129,7 +157,8 @@
   /** A lit ball in the current fill colour. Other fill styles are drawn flat. */
   B.ball = function (ctx, x, y, r) {
     var c = ctx.fillStyle;
-    if (typeof c !== "string" || c.charAt(0) !== "#" || c.length !== 7) {
+    // low quality draws flat discs: a gradient per body is the costly part
+    if (gfx === 0 || typeof c !== "string" || c.charAt(0) !== "#" || c.length !== 7) {
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
@@ -164,7 +193,7 @@
     if (!cw || !ch) return;
     // the short side of the screen always shows about the same amount of field
     var s = Math.min(cw, ch) / (cw >= ch ? 500 : 430);
-    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var dpr = Math.min(DPR_CAP[gfx], window.devicePixelRatio || 1);
     canvas.width = Math.round(cw * dpr);
     canvas.height = Math.round(ch * dpr);
     view.cw = cw;
@@ -180,11 +209,23 @@
 
   function frame(now) {
     raf = requestAnimationFrame(frame);
+    // the frame-rate limit: skip this frame and let the time add up for the next
+    // (a couple of milliseconds of slack, so a 60 limit still gets every 60 Hz frame)
+    if (frameGap && now - last < frameGap - 2.5) return;
     // a frame's timestamp can be older than the moment a card was picked
     // or the game resumed, so the step is never allowed to run backwards
     var dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
     last = now;
     if (!R) return;
+    if (fpsEl && !fpsEl.hidden) {
+      fpsFrames++;
+      if (!fpsSince) fpsSince = now;
+      if (now - fpsSince >= 500) {
+        fpsEl.textContent = Math.round((fpsFrames * 1000) / (now - fpsSince)) + " FPS";
+        fpsFrames = 0;
+        fpsSince = now;
+      }
+    }
     var speed = PS.dev.cheats.speed;
     if (speed < 1) {
       B.step(dt * speed);
@@ -267,7 +308,7 @@
   /** Damage of one plain hit, before a weapon's own multiplier. */
   B.dmg = function () {
     var p = R.p;
-    var d = p.atk * p.mods.dmg * (1 + p.lvlAtk);
+    var d = p.atk * p.mods.dmg * (1 + p.lvlAtk) * PS.dev.cheats.dmgMul;
     if (p.fx.movingDmg && p.moving) d *= 1 + p.fx.movingDmg;
     if (R.weaponId === "solstice" && p.fx.q && p.hp > p.maxHp * 0.7) d *= 1.5;
     return d;
@@ -277,7 +318,7 @@
   B.pierce = function () { return (R.p.fx.pierce || 0) + R.p.mods.pierce; };
   B.cooldown = function (base) {
     var p = R.p;
-    return base / (1 + p.haste + p.mods.haste + p.frenzy * 0.04);
+    return base / ((1 + p.haste + p.mods.haste + p.frenzy * 0.04) * PS.dev.cheats.hasteMul);
   };
 
   /** How close a pest has to be before the weapon bothers to attack. */
@@ -355,7 +396,7 @@
     var move = steering();
     p.moving = Boolean(move);
     if (move) {
-      var speed = p.moveSpeed * p.mods.speed * move.mag * (1 - p.slow);
+      var speed = p.moveSpeed * p.mods.speed * move.mag * (1 - p.slow) * PS.dev.cheats.moveMul;
       p.x += move.x * speed * dt;
       p.y += move.y * speed * dt;
     }
@@ -706,7 +747,7 @@
         e.ky += (ky / kd) * opts.knock / e.mass;
       }
       if (opts && opts.stun && !e.boss) e.stun = Math.max(e.stun, opts.stun);
-      if (R.texts.length < 40 && PS.prefs.get("numbers")) {
+      if (R.texts.length < TEXT_CAP[gfx] && PS.prefs.get("numbers")) {
         B.text(e.x, e.y - e.r, PS.fmt(Math.max(1, Math.round(dmg))), flags & 2 ? "#FFE66D" : "#FFFCF2", flags & 2 ? 15 : 11);
       }
     }
@@ -1106,6 +1147,7 @@
     var thorns = p.fx.thorns ? B.dmg() * p.fx.thorns * dt : 0;
     var far = view.ring + 330;
     var decay = Math.exp(-7 * dt);
+    var frozen = PS.dev.cheats.freeze;
 
     for (var i = 0, n = list.length; i < n; i++) {
       var e = list[i];
@@ -1142,7 +1184,7 @@
 
       if (e.stun > 0) {
         e.stun -= dt;
-      } else {
+      } else if (!frozen) {
         B.think(e, dt, dx, dy, d);
         if (e.dead) continue;
       }
@@ -1204,7 +1246,7 @@
   function collect(d) {
     var p = R.p;
     if (d.type === "xp") {
-      p.xp += d.value * p.xpMul;
+      p.xp += d.value * p.xpMul * PS.dev.cheats.xpMul;
       PS.sfx.play("gem");
     } else if (d.type === "coin") {
       R.coins += d.value;
@@ -1221,6 +1263,7 @@
   function updateDrops(dt, hoover) {
     var p = R.p;
     var list = R.drops;
+    hoover = hoover || PS.dev.cheats.vacuum;
     for (var i = list.length - 1; i >= 0; i--) {
       var d = list[i];
       d.t += dt;
@@ -1251,7 +1294,8 @@
   /* ----------------------------------------------------------- particles */
 
   function burstSparks(x, y, fill, count, speed) {
-    if (R.sparks.length > 260) return;
+    if (R.sparks.length > SPARK_CAP[gfx]) return;
+    count = Math.max(1, Math.round(count * SPARK_SCALE[gfx]));
     for (var i = 0; i < count; i++) {
       var angle = Math.random() * TAU;
       var v = speed * PS.rand(0.4, 1);
@@ -1820,6 +1864,13 @@
   function bindInput() {
     window.addEventListener("keydown", function (e) {
       if (!R || R.done) return;
+      // the backtick key opens and closes the DEV panel (when it is unlocked)
+      if (e.key === "`" && PS.dev.unlocked && B.devPanel) {
+        if (R.devOpen) B.devPanel.close();
+        else B.devPanel.open();
+        e.preventDefault();
+        return;
+      }
       if (R.devOpen) {
         if (e.key === "Escape") B.devPanel.close();
         return;

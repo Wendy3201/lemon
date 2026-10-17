@@ -40,7 +40,7 @@
       ctx = new AC();
       var squash = ctx.createDynamicsCompressor();
       master = ctx.createGain();
-      master.gain.value = PS.VOLUMES[PS.prefs.get("volume")].gain;
+      master.gain.value = PS.prefs.gain();
       master.connect(squash);
       squash.connect(ctx.destination);
     } catch (err) {
@@ -219,11 +219,17 @@
 
   /* ------------------------------------------------------------------- api */
 
+  /* the two groups Settings can switch off on their own */
+  var COMBAT = { shoot: 1, hit: 1, kill: 1, boom: 1, zap: 1 };
+  var MENU = { click: 1, tab: 1, deny: 1 };
+
   PS.sfx = {
     play: function (name, arg) {
       if (!ctx || !enabled) return;
       var make = SOUNDS[name];
       if (!make) return;
+      if (COMBAT[name] && !PS.prefs.get("combatSfx")) return;
+      if (MENU[name] && !PS.prefs.get("menuSfx")) return;
       var gap = GAP[name];
       if (gap) {
         var now = performance.now();
@@ -236,7 +242,7 @@
     on: function () { return enabled; },
     /** Apply the volume chosen in Settings (and play a note so it can be judged). */
     refreshVolume: function () {
-      if (master) master.gain.value = PS.VOLUMES[PS.prefs.get("volume")].gain;
+      if (master) master.gain.value = PS.prefs.gain();
     },
     set: function (value) {
       enabled = Boolean(value);
