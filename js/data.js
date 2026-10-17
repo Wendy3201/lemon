@@ -26,7 +26,7 @@
     { key: "unknown", name: "???", color: "#8E7BFF", mult: 12, cap: 80 }
   ];
   PS.MAX_RARITY = PS.RARITY.length - 1;
-  PS.MAX_DROP_RARITY = 5;
+  PS.MAX_DROP_RARITY = 4; // Legendary: chapter loot, gifts and deals stop here; Mythic and up are forged
 
   /* Grades are a property of the item itself: an S-grade bow is S-grade at
      every rarity. They raise the main stat and come with stronger perks. */
@@ -717,7 +717,7 @@
     lootMu: function (chapter) { return 0.315 * (chapter - 1) - 0.5; }
   };
 
-  /** Chances for Common..Mythic when loot is centred on rarity `mu`. */
+  /** Chances for Common up to MAX_DROP_RARITY when loot is centred on rarity `mu`. */
   PS.rarityWeights = function (mu) {
     var weights = [];
     for (var r = 0; r <= PS.MAX_DROP_RARITY; r++) {
@@ -908,6 +908,32 @@
   };
 
   PS.GIFT = { every: 4 * 60 * 60 * 1000, gems: 10, goldShare: 0.25 };
+  /* Daily rewards: one claim per calendar day. Claiming on the day after the
+     last claim moves the streak on; missing a day starts it again at day 1.
+     After day 7 it goes round again. `gold` is a share of what a battle at
+     your furthest chapter pays; chests are opened for free. */
+  PS.DAILY = [
+    { gold: 0.5 },
+    { gems: 20 },
+    { chest: "crate", count: 3 },
+    { gold: 1 },
+    { gems: 40 },
+    { chest: "gilded", count: 1 },
+    { gems: 100, chest: "gilded", count: 3 }
+  ];
+  /* Endless swarm opens once this chapter is cleared. Its pests are as tough
+     as the furthest chapter you have cleared. */
+  PS.ENDLESS = { from: 40 };
+  /* From this chapter on, two bosses arrive together: the chapter's own and
+     the one from the chapter before. Each has `hp` of a lone boss's health. */
+  PS.TWIN_BOSS = { from: 40, hp: 0.65 };
+  /** The bosses a chapter ends with: its own, then (from TWIN_BOSS.from) the one before. */
+  PS.chapterBosses = function (n) {
+    var ch = PS.chapter(n);
+    var list = [ch];
+    if (ch.n >= PS.TWIN_BOSS.from && ch.n > 1) list.push(PS.chapter(ch.n - 1));
+    return list;
+  };
   PS.GOLD_PACK = { gems: 50, runs: 2 };
   PS.DEAL_COUNT = 4;
   PS.START = { gems: 100, gold: 0, kit: ["sling", "cap", "bark"] };

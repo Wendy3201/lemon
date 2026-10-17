@@ -225,6 +225,29 @@
     return out;
   }
 
+  /** The Endless swarm card under the chapter: locked until PS.ENDLESS.from is cleared. */
+  function endlessCard() {
+    var info = st.endlessInfo();
+    if (!info.open) {
+      return (
+        '<div class="panel endless is-locked">' +
+          '<div class="endless__art">' + PS.icon("lock") + "</div>" +
+          '<div class="endless__body"><h3>Endless swarm</h3><p>Clear chapter ' + PS.ENDLESS.from + " to unlock a battle that never ends.</p></div>" +
+        "</div>"
+      );
+    }
+    return (
+      '<div class="panel endless">' +
+        '<div class="endless__art">' + PS.icon("skull") + "</div>" +
+        '<div class="endless__body"><h3>Endless swarm</h3>' +
+          "<p>No boss, no end: the swarm just keeps growing. Pests are as tough as chapter " + info.chapter + ". Pays gold for every second you last.</p>" +
+          '<p class="endless__best">' + PS.icon("clock") + (info.best ? "Best " + PS.clock(info.best) + " · chapter " + info.bestCh + " · " + fmt(info.bestKills) + " squashed" : "No record yet") + "</p>" +
+        "</div>" +
+        '<button class="btn btn--primary" type="button" data-act="endless" data-key="endless">Play</button>' +
+      "</div>"
+    );
+  }
+
   SCREENS.battle = function () {
     var S = st.get();
     var ch = PS.chapter(S.chapter);
@@ -268,7 +291,7 @@
           '<p class="verdict verdict--' + verdict[0] + '">' + verdict[1] + " · recommended power " + fmt(ch.rec) + "</p>" +
 
           '<dl class="facts">' +
-            "<div><dt>Length</dt><dd>" + PS.clock(ch.duration) + " then the boss</dd></div>" +
+            "<div><dt>Length</dt><dd>" + PS.clock(ch.duration) + (PS.chapterBosses(ch.n).length > 1 ? " then two bosses: " + esc(PS.chapterBosses(ch.n).map(function (c) { return c.bossName; }).join(" & ")) : " then the boss") + "</dd></div>" +
             "<div><dt>" + (first ? "First clear" : "Reward") + "</dt><dd>" + price("gold", ch.gold * (first ? 3 : 1)) + (first ? price("gems", PS.BAL.gemsFirst(ch.n)) : "") + "</dd></div>" +
             "<div><dt>Gear drops</dt><dd>" + (first ? (ch.milestone ? "6" : "5") : "3") + ' × <span class="rlist">' + lootPreview(ch.n) + (first && ch.milestone ? '<span class="rname g-' + ch.milestone[0] + '">' + ch.milestone[0] + "-grade</span>" : "") + "</span></dd></div>" +
             "<div><dt>Best</dt><dd>" + (record && record.n ? PS.clock(record.time) + " · cleared " + record.n + (record.n === 1 ? " time" : " times") : "Not cleared yet") + "</dd></div>" +
@@ -277,6 +300,7 @@
           '<button class="btn btn--primary btn--xl" type="button" data-act="fight" data-key="fight">' + PS.icon("tabBattle") + "Battle</button>" +
           '<p class="hint">Move with WASD or the arrow keys, or drag on the screen. Your lemon attacks by itself.</p>' +
         "</div>" +
+        endlessCard() +
         '<footer class="foot"><span>Your progress is saved in this browser.</span>' +
           '<button class="foot__secret" type="button" data-act="secret" aria-label="Locked area">?</button></footer>' +
       "</section>"
@@ -567,6 +591,43 @@
     return next - now;
   }
 
+  /** One reward in words, short enough for a calendar cell. */
+  function dailyText(r) {
+    var parts = [];
+    if (r.gems) parts.push(price("gems", r.gems));
+    if (r.gold) parts.push(price("gold", r.gold));
+    if (r.chest) parts.push('<span class="daily__chest">' + r.count + " × " + esc(PS.CHESTS[r.chest].name) + "</span>");
+    return parts.join("");
+  }
+
+  function dailyCard() {
+    var info = st.dailyInfo();
+    var cells = info.rewards.map(function (r, i) {
+      var n = i + 1;
+      // days before today's are done; today's is either waiting or just claimed
+      var state = n < info.day || (n === info.day && !info.ready) ? "is-done" : n === info.day ? "is-today" : "";
+      return (
+        '<li class="daily__day ' + state + (n === PS.DAILY.length ? " is-big" : "") + '">' +
+          "<b>Day " + n + "</b>" +
+          '<span class="daily__art">' + (state === "is-done" ? PS.icon("check") : PS.icon(r.chest ? "gift" : r.gems ? "gem" : "coin")) + "</span>" +
+          '<span class="daily__what">' + dailyText(r) + "</span>" +
+        "</li>"
+      );
+    }).join("");
+    return (
+      '<div class="panel daily' + (info.ready ? " is-ready" : "") + '">' +
+        '<div class="daily__head"><div><h3>Daily rewards</h3><p>' +
+          (info.ready
+            ? "Day " + info.day + " is waiting. Come back every day to reach the big one on day " + PS.DAILY.length + "."
+            : "Claimed for today. Day " + ((info.day % PS.DAILY.length) + 1) + ' opens in <b data-countdown="deals">' + PS.countdown(untilMidnight()) + "</b>. Miss a day and it starts again.") +
+          "</p></div>" +
+          (info.ready ? '<button class="btn btn--primary" type="button" data-act="daily" data-key="daily">Claim day ' + info.day + "</button>" : "") +
+        "</div>" +
+        '<ol class="daily__days">' + cells + "</ol>" +
+      "</div>"
+    );
+  }
+
   SCREENS.shop = function () {
     var S = st.get();
     var wait = st.giftWait();
@@ -582,6 +643,8 @@
             ? '<span class="gift__wait">' + PS.icon("clock") + '<b data-countdown="gift">' + PS.countdown(wait) + "</b></span>"
             : '<button class="btn btn--primary" type="button" data-act="gift" data-key="gift">Claim</button>') +
         "</div>" +
+
+        dailyCard() +
 
         '<h2 class="section">Chests</h2>' +
         '<div class="chests">' + chestCard("crate") + chestCard("gilded") + "</div>" +
@@ -970,6 +1033,9 @@
         settingsToggle("Volume", '<span id="set-vol-label">' + PS.prefs.get("vol") + "%</span>",
           '<input class="settings__range" id="set-vol" type="range" min="0" max="100" step="5" value="' + PS.prefs.get("vol") + '" aria-label="Volume" />') +
         settingsPref("combatSfx", "Battle sounds", "Shots, hits, pests squashed and explosions") +
+        settingsPref("music", "Music", "A tune for camp, for battles and for the boss") +
+        settingsToggle("Music volume", '<span id="set-music-label">' + PS.prefs.get("musicVol") + "%</span>",
+          '<input class="settings__range" id="set-music" type="range" min="0" max="100" step="5" value="' + PS.prefs.get("musicVol") + '" aria-label="Music volume" />') +
         settingsPref("menuSfx", "Menu sounds", "Button clicks and tab changes") +
         "<h3>Performance</h3>" +
         settingsCycle("quality", "Graphics quality", "Low draws flat pests and fewer sparks, for slow devices") +
@@ -1479,7 +1545,7 @@
           devNumber("dev-swarm-ch", "Pests as tough as chapter", S.chapter, 1, PS.BAL.CHAPTERS) +
           devButton("dev-swarm", "Start swarm mode", "", "btn--primary") +
         "</div>" +
-        '<p class="hint">Endless, no boss. Pays 1.2× the usual gold for the chapter you pick and keeps nothing else.</p>'
+        '<p class="hint">Endless, no boss. Pays 3× the usual gold for the chapter you pick and keeps nothing else.</p>'
       ) +
       devCard("Start the next battle with",
         '<div class="devbox__toggles">' + toggles.map(function (t) {
@@ -1860,11 +1926,13 @@
     el.results.hidden = true;
     el.app.hidden = true;
     el.battle.hidden = false;
+    PS.music.play("battle");
     PS.B.start(chapter, mode);
-    if (mode === "swarm") PS.B.toast("Swarm mode! Survive as long as you can.", 4);
+    if (mode === "swarm") PS.B.toast("Endless swarm! Survive as long as you can.", 4);
   }
 
   function leaveBattle() {
+    PS.music.play("camp");
     PS.B.stop();
     PS.B.hud.hide();
     el.battle.hidden = true;
@@ -1879,14 +1947,15 @@
     var ch = PS.chapter(result.chapter);
     el.results.innerHTML =
       '<div class="panel results results--loss">' +
-        '<p class="kicker">Swarm mode · pests as tough as chapter ' + ch.n + "</p>" +
-        "<h2>Swarmed!</h2>" +
-        '<p class="results__sub">You held out for ' + PS.clock(result.time) + ". Swarm mode pays 1.2× the usual gold; nothing else is kept.</p>" +
+        '<p class="kicker">Endless swarm · pests as tough as chapter ' + ch.n + "</p>" +
+        "<h2>" + (result.newBest ? "New record!" : "Swarmed!") + "</h2>" +
+        '<p class="results__sub">You held out for ' + PS.clock(result.time) + (result.newBest ? ", your longest yet." : ". Your best is " + PS.clock(result.best || 0) + ".") + " Endless pays gold for the time you last; nothing else is kept.</p>" +
         '<dl class="facts facts--tight">' +
           "<div><dt>Time</dt><dd>" + PS.clock(result.time) + "</dd></div>" +
           "<div><dt>Squashed</dt><dd>" + fmt(result.kills) + "</dd></div>" +
           "<div><dt>Level</dt><dd>" + result.level + "</dd></div>" +
           "<div><dt>Damage</dt><dd>" + fmt(result.dealt || 0) + "</dd></div>" +
+          "<div><dt>Best combo</dt><dd>×" + fmt(result.combo || 0) + "</dd></div>" +
         "</dl>" +
         '<p class="loot__money">' + price("gold", result.gold) + "</p>" +
         '<div class="modal__actions">' +
@@ -1901,6 +1970,7 @@
 
   function showResults(result) {
     view.results = result;
+    PS.music.play("camp");
     if (result.swarm) return showSwarmResults(result);
     var ch = PS.chapter(result.chapter);
     var title = result.won ? (result.finished ? "The grove is saved!" : "Chapter cleared!") : result.progress >= 1 ? "So close…" : "Overrun!";
@@ -1918,6 +1988,7 @@
           "<div><dt>Squashed</dt><dd>" + fmt(result.kills) + "</dd></div>" +
           "<div><dt>Level</dt><dd>" + result.level + "</dd></div>" +
           "<div><dt>Damage</dt><dd>" + fmt(result.dealt || 0) + "</dd></div>" +
+          "<div><dt>Best combo</dt><dd>×" + fmt(result.combo || 0) + "</dd></div>" +
         "</dl>" +
         '<p class="loot__money">' + price("gold", result.gold) + (result.gems ? price("gems", result.gems) : "") + "</p>" +
         (result.items.length
@@ -1995,6 +2066,7 @@
     "prefs-reset": function () {
       PS.prefs.reset();
       PS.sfx.refreshVolume();
+      PS.music.refresh();
       applyBlur();
       renderModal();
       toast("Settings restored");
@@ -2003,6 +2075,7 @@
       var name = node.getAttribute("data-pref");
       PS.prefs.set(name, !PS.prefs.get(name));
       if (name === "blur") applyBlur();
+      if (name === "music") PS.music.refresh();
       renderModal();
     },
     motion: function () {
@@ -2015,6 +2088,20 @@
       render();
     },
     fight: function () { startBattle(st.get().chapter); },
+    endless: function () {
+      var info = st.endlessInfo();
+      if (info.open) startBattle(info.chapter, "swarm");
+    },
+    daily: function () {
+      var got = st.claimDaily();
+      if (!got) return;
+      openModal({
+        type: "loot", title: "Daily reward · day " + got.day, items: got.items, gold: got.gold, gems: got.gems, shards: got.shards,
+        art: got.items.length ? "gilded" : "gift"
+      });
+      if (got.items.length) revealSound(got.items);
+      else PS.sfx.play("coin");
+    },
     again: function () {
       var chapter = view.results.chapter;
       var mode = view.results.swarm ? "swarm" : undefined;
@@ -2616,7 +2703,7 @@
   var SOUND = {
     tab: "tab", fight: "start", again: "start", equip: "equip", "equip-best": "equip", "dev-give": "equip", "dev-set": "equip",
     upgrade: "upgrade", "upgrade-max": "upgrade", talent: "talent", quest: "coin", deal: "coin", gold: "coin",
-    gift: null, chest: null, craft: null, ascend: null, egg: null, "pet-slot": null, sell: null, "forge-go": null, "quick-go": null, sound: null, cycle: null
+    gift: null, daily: null, chest: null, craft: null, ascend: null, egg: null, "pet-slot": null, sell: null, "forge-go": null, "quick-go": null, sound: null, cycle: null
   };
 
   function upgraded(slot, text) {
@@ -2696,7 +2783,7 @@
       }
       nodes[i].textContent = PS.countdown(kind === "gift" ? st.giftWait() : untilMidnight());
     }
-    el.tabbar.querySelector('[data-tab="shop"]').classList.toggle("has-badge", giftReady);
+    el.tabbar.querySelector('[data-tab="shop"]').classList.toggle("has-badge", giftReady || st.dailyInfo().ready);
   }
 
   /* ---------------------------------------------------------------- boot */
@@ -2718,6 +2805,7 @@
       if (theme === "dark" || theme === "light") document.documentElement.setAttribute("data-theme", theme);
 
       applyBlur();
+      PS.scenery.mount(); // the orchard behind the menus
       $("#open-settings").innerHTML = PS.icon("gear");
       var tabs = el.tabbar.querySelectorAll("[data-tab]");
       for (var i = 0; i < tabs.length; i++) {
@@ -2726,6 +2814,7 @@
       }
 
       st.load();
+      PS.music.play("camp"); // starts with the first click or key press
       PS.B.mount(el.battle);
       el.results = document.createElement("div");
       el.results.className = "sheet";
@@ -2737,6 +2826,13 @@
       el.modal.addEventListener("close", function () { view.modal = null; });
       // the volume slider: move it and the sound changes at once, no redraw to interrupt the drag
       el.modal.addEventListener("input", function (e) {
+        if (e.target.id === "set-music") {
+          PS.prefs.set("musicVol", Number(e.target.value));
+          PS.music.refresh();
+          var musicLabel = $("#set-music-label");
+          if (musicLabel) musicLabel.textContent = PS.prefs.get("musicVol") + "%";
+          return;
+        }
         if (e.target.id !== "set-vol") return;
         PS.prefs.set("vol", Number(e.target.value));
         PS.sfx.refreshVolume();

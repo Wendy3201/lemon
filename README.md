@@ -45,20 +45,34 @@ GitHub Pages, Netlify or any web host. Nothing needs compiling.
   you pick **one of three upgrades** (click a card, or press 1, 2 or 3). `R`
   rerolls the cards, once per battle unless your gear gives you more.
 - Survive until the timer runs out and the **boss** arrives. Beat the boss to
-  clear the chapter and open the next one.
+  clear the chapter and open the next one. From chapter 40 on, **two bosses**
+  arrive together (the chapter's own and the one before it, each with 65% of a
+  lone boss's health), and both must fall. `PS.TWIN_BOSS` in `js/data.js` sets
+  the chapter and the health share.
 - `Esc` or `P` pauses. Losing still pays some gold, and gear too if you got
   halfway.
 - The **damage meter** in the top-left ranks what is doing the damage (your
   weapon, each upgrade's ability, burning, death blasts, thorns) with each
   one's share of the total. The chart button, or `Tab`, shows or hides it.
+- Squash pests quickly, one after another, to build a **combo**. It shows on
+  the right once it reaches ten, and your best combo is on the results screen.
+- When your health drops below 30% the edges of the screen glow red.
+- **Music** plays throughout: a calm tune at camp, a quick one in battle and a
+  heavier one when the boss arrives. It is made in the browser like the sound
+  effects (no audio files), starts with your first click, and can be switched
+  off or turned down in Settings.
 
 ### Between battles
 
+The menus sit in front of a little orchard (`js/scenery.js`): drifting
+clouds, hills, swaying lemon trees and falling petals by day, the moon, stars
+and fireflies at night. It stays still when Animations is set to Off.
+
 | Tab | What it is for |
 | --- | --- |
-| **Battle** | Pick a chapter and fight. Shows your Power against the chapter's recommended Power. |
+| **Battle** | Pick a chapter and fight. Shows your Power against the chapter's recommended Power. Once chapter 40 is cleared, **Endless swarm** opens below it: no boss and no end, pests as tough as your furthest chapter, gold for every second you last, and your best time kept. |
 | **Equipment** | Six slots: weapon, ring, amulet, helmet, armour, boots. Level slots up with gold, swap gear, and open the **Forge**. |
-| **Shop** | A free gift every four hours, chests bought with gems (a fixed price: 10 for a Seed Crate, 40 for a Gilded Chest), four deals a day (never S-grade), and gold for gems. |
+| **Shop** | **Daily rewards** (a seven-day streak: gold, gems and free chests, with 100 gems and three Gilded Chests on day 7; miss a day and it starts again), a free gift every four hours, chests bought with gems (a fixed price: 10 for a Seed Crate, 40 for a Gilded Chest), four deals a day (never S-grade), and gold for gems. |
 | **Pets** | Hatch pets from eggs bought with gems in the Shop (Common 70%, Uncommon 18%, Rare 9%, Epic 3%; never S or SS). You start with one team slot and can unlock a second (150 gems) and a third (400 gems); every pet in your team fights beside you and gives its stat bonus. Hatching a duplicate, or spending gold, levels it up. |
 | **Talents** | Permanent bonuses bought with gold. Max every talent in a tier and you can **ascend**: tier II and tier III repeat the talents at a bigger bonus and a much bigger price, and add Lucky Star, Wide Swing and Giant Slayer. |
 | **Quests** | Ladders of goals that pay gems. |
@@ -82,7 +96,8 @@ cap for its slot, and more of the item's perks switched on.
 | Surpass | ×8 | 70 | |
 | ??? | ×12 | 80 | a hidden 5th |
 
-Surpass and ??? never drop. They only come out of the forge.
+Chapter loot, the free gift and the daily deals go up to Legendary at most.
+Mythic, Surpass and ??? never drop: they only come out of the forge.
 
 Some items are **S-grade** or **SS-grade**. The grade belongs to the item
 itself (an S-grade bow is S-grade at every rarity): ×1.2 or ×1.45 on the main
@@ -207,7 +222,7 @@ Most tweaks are one line in `js/data.js`.
   The lobby menu can give or remove any item, set gold and
   gems to an exact figure, and start **Swarm mode**, an endless battle with no
   boss and a swarm that keeps growing, with pests as tough as the chapter you
-  pick. It pays gold (1.2 times what a normal run of that chapter pays, scaled by how
+  pick. It pays gold (3 times what a normal run of that chapter pays, scaled by how
   long you last) and keeps nothing else: no gear, progress or records.
 
 ---

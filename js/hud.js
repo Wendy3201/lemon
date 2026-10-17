@@ -33,6 +33,7 @@
       '<div class="hud__meter" aria-label="Damage by source" hidden></div>' +
       '<div class="hud__boss" hidden><span></span><div><i></i></div></div>' +
       '<div class="hud__toast" role="status" aria-live="polite"></div>' +
+      '<div class="hud__combo" hidden aria-hidden="true"><b></b><span>combo</span></div>' +
       '<div class="hud__build"></div>' +
     '</div>' +
     '<div class="sheet" data-panel="choose" hidden>' +
@@ -222,6 +223,8 @@
       el.bossName = root.querySelector(".hud__boss span");
       el.bossFill = root.querySelector(".hud__boss i");
       el.toast = root.querySelector(".hud__toast");
+      el.combo = root.querySelector(".hud__combo");
+      el.comboText = el.combo.querySelector("b");
       el.build = root.querySelector(".hud__build");
       el.choose = root.querySelector('[data-panel="choose"]');
       el.chooseTitle = root.querySelector(".choose__title");
@@ -270,6 +273,21 @@
       setText("kills", el.killsText, PS.fmt(R.kills));
       setText("coins", el.coinsText, PS.fmt(R.coins));
 
+      // the combo shows from ten squashes in a row, and grows a little with it
+      var combo = R.combo >= 10 && R.comboT > 0 ? R.combo : 0;
+      if (shown.comboOn !== Boolean(combo)) {
+        shown.comboOn = Boolean(combo);
+        el.combo.hidden = !combo;
+      }
+      if (combo) {
+        setText("combo", el.comboText, "×" + combo);
+        var tier = combo >= 100 ? 3 : combo >= 50 ? 2 : combo >= 25 ? 1 : 0;
+        if (shown.comboTier !== tier) {
+          shown.comboTier = tier;
+          el.combo.setAttribute("data-tier", tier);
+        }
+      }
+
       if (meterOpen) {
         var tick = Math.floor(R.t * 4);
         if (shown.meterTick !== tick) {
@@ -279,13 +297,23 @@
         }
       }
 
-      var boss = R.boss && !R.boss.dead ? R.boss : null;
-      if (shown.boss !== Boolean(boss)) {
-        shown.boss = Boolean(boss);
-        el.boss.hidden = !boss;
-        if (boss) el.bossName.textContent = boss.name;
+      // one bar for every boss on the field: their names, and their health added up
+      var bosses = R.bosses || (R.boss ? [R.boss] : []);
+      var alive = bosses.filter(function (b) { return !b.dead; });
+      if (shown.boss !== Boolean(alive.length)) {
+        shown.boss = Boolean(alive.length);
+        el.boss.hidden = !alive.length;
       }
-      if (boss) setWidth("bossHp", el.bossFill, boss.hp / boss.maxHp);
+      if (alive.length) {
+        setText("bossName", el.bossName, alive.map(function (b) { return b.name; }).join(" & "));
+        var hpLeft = 0;
+        var hpAll = 0;
+        bosses.forEach(function (b) {
+          hpAll += b.maxHp;
+          if (!b.dead) hpLeft += Math.max(0, b.hp);
+        });
+        setWidth("bossHp", el.bossFill, hpAll ? hpLeft / hpAll : 0);
+      }
 
       var toast = R.toastT > 0 ? R.toast : "";
       if (shown.toast !== toast) {

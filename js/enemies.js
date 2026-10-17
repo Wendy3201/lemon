@@ -208,31 +208,59 @@
     for (i = 0; i < R.drops.length; i++) R.drops[i].pull = true;
     R.ebullets.length = 0;
 
+    // late chapters bring two bosses at once, from opposite sides, each a
+    // little less tough than a lone one
+    var from = PS.chapterBosses(R.ch.n);
+    var share = from.length > 1 ? PS.TWIN_BOSS.hp : 1;
     var angle = Math.random() * TAU;
-    var e = blank(R.ch.boss, R.p.x + Math.cos(angle) * B.view.ring, R.p.y + Math.sin(angle) * B.view.ring);
-    e.boss = true;
-    e.name = R.ch.bossName;
-    e.tier = R.ch.bossTier;
-    e.r = def.r;
-    e.look = R.ch.look;
-    e.fill = e.look ? e.look.body : def.fill;
-    e.hp = e.maxHp = 2250 * R.ch.bossScale * Math.pow(R.dur / 180, 1.3) * def.hp;
-    e.speed = def.speed;
-    e.hurt = 44 * R.ch.dmgScale;
-    e.mass = 1e6;
-    e.clock = 2.5;
-    e.clock2 = 4;
-    e.spin = 0;
-    e.dashes = 0;
-    e.age = 0;
-    e.onDeath = function () { B.win(); };
+    R.bosses = from.map(function (src, index) {
+      var kind = BOSSES[src.boss];
+      var a = angle + index * Math.PI;
+      var e = blank(src.boss, R.p.x + Math.cos(a) * B.view.ring, R.p.y + Math.sin(a) * B.view.ring);
+      e.boss = true;
+      e.name = src.bossName;
+      e.tier = src.bossTier;
+      e.r = kind.r;
+      e.look = src.look;
+      e.fill = e.look ? e.look.body : kind.fill;
+      // toughness always comes from the chapter being played
+      e.hp = e.maxHp = 2250 * R.ch.bossScale * Math.pow(R.dur / 180, 1.3) * kind.hp * share;
+      e.speed = kind.speed;
+      e.hurt = 44 * R.ch.dmgScale;
+      e.mass = 1e6;
+      e.clock = 2.5 + index * 1.3; // out of step, so they do not attack in unison
+      e.clock2 = 4 + index * 1.7;
+      e.spin = 0;
+      e.dashes = 0;
+      e.age = 0;
+      e.onDeath = bossDown;
+      R.enemies.push(e);
+      return e;
+    });
+    R.bosses.forEach(function (b) {
+      R.fx.push({ type: "ring", x: b.x, y: b.y, r0: b.r, r1: b.r * 5, color: "#E5484D", width: 8, t: 0, dur: 0.8 });
+      R.fx.push({ type: "ring", x: b.x, y: b.y, r0: b.r * 0.5, r1: b.r * 3.2, color: "#FFE66D", width: 4, t: 0, dur: 0.55 });
+    });
+    R.shake = Math.max(R.shake, 14);
     R.phase = "boss";
     R.reachedBoss = true;
-    R.boss = e;
+    R.boss = R.bosses[0];
     R.spawnIn = 2;
-    R.enemies.push(e);
     PS.sfx.play("boss");
-    B.toast(e.name + " has arrived!");
+    PS.music.play("boss");
+    B.toast(R.bosses.length > 1 ? R.bosses[0].name + " and " + R.bosses[1].name + " have arrived!" : R.boss.name + " has arrived!");
+  }
+
+  /** A boss has fallen: the chapter is won once none are left. */
+  function bossDown(e) {
+    var R = B.run;
+    var left = (R.bosses || []).filter(function (b) { return !b.dead; });
+    if (!left.length) {
+      B.win();
+      return;
+    }
+    R.boss = left[0];
+    B.toast(e.name + " is down! " + left[0].name + " is still out there");
   }
 
   /* ------------------------------------------------------------------ ai */
@@ -498,7 +526,14 @@
     var angle;
 
     if (e.boss) {
+      // drawn larger than the body that is hit, so it looms; nothing else about it changes
+      drawBossAura(ctx, e, R);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(BOSS_LOOK, BOSS_LOOK);
+      ctx.translate(-x, -y);
       drawBoss(ctx, e, R, nx, ny, body);
+      ctx.restore();
       return;
     }
 
@@ -780,6 +815,78 @@
       ctx.beginPath();
       ctx.arc(x, y + r * 0.2, r * 0.62, Math.PI * 1.2, Math.PI * 1.8);
       ctx.stroke();
+    }
+  }
+
+  /* how much bigger a boss is drawn than its hitbox */
+  var BOSS_LOOK = 1.35;
+
+  /** Under a boss: a pulsing glow in its own colour (red once it is past half
+   *  health and fighting harder), a ring of spikes turning slowly round it, and,
+   *  when enraged, wisps of steam. */
+  function drawBossAura(ctx, e, R) {
+    var x = e.x;
+    var y = e.y;
+    var r = e.r * BOSS_LOOK;
+    var t = R.t + e.wob;
+    var rage = e.hp < e.maxHp * 0.5;
+    var tone = rage ? "#E5484D" : (e.look && e.look.accent) || "#F2B93B";
+    var pulse = 0.75 + 0.25 * Math.sin(t * (rage ? 7 : 3));
+    var hi = B.quality === undefined || B.quality >= 1; // low quality skips the glow and steam
+
+    if (hi) {
+      ctx.globalCompositeOperation = "lighter";
+      var glow = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 2.3);
+      glow.addColorStop(0, B.rgba(tone, 0.32 * pulse));
+      glow.addColorStop(1, B.rgba(tone, 0));
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x, y, r * 2.3, 0, TAU);
+      ctx.fill();
+      ctx.globalCompositeOperation = "source-over";
+    }
+
+    // a crown of spikes, turning, that points outward like a warning
+    var spikes = 14;
+    var turn = t * (rage ? 0.9 : 0.35);
+    ctx.fillStyle = "rgba(20,14,12,0.55)";
+    ctx.strokeStyle = B.rgba(tone, 0.75);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (var i = 0; i < spikes; i++) {
+      var a = turn + (i / spikes) * TAU;
+      var inner = r * 1.08;
+      var outer = r * (1.3 + (i % 2) * 0.12) + Math.sin(t * 4 + i) * 2;
+      ctx.moveTo(x + Math.cos(a - 0.12) * inner, y + Math.sin(a - 0.12) * inner);
+      ctx.lineTo(x + Math.cos(a) * outer, y + Math.sin(a) * outer);
+      ctx.lineTo(x + Math.cos(a + 0.12) * inner, y + Math.sin(a + 0.12) * inner);
+      ctx.closePath();
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    // a dashed ring just outside the spikes, turning the other way
+    ctx.strokeStyle = B.rgba(tone, 0.4 * pulse);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 12]);
+    ctx.lineDashOffset = -t * 30;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 1.55, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+
+    if (rage && hi) {
+      // steam rising off it
+      for (var s = 0; s < 6; s++) {
+        var k = ((t * 0.8 + s / 6) % 1);
+        var sx = x + Math.sin(s * 2.1 + t) * r * 0.6;
+        var sy = y - r * 0.6 - k * r * 1.3;
+        ctx.fillStyle = "rgba(255,200,190," + (0.22 * (1 - k)).toFixed(3) + ")";
+        ctx.beginPath();
+        ctx.arc(sx, sy, 5 + k * 10, 0, TAU);
+        ctx.fill();
+      }
     }
   }
 

@@ -1,31 +1,30 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Kingsely Huang believe me now?</title>
-    <meta
-      name="description"
-      content="Pip Survivors: steer a lemon through swarms of garden pests, pick upgrades, forge better gear and grow your power. Plays in the browser, nothing to download."
-    />
-    <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#F7D94C" />
-    <link rel="icon" href="assets/icons/lemon.svg" type="image/svg+xml" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
-    />
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <!-- ------------------------------------------------------------ menus -->
-    <div class="app" id="app">
-      <div class="head">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Kingsely Huang believe me now?</title>
+  <meta name="description"
+    content="Pip Survivors: steer a lemon through swarms of garden pests, pick upgrades, forge better gear and grow your power. Plays in the browser, nothing to download." />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#F7D94C" />
+  <link rel="icon" href="assets/icons/lemon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <!-- ------------------------------------------------------------ menus -->
+  <div class="app" id="app">
+    <div class="head">
       <!-- The status bar above the top bar. Change the text between the tags
            whenever you like; leave it empty to hide the bar. -->
-      <p class="status" id="status" role="status">PLAYERS, JUST SAYING THAT ALL DATA YOU HAVE MADE IS GOING TO BE REMOVED</p>
+      <p class="status" id="status" role="status">PLAYERS, JUST SAYING THAT ALL DATA YOU HAVE MADE IS GOING TO BE
+        REMOVED</p>
 
       <header class="topbar">
         <div class="brand">
@@ -43,48 +42,55 @@
           <span class="pill pill--power" id="top-power" title="Power: how strong your lemon is"></span>
           <span class="pill" id="top-gold" title="Gold: for levels and talents"></span>
           <span class="pill" id="top-gems" title="Gems: for chests"></span>
-          <button class="btn btn--icon" id="open-settings" type="button" data-act="settings" aria-label="Settings"></button>
+          <button class="btn btn--icon" id="open-settings" type="button" data-act="settings"
+            aria-label="Settings"></button>
         </div>
       </header>
-      </div>
-
-      <main class="screen" id="screen" tabindex="-1"></main>
-
-      <nav class="tabbar" id="tabbar" aria-label="Main">
-        <button class="tab" type="button" data-act="tab" data-tab="shop"><span>Shop</span></button>
-        <button class="tab" type="button" data-act="tab" data-tab="gear"><span>Equipment</span></button>
-        <button class="tab tab--main" type="button" data-act="tab" data-tab="battle"><span>Battle</span></button>
-        <button class="tab" type="button" data-act="tab" data-tab="pets"><span>Pets</span></button>
-        <button class="tab" type="button" data-act="tab" data-tab="talents"><span>Talents</span></button>
-        <button class="tab" type="button" data-act="tab" data-tab="quests"><span>Quests</span></button>
-      </nav>
     </div>
 
-    <!-- ----------------------------------------------------------- battle -->
-    <section class="battle" id="battle" hidden aria-label="Battle"></section>
+    <main class="screen" id="screen" tabindex="-1"></main>
 
-    <dialog class="modal" id="modal" aria-labelledby="modal-title"></dialog>
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <nav class="tabbar" id="tabbar" aria-label="Main">
+      <button class="tab" type="button" data-act="tab" data-tab="shop"><span>Shop</span></button>
+      <button class="tab" type="button" data-act="tab" data-tab="gear"><span>Equipment</span></button>
+      <button class="tab tab--main" type="button" data-act="tab" data-tab="battle"><span>Battle</span></button>
+      <button class="tab" type="button" data-act="tab" data-tab="pets"><span>Pets</span></button>
+      <button class="tab" type="button" data-act="tab" data-tab="talents"><span>Talents</span></button>
+      <button class="tab" type="button" data-act="tab" data-tab="quests"><span>Quests</span></button>
+    </nav>
+  </div>
 
-    <noscript><p class="noscript">Pip Survivors needs JavaScript to run.</p></noscript>
+  <!-- ----------------------------------------------------------- battle -->
+  <section class="battle" id="battle" hidden aria-label="Battle"></section>
 
-    <!-- ---------------------------------------------------------- scripts -->
-    <script src="js/core.js"></script>
-    <script src="js/data.js"></script>
-    <script src="js/icons.js"></script>
-    <script src="js/audio.js"></script>
-    <script src="js/state.js"></script>
-    <script src="js/battle.js"></script>
-    <script src="js/enemies.js"></script>
-    <script src="js/weapons.js"></script>
-    <script src="js/outfit.js"></script>
-    <script src="js/upgrades.js"></script>
-    <script src="js/hud.js"></script>
-    <script src="js/pets.js"></script>
-    <script src="js/dev.js"></script>
-    <script src="js/ui.js"></script>
-    <script>
-      PS.ui.init();
-    </script>
-  </body>
+  <dialog class="modal" id="modal" aria-labelledby="modal-title"></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <noscript>
+    <p class="noscript">Pip Survivors needs JavaScript to run.</p>
+  </noscript>
+
+  <!-- ---------------------------------------------------------- scripts -->
+  <script src="js/core.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/music.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/battle.js"></script>
+  <script src="js/arena.js"></script>
+  <script src="js/enemies.js"></script>
+  <script src="js/weapons.js"></script>
+  <script src="js/outfit.js"></script>
+  <script src="js/upgrades.js"></script>
+  <script src="js/hud.js"></script>
+  <script src="js/pets.js"></script>
+  <script src="js/dev.js"></script>
+  <script src="js/scenery.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    PS.ui.init();
+  </script>
+</body>
+
 </html>

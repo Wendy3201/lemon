@@ -41,9 +41,11 @@
       clears: {},
       shop: { freeAt: 0, day: "", dealBest: 1, bought: [], pityS: 0, pitySS: 0 },
       quests: {},
+      daily: { last: "", streak: 0 }, // the day of the last daily claim, and which day of 7 it was
+      endless: { best: 0, ch: 0, kills: 0 }, // the longest endless swarm survived
       stats: {
         kills: 0, runs: 0, wins: 0, forges: 0, chests: 0, upgrades: 0, talents: 0,
-        bestLevel: 0, bestPower: 0, maxRarity: 0, grade: 0, time: 0, earned: 0, eggs: 0
+        bestLevel: 0, bestPower: 0, maxRarity: 0, grade: 0, time: 0, earned: 0, eggs: 0, bestCombo: 0
       }
     };
     PS.SLOTS.forEach(function (slot) {
@@ -154,6 +156,14 @@
     save.shop.bought = Array.isArray(shop.bought) ? shop.bought.map(Boolean) : [];
     save.shop.pityS = Math.floor(num(shop.pityS, 0));
     save.shop.pitySS = Math.floor(num(shop.pitySS, 0));
+
+    var daily = raw.daily || {};
+    save.daily.last = typeof daily.last === "string" ? daily.last : "";
+    save.daily.streak = Math.floor(num(daily.streak, 0, 0, PS.DAILY.length));
+    var endless = raw.endless || {};
+    save.endless.best = num(endless.best, 0, 0, 1e7);
+    save.endless.ch = Math.floor(num(endless.ch, 0, 0, PS.BAL.CHAPTERS));
+    save.endless.kills = Math.floor(num(endless.kills, 0, 0, 1e9));
 
     PS.QUESTS.forEach(function (quest) {
       var claimed = Math.floor(num(raw.quests ? raw.quests[quest.id] : 0, 0, 0, quest.tiers.length));
@@ -725,7 +735,8 @@
   /* ---------------------------------------------------------------- loot */
 
   function rollRarity(mu, rnd) {
-    return PS.weighted([0, 1, 2, 3, 4, 5], PS.rarityWeights(mu), rnd ? rnd() : undefined);
+    var weights = PS.rarityWeights(mu);
+    return PS.weighted(weights.map(function (w, r) { return r; }), weights, rnd ? rnd() : undefined);
   }
 
   /** Pick an item. opts: s / ss (grade chances), grade and slot (forced),
@@ -810,6 +821,7 @@
     S.stats.kills += result.kills || 0;
     S.stats.time += result.time || 0;
     if ((result.level || 0) > S.stats.bestLevel) S.stats.bestLevel = result.level;
+    if ((result.combo || 0) > S.stats.bestCombo) S.stats.bestCombo = result.combo;
 
     var items = rolls.map(function (roll) { return add(roll.id, roll.r); });
 
@@ -837,10 +849,10 @@
     };
   }
 
-  /* Swarm mode (the dev menu's endless battle) pays gold only: 1.2 times what a
-     normal chapter run pays, in proportion to how long you lasted (lasting a
-     chapter's length earns 1.2 chapter-clears), and the coins you picked up. */
-  var SWARM_PAY = 120;
+  /* Endless swarm pays gold only: 3 times what a normal chapter run pays, in
+     proportion to how long you lasted (lasting a chapter's length earns 3
+     chapter-clears), and the coins you picked up. */
+  var SWARM_PAY = 3;
 
   /** Gold for selling an item: its rarity's price plus its grade's price. */
   function sellValue(item) {
@@ -859,14 +871,33 @@
     return value;
   }
 
-  function paySwarm(chapter, time, coins) {
+  /** Pay out an endless swarm and keep its record. `extra`: { kills, combo }. */
+  function paySwarm(chapter, time, coins, extra) {
+    extra = extra || {};
     var ch = PS.chapter(chapter);
     var base = ch.gold * Math.max(0, time) / ch.duration + (coins || 0);
     var gold = Math.round(base * SWARM_PAY * (1 + calc().gold));
     S.gold += gold;
     S.stats.earned += gold;
+    if ((extra.combo || 0) > S.stats.bestCombo) S.stats.bestCombo = extra.combo;
+    if (time > S.endless.best) {
+      S.endless.best = time;
+      S.endless.ch = chapter;
+      S.endless.kills = extra.kills || 0;
+    }
     commit();
     return gold;
+  }
+
+  /** Endless swarm: open, and how tough its pests are (the furthest chapter cleared). */
+  function endlessInfo() {
+    return {
+      open: S.best >= PS.ENDLESS.from,
+      chapter: Math.max(1, Math.min(PS.BAL.CHAPTERS, S.best)),
+      best: S.endless.best,
+      bestCh: S.endless.ch,
+      bestKills: S.endless.kills
+    };
   }
 
   /* ---------------------------------------------------------------- shop */
@@ -979,10 +1010,58 @@
     return { gold: gold, gems: PS.GIFT.gems, items: [item] };
   }
 
-  function today() {
-    var d = new Date();
+  /** The local calendar day as "2026-10-17"; `offset` days from today. */
+  function today(offset) {
+    var now = new Date();
+    var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (offset || 0));
     function two(n) { return (n < 10 ? "0" : "") + n; }
     return d.getFullYear() + "-" + two(d.getMonth() + 1) + "-" + two(d.getDate());
+  }
+
+  /* -------------------------------------------------------- daily rewards */
+
+  /** { ready, day (1 to 7: the one to claim now, or the one claimed today),
+   *  rewards: [{ gold, gems, chest, count }] with gold worked out }. */
+  function dailyInfo() {
+    var day;
+    var ready;
+    if (S.daily.last === today()) {
+      ready = false;
+      day = S.daily.streak || 1;
+    } else {
+      ready = true;
+      day = S.daily.last === today(-1) ? (S.daily.streak % PS.DAILY.length) + 1 : 1;
+    }
+    var goldBase = PS.BAL.gold(frontier());
+    return {
+      ready: ready,
+      day: day,
+      rewards: PS.DAILY.map(function (r) {
+        return { gold: r.gold ? Math.round(goldBase * r.gold) : 0, gems: r.gems || 0, chest: r.chest || null, count: r.count || 0 };
+      })
+    };
+  }
+
+  /** Claim today's reward. Returns { day, gold, gems, items, shards } or null. */
+  function claimDaily() {
+    var info = dailyInfo();
+    if (!info.ready) return null;
+    var reward = info.rewards[info.day - 1];
+    S.gold += reward.gold;
+    S.gems += reward.gems;
+    S.stats.earned += reward.gold;
+    S.daily.last = today();
+    S.daily.streak = info.day;
+    var items = [];
+    var shards = 0;
+    if (reward.chest) {
+      // openChest saves, so the streak above goes in with it
+      items = openChest(reward.chest, reward.count, true) || [];
+      shards = items.shards || 0;
+    } else {
+      commit();
+    }
+    return { day: info.day, gold: reward.gold, gems: reward.gems, items: items, shards: shards };
   }
 
   /** Today's four offers. They are worked out from the date, so they stay
@@ -1172,7 +1251,7 @@
   /** Which tabs have something waiting. */
   function badges() {
     return {
-      shop: giftWait() === 0,
+      shop: giftWait() === 0 || dailyInfo().ready,
       gear: forgeAvailable() || S.items.some(function (item) { return item.n; }),
       quests: quests().some(function (quest) { return quest.ready; }),
       talents: ascendInfo().can
@@ -1249,6 +1328,9 @@
     quests: quests,
     claimQuest: claimQuest,
     paySwarm: paySwarm,
+    endlessInfo: endlessInfo,
+    dailyInfo: dailyInfo,
+    claimDaily: claimDaily,
     sellValue: sellValue,
     sell: sell,
     badges: badges,

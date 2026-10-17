@@ -918,8 +918,48 @@
     };
   });
 
+  /* Behind each shot: a fading streak the way it came and, on high quality, a
+     soft glow, both added as light so they brighten the dark floor. */
+  function shotTrail(ctx, s) {
+    var v = Math.sqrt(s.vx * s.vx + s.vy * s.vy);
+    if (v < 80 || s.age < 0.02) return;
+    var nx = s.vx / v;
+    var ny = s.vy / v;
+    var len = Math.min(52, v * 0.075, s.age * v) * (s.sprite === "rang" ? 0.6 : 1);
+    var color = s.sprite === "shard" ? VOID : s.color;
+    var tx = s.x - nx * len;
+    var ty = s.y - ny * len;
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineCap = "round";
+    if (B.quality >= 2) {
+      var g = ctx.createLinearGradient(tx, ty, s.x, s.y);
+      g.addColorStop(0, B.rgba(color, 0));
+      g.addColorStop(1, B.rgba(color, 0.7));
+      ctx.strokeStyle = g;
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = 0.35;
+    }
+    ctx.lineWidth = Math.max(2, Math.min(9, s.r * 1.2));
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(s.x, s.y);
+    ctx.stroke();
+    if (B.quality >= 2 && s.r < 30) {
+      ctx.globalAlpha = 0.13;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, Math.min(s.r * 1.7 + 3, 16), 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+  }
+
   B.drawShot = function (ctx, s) {
     var angle;
+    if (B.quality >= 1 && s.sprite !== "void" && s.sprite !== "wave") shotTrail(ctx, s);
     switch (s.sprite) {
       case "arrow":
         angle = Math.atan2(s.vy, s.vx);

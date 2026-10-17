@@ -34,12 +34,29 @@
   var fpsFrames = 0;
   var fpsSince = 0;
   var SPARK_CAP = [70, 150, 260];
+  B.quality = 2;
+
+  /* the colour of each weapon's muzzle flash; anything not listed flashes lemon */
+  var FLASH = {
+    frost: "#9BDCFF", storm: "#8EC5FF", ember: "#FF8A3D", eclipse: "#B48CFF", solstice: "#FFD166",
+    comet: "#FFB84A", nova: "#FFE66D", geyser: "#7FE3F0", flask: "#9BE08A", fangs: "#E5484D",
+    thornlash: "#8FAE65", hive: "#F2B93B", staff: "#C9A6FF"
+  };
+
+  /** "#rrggbb" and an opacity as an rgba() string, for gradients that fade out. */
+  function rgba(hex, a) {
+    if (typeof hex !== "string" || hex.charAt(0) !== "#" || hex.length !== 7) return "rgba(255,230,109," + a + ")";
+    var n = parseInt(hex.slice(1), 16);
+    return "rgba(" + (n >> 16) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
+  }
+  B.rgba = rgba;
   var SPARK_SCALE = [0.35, 0.7, 1];
   var TEXT_CAP = [10, 24, 40];
   var DPR_CAP = [1, 1.5, 2];
 
   function applyPrefs() {
     gfx = PS.prefs.get("quality");
+    B.quality = gfx; // weapons.js reads it to decide on trails and glow
     var cap = PS.prefs.get("fps");
     frameGap = cap ? 1000 / cap : 0;
     if (fpsEl) {
@@ -111,7 +128,7 @@
       t: 0, dur: ch.duration, phase: "swarm", over: 0, done: false,
       p: p,
       enemies: [], shots: [], zones: [], ebullets: [], drops: [], sparks: [], texts: [], fx: [], timers: [],
-      kills: 0, coins: 0, dealt: 0, coinValue: Math.max(1, Math.round(ch.gold * 0.005)),
+      kills: 0, combo: 0, comboT: 0, bestCombo: 0, coins: 0, dealt: 0, coinValue: Math.max(1, Math.round(ch.gold * 0.005)),
       spawnIn: 0.6,
       elites: [ch.duration * 0.35, ch.duration * 0.7],
       hordes: [ch.duration * 0.25, ch.duration * 0.5, ch.duration * 0.75],
@@ -249,6 +266,10 @@
     }
     R.t += dt;
     R.procs = 0;
+    if (R.comboT > 0) {
+      R.comboT -= dt;
+      if (R.comboT <= 0) R.combo = 0;
+    }
     R.src = R.weaponId;
     updatePlayer(dt);
     if (B.petUpdate) B.petUpdate(dt);
@@ -441,10 +462,16 @@
     var p = R.p;
     p.aim = Math.atan2(target.y - p.y, target.x - p.x);
     p.shots++;
-    PS.sfx.play("shoot");
+    PS.sfx.play("shoot", R.weaponId);
     p.swing = 0.2;
     var empowered = p.fx.emp > 0 && p.shots % p.fx.emp === 0;
     R.weapon.attack(p.aim, target, empowered, 1);
+    if (gfx >= 1 && R.fx.length < 180) {
+      R.fx.push({
+        type: "flash", x: p.x + Math.cos(p.aim) * 20, y: p.y + Math.sin(p.aim) * 20, angle: p.aim,
+        color: FLASH[R.weaponId] || "#FFE66D", big: empowered, t: 0, dur: empowered ? 0.16 : 0.1
+      });
+    }
     if (p.fx.echo) {
       B.later(0.16, function () {
         var again = pickTarget();
@@ -562,6 +589,7 @@
     if (!R || R.paused || R.done || R.phase === "won" || R.phase === "lost") return;
     R.paused = true;
     stick.on = false;
+    PS.music.duck(true);
     B.hud.paused(R);
   };
 
@@ -569,6 +597,7 @@
     if (!R || !R.paused) return;
     R.paused = false;
     last = performance.now();
+    PS.music.duck(false);
     B.hud.paused(R);
   };
 
@@ -576,6 +605,7 @@
   B.giveUp = function () {
     if (!R || R.done) return;
     R.paused = false;
+    PS.music.duck(false);
     R.choices = null;
     B.hud.paused(R);
     B.hud.choices(R);
@@ -589,10 +619,12 @@
     R.done = true;
     var result;
     if (R.mode === "swarm") {
-      // a sandbox run: gold only, no gear, no progress, no records
+      // endless: gold and the endless record only, no gear or progress
+      var before = PS.state.get().endless.best;
       result = {
         swarm: true, chapter: R.ch.n, won: false, time: R.t, kills: R.kills, level: R.p.level, items: [], gems: 0, unlocked: 0,
-        gold: PS.state.paySwarm(R.ch.n, R.t, R.coins)
+        gold: PS.state.paySwarm(R.ch.n, R.t, R.coins, { kills: R.kills, combo: R.bestCombo }),
+        best: Math.max(before, R.t), newBest: R.t > before && R.t >= 10
       };
     } else {
       result = PS.state.finishRun({
@@ -602,10 +634,12 @@
         kills: R.kills,
         level: R.p.level,
         coins: R.coins,
-        boss: R.reachedBoss
+        boss: R.reachedBoss,
+        combo: R.bestCombo
       });
     }
     result.dealt = R.dealt;
+    result.combo = R.bestCombo;
     PS.emit("battle:end", result);
   }
 
@@ -707,6 +741,11 @@
     }
   }
 
+  /** Where a point is, left to right of the lemon, for placing its sound (-1 to 1). */
+  function panOf(x) {
+    return Math.max(-1, Math.min(1, (x - R.p.x) / (view.w / 2)));
+  }
+
   /** Damage one pest. Returns 0 if nothing happened, otherwise bit flags:
    *  1 hit · 2 critical · 4 killed.
    *  opts: dot (no crit, no number, no status) · knock + sx/sy (push away
@@ -721,6 +760,8 @@
     if (!dot && Math.random() < p.crit + p.mods.crit) {
       dmg *= p.critDmg + p.mods.critDmg;
       flags |= 2;
+      // a little star where a critical lands
+      if (gfx >= 1 && R.fx.length < 180) R.fx.push({ type: "crit", x: e.x, y: e.y - e.r * 0.3, spin: Math.random() * TAU, t: 0, dur: 0.2 });
     }
     if (e.shockT > 0) dmg *= 1 + e.shockAmp;
     if (fx.chillAmp && e.chillT > 0) dmg *= 1 + fx.chillAmp;
@@ -734,7 +775,7 @@
     R.dealt += dmg;
 
     if (!dot) {
-      PS.sfx.play("hit");
+      PS.sfx.play("hit", Boolean(flags & 2), panOf(e.x));
       e.flash = 0.09;
       applyStatus(e, fx);
       if (opts && opts.knock && !e.boss) {
@@ -764,7 +805,11 @@
     var fx = p.fx;
     e.dead = true;
     R.kills++;
-    PS.sfx.play("kill");
+    // squash pests within a couple of seconds of each other to build a combo
+    R.combo++;
+    R.comboT = 2.2;
+    if (R.combo > R.bestCombo) R.bestCombo = R.combo;
+    PS.sfx.play("kill", R.combo, panOf(e.x));
     dropLoot(e);
     burstSparks(e.x, e.y, e.fill, e.boss ? 40 : e.elite ? 14 : 5, e.boss ? 220 : 90);
 
@@ -844,7 +889,7 @@
     R.fx.push({ type: "blast", x: x, y: y, r: r, color: opts.color || "#FFE66D", t: 0, dur: 0.3 });
     if (!opts.quiet) {
       R.shake = Math.max(R.shake, Math.min(7, r / 28));
-      PS.sfx.play("boom");
+      PS.sfx.play("boom", null, panOf(x));
     }
     return count;
   };
@@ -912,7 +957,7 @@
       power *= 0.88;
       target = B.nearest(target.x, target.y, range, seen);
     }
-    if (points.length > 2) PS.sfx.play("zap");
+    if (points.length > 2) PS.sfx.play("zap", null, panOf(points[points.length - 2]));
     if (points.length > 2) R.fx.push({ type: "bolt", pts: points, t: 0, dur: 0.22, seed: Math.random() * 1000 });
     return seen;
   };
@@ -1646,6 +1691,22 @@
         ctx.beginPath();
         ctx.arc(f.x, f.y, f.r * (0.7 + 0.3 * k), 0, TAU);
         ctx.stroke();
+        if (gfx >= 1) {
+          ctx.globalCompositeOperation = "lighter";
+          if (k < 0.4) {
+            ctx.globalAlpha = 0.7 * (1 - k / 0.4);
+            ctx.fillStyle = "#FFF6D0";
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, f.r * 0.35 * (0.6 + k), 0, TAU);
+            ctx.fill();
+          }
+          ctx.globalAlpha = 0.35 * (1 - k);
+          ctx.lineWidth = 10;
+          ctx.beginPath();
+          ctx.arc(f.x, f.y, f.r * (0.7 + 0.3 * k), 0, TAU);
+          ctx.stroke();
+          ctx.globalCompositeOperation = "source-over";
+        }
       } else if (f.type === "arc") {
         ctx.globalAlpha = 0.75 * (1 - k);
         ctx.strokeStyle = f.color;
@@ -1660,6 +1721,18 @@
           ctx.arc(p.x, p.y, f.r * 0.86, from, from + f.half * 2 * Math.min(1, k * 2.2 + 0.25));
         }
         ctx.stroke();
+        if (gfx >= 1) {
+          // a soft glow under the swing and a thin white-hot edge on it
+          ctx.globalCompositeOperation = "lighter";
+          ctx.globalAlpha = 0.3 * (1 - k);
+          ctx.lineWidth = 22 * (1 - k) + 4;
+          ctx.stroke();
+          ctx.globalAlpha = 0.85 * (1 - k);
+          ctx.strokeStyle = "#FFFDF0";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.globalCompositeOperation = "source-over";
+        }
         ctx.globalAlpha = 0.16 * (1 - k);
         ctx.fillStyle = f.color;
         ctx.beginPath();
@@ -1677,13 +1750,26 @@
         ctx.moveTo(p.x + Math.cos(f.angle) * 14, p.y + Math.sin(f.angle) * 14);
         ctx.lineTo(p.x + Math.cos(f.angle) * reach, p.y + Math.sin(f.angle) * reach);
         ctx.stroke();
+        if (gfx >= 1) {
+          ctx.globalCompositeOperation = "lighter";
+          ctx.globalAlpha = 0.3 * (1 - k);
+          ctx.lineWidth = Math.max(6, f.width * (1 - k));
+          ctx.stroke();
+          ctx.globalAlpha = 0.9 * (1 - k);
+          ctx.strokeStyle = "#FFFDF0";
+          ctx.lineWidth = 1.6;
+          ctx.stroke();
+          ctx.globalCompositeOperation = "source-over";
+        }
       } else if (f.type === "bolt") {
         ctx.globalAlpha = 1 - k;
         ctx.lineJoin = "round";
         ctx.lineCap = "round";
-        for (var pass = 0; pass < 2; pass++) {
-          ctx.strokeStyle = pass ? "#FFFDF0" : "#8EC5FF";
-          ctx.lineWidth = pass ? 1.6 : 5;
+        for (var pass = gfx >= 1 ? -1 : 0; pass < 2; pass++) {
+          ctx.globalCompositeOperation = pass < 0 ? "lighter" : "source-over";
+          ctx.globalAlpha = pass < 0 ? 0.35 * (1 - k) : 1 - k;
+          ctx.strokeStyle = pass > 0 ? "#FFFDF0" : "#8EC5FF";
+          ctx.lineWidth = pass > 0 ? 1.6 : pass < 0 ? 14 : 5;
           ctx.beginPath();
           ctx.moveTo(f.pts[0], f.pts[1]);
           for (var q = 2; q < f.pts.length; q += 2) {
@@ -1704,6 +1790,7 @@
           }
           ctx.stroke();
         }
+        ctx.globalCompositeOperation = "source-over";
       } else if (f.type === "ring") {
         ctx.globalAlpha = 0.8 * (1 - k);
         ctx.strokeStyle = f.color;
@@ -1711,6 +1798,46 @@
         ctx.beginPath();
         ctx.arc(f.x, f.y, f.r0 + (f.r1 - f.r0) * k, 0, TAU);
         ctx.stroke();
+      } else if (f.type === "flash") {
+        // a short star of light where the weapon goes off
+        var size = (f.big ? 22 : 13) * (1 - k * 0.5);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 0.9 * (1 - k);
+        var glow = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, size * 1.6);
+        glow.addColorStop(0, "rgba(255,253,240,0.95)");
+        glow.addColorStop(0.35, rgba(f.color, 0.75));
+        glow.addColorStop(1, rgba(f.color, 0));
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, size * 1.6, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = rgba(f.color, 0.9);
+        ctx.lineWidth = 2;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        for (var ray = -1; ray <= 1; ray++) {
+          var ra = f.angle + ray * 0.5;
+          ctx.moveTo(f.x + Math.cos(ra) * size * 0.4, f.y + Math.sin(ra) * size * 0.4);
+          ctx.lineTo(f.x + Math.cos(ra) * size * (ray ? 1.2 : 1.9), f.y + Math.sin(ra) * size * (ray ? 1.2 : 1.9));
+        }
+        ctx.stroke();
+        ctx.globalCompositeOperation = "source-over";
+      } else if (f.type === "crit") {
+        // a four-pointed gold star that pops and spins
+        var cs = 5 + 13 * Math.sin(Math.min(1, k * 1.6) * Math.PI * 0.5);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 1 - k;
+        ctx.fillStyle = "#FFE66D";
+        ctx.beginPath();
+        for (var pt = 0; pt < 8; pt++) {
+          var pa = f.spin + k * 2 + (pt / 8) * TAU;
+          var pr = pt % 2 ? cs * 0.28 : cs;
+          if (pt) ctx.lineTo(f.x + Math.cos(pa) * pr, f.y + Math.sin(pa) * pr);
+          else ctx.moveTo(f.x + Math.cos(pa) * pr, f.y + Math.sin(pa) * pr);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalCompositeOperation = "source-over";
       } else if (f.type === "lob") {
         // something thrown in an arc from one spot to another
         var lx = f.x0 + (f.x1 - f.x0) * k;
@@ -1793,12 +1920,15 @@
     }
     var ox = view.w / 2 - p.x + shakeX;
     var oy = view.h / 2 - p.y + shakeY;
-    drawFloor(ox, oy);
+    // each zone's own ground (arena.js); low quality keeps the plain dotted floor
+    if (gfx >= 1 && B.drawArena) B.drawArena(ctx, R, ox, oy);
+    else drawFloor(ox, oy);
 
     ctx.save();
     ctx.translate(ox, oy);
     drawZones();
     drawDrops();
+    if (gfx >= 1 && B.drawShadows) B.drawShadows(ctx, R);
 
     var halfW = view.w / 2 + 70;
     var halfH = view.h / 2 + 70;
@@ -1829,12 +1959,21 @@
     if (B.petDraw) B.petDraw(ctx, R);
     drawFx();
 
+    if (gfx >= 1) ctx.globalCompositeOperation = "lighter";
     for (i = 0; i < R.sparks.length; i++) {
       var spark = R.sparks[i];
-      ctx.globalAlpha = Math.max(0, spark.life / spark.max);
+      var life = Math.max(0, spark.life / spark.max);
+      ctx.globalAlpha = life;
       ctx.fillStyle = spark.fill;
-      ctx.fillRect(spark.x - 2, spark.y - 2, 4, 4);
+      if (gfx >= 1) {
+        ctx.beginPath();
+        ctx.arc(spark.x, spark.y, 0.8 + 2.4 * life, 0, TAU);
+        ctx.fill();
+      } else {
+        ctx.fillRect(spark.x - 2, spark.y - 2, 4, 4);
+      }
     }
+    ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = 1;
 
     ctx.textAlign = "center";
@@ -1852,8 +1991,28 @@
     ctx.globalAlpha = 1;
     ctx.restore();
 
+    // motes, the lemon's light and the dark screen edge go over the world
+    if (gfx >= 1 && B.drawAtmosphere) B.drawAtmosphere(ctx, R, ox, oy);
     drawPointers();
     drawStick();
+    drawDanger();
+  }
+
+  /** Red edges when health is low, stronger the lower it gets (a slow pulse
+   *  unless motion is turned down). */
+  function drawDanger() {
+    var p = R.p;
+    var left = Math.max(0, p.hp) / p.maxHp;
+    if (left >= 0.3 || R.phase === "won") return;
+    var k = Math.min(1, (0.3 - left) / 0.3 + 0.25);
+    var pulse = calm ? 1 : 0.78 + 0.22 * Math.sin(R.t * 6);
+    var cx = view.w / 2;
+    var cy = view.h / 2;
+    var g = ctx.createRadialGradient(cx, cy, Math.min(view.w, view.h) * 0.32, cx, cy, Math.max(view.w, view.h) * 0.72);
+    g.addColorStop(0, "rgba(229,72,77,0)");
+    g.addColorStop(1, "rgba(229,72,77," + (0.5 * k * pulse).toFixed(3) + ")");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, view.w, view.h);
   }
   B.draw = draw;
 

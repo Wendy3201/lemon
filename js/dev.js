@@ -310,7 +310,7 @@
           action("time", "+120 s", ' data-value="120"') +
           action("coins", "+1,000 coins", ' data-value="1000"')
         ) +
-        label("Boss", boss ? PS.esc(R.boss.name) + " · " + pct(R.boss.hp / R.boss.maxHp) + " health" : "not here") +
+        label(liveBosses(R).length > 1 ? "Bosses" : "Boss", boss ? liveBosses(R).map(function (b) { return PS.esc(b.name) + " · " + pct(b.hp / b.maxHp); }).join(", ") : "not here") +
         row(
           action("boss-hp", "Down to 50%", ' data-value="0.5"', boss ? "" : " disabled") +
           action("boss-hp", "Down to 10%", ' data-value="0.1"', boss ? "" : " disabled") +
@@ -458,6 +458,11 @@
     if (build.maxAll) maxUpgrades(R);
     if (build.levels > 0) autoLevels(R, Math.min(200, Math.round(build.levels)));
   };
+
+  /** Every boss still standing (late chapters have two). */
+  function liveBosses(R) {
+    return (R.bosses || (R.boss ? [R.boss] : [])).filter(function (b) { return !b.dead; });
+  }
 
   function eachPest(R, fn) {
     var count = 0;
@@ -804,13 +809,16 @@
       return "Clock at " + PS.clock(R.t);
     },
     "boss-hp": function (R, node) {
-      if (!R.boss || R.boss.dead) return;
+      var all = liveBosses(R);
+      if (!all.length) return;
       var f = Number(node.getAttribute("data-value"));
-      R.boss.hp = f >= 1 ? R.boss.maxHp : Math.min(R.boss.hp, R.boss.maxHp * f);
-      return f >= 1 ? "The boss is back to full health" : "The boss is down to " + pct(R.boss.hp / R.boss.maxHp);
+      all.forEach(function (b) { b.hp = f >= 1 ? b.maxHp : Math.min(b.hp, b.maxHp * f); });
+      var who = all.length > 1 ? "Both bosses are" : "The boss is";
+      return f >= 1 ? who + " back to full health" : who + " down to " + pct(f);
     },
     "boss-dead": function (R) {
-      if (R.boss && !R.boss.dead) B.hit(R.boss, R.boss.hp + 1, { dot: true });
+      // every boss on the field, so the chapter is won
+      liveBosses(R).forEach(function (b) { if (!b.dead) B.hit(b, b.hp + 1, { dot: true }); });
     },
     restart: function (R) {
       var chapter = R.ch.n;

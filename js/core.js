@@ -205,11 +205,11 @@
      no limit or 30 / 60). `volume` is the old three-step volume: it is only read
      to carry an earlier choice over to `vol`. */
   var PREFS = {
-    volume: 1, vol: 55, quality: 2, fps: 0,
+    volume: 1, vol: 55, quality: 2, fps: 0, musicVol: 45, music: true,
     shake: true, numbers: true, autopause: true,
     combatSfx: true, menuSfx: true, showFps: false, blur: true
   };
-  var RANGES = { vol: [0, 100], quality: [0, 2], fps: [0, 60] };
+  var RANGES = { vol: [0, 100], musicVol: [0, 100], quality: [0, 2], fps: [0, 60] };
 
   PS.VOLUMES = [{ name: "Low", gain: 0.25 }, { name: "Medium", gain: 0.5 }, { name: "High", gain: 0.85 }];
   /* what each old volume step becomes on the 0 to 100 scale */
