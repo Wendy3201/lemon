@@ -1854,6 +1854,8 @@
 
   function startBattle(chapter, mode) {
     closeModal();
+    var pad = document.querySelector(".codepad"); // the admin key pad must not follow you into a battle
+    if (pad) pad.hidden = true;
     view.results = null;
     el.results.hidden = true;
     el.app.hidden = true;
@@ -2773,8 +2775,10 @@
         if (!el.app.hidden) render();
       });
 
-      // Step one of the hidden admin door: click the lemon logo twice. That
-      // arms the key code below for a minute; without it the code does nothing.
+      // Step one of the hidden admin door: click (or tap) the lemon logo twice.
+      // That arms the key code below for a minute; without it the code does
+      // nothing. On a phone there is no keyboard, so arming also brings up a
+      // small pad with the same keys to tap.
       var logoClicks = [];
       var mark = $(".brand__mark");
       if (mark) {
@@ -2785,6 +2789,7 @@
           if (logoClicks.length >= 2) {
             logoClicks = [];
             logoArmedUntil = now + 60000;
+            if (!PS.dev.admin && coarsePointer()) showCodePad();
           }
         });
       }
@@ -2792,10 +2797,10 @@
       // up, up, down, down, left, right, left, right, then B and A (either way round)
       var CODE = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright"];
       var typed = [];
-      document.addEventListener("keydown", function (e) {
-        var tag = e.target && e.target.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.app.hidden || !e.key) return;
-        typed.push(e.key.toLowerCase());
+
+      /** One key of the code, from the keyboard or from the on-screen pad. */
+      function feedCode(key) {
+        typed.push(key);
         if (typed.length > 10) typed.shift();
         if (typed.length < 10) return;
         var head = typed.slice(0, 8).join(",") === CODE.join(",");
@@ -2803,16 +2808,66 @@
         if (head && (tail === "ba" || tail === "ab")) {
           typed = [];
           if (PS.dev.admin) {
+            hideCodePad();
             openModal({ type: "secret", open: true, admin: true, wrong: false });
           } else if (logoArmedUntil > Date.now()) {
             // the logo was double-clicked first; now the password is asked for
             logoArmedUntil = 0;
+            hideCodePad();
             openModal({ type: "secret", open: false, admin: true, wrong: false });
             var box = $("#secret-input");
             if (box) box.focus();
           }
         }
+      }
+
+      document.addEventListener("keydown", function (e) {
+        var tag = e.target && e.target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.app.hidden || !e.key) return;
+        feedCode(e.key.toLowerCase());
       });
+
+      var padEl = null;
+      var padTimer = 0;
+      function coarsePointer() {
+        return Boolean(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+      }
+      function hideCodePad() {
+        clearTimeout(padTimer);
+        if (padEl) padEl.hidden = true;
+      }
+      function showCodePad() {
+        if (!padEl) {
+          padEl = document.createElement("div");
+          padEl.className = "codepad";
+          padEl.setAttribute("role", "group");
+          padEl.setAttribute("aria-label", "Key code");
+          padEl.innerHTML =
+            '<button type="button" class="codepad__key codepad__key--up" data-code="arrowup" aria-label="Up">&#9650;</button>' +
+            '<button type="button" class="codepad__key codepad__key--left" data-code="arrowleft" aria-label="Left">&#9664;</button>' +
+            '<button type="button" class="codepad__key codepad__key--down" data-code="arrowdown" aria-label="Down">&#9660;</button>' +
+            '<button type="button" class="codepad__key codepad__key--right" data-code="arrowright" aria-label="Right">&#9654;</button>' +
+            '<button type="button" class="codepad__key codepad__key--b" data-code="b">B</button>' +
+            '<button type="button" class="codepad__key codepad__key--a" data-code="a">A</button>' +
+            '<button type="button" class="codepad__close" data-code="close" aria-label="Close the pad">&times;</button>';
+          padEl.addEventListener("click", function (e) {
+            var key = e.target.closest("[data-code]");
+            if (!key) return;
+            var code = key.getAttribute("data-code");
+            if (code === "close") {
+              hideCodePad();
+              typed = [];
+            } else {
+              feedCode(code);
+            }
+          });
+          document.body.appendChild(padEl);
+        }
+        typed = [];
+        padEl.hidden = false;
+        clearTimeout(padTimer);
+        padTimer = setTimeout(hideCodePad, 60000); // as long as the logo stays armed
+      }
       PS.on("battle:end", showResults);
 
       render();

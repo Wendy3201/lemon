@@ -5181,3 +5181,59 @@ body::before {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
+
+/* ------------------------------------------- the admin key pad (phones only) */
+
+.codepad {
+  position: fixed;
+  right: 14px;
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(5, 44px);
+  grid-template-rows: repeat(2, 44px);
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 26px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow);
+}
+
+.codepad__key,
+.codepad__close {
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--card-top), var(--card-bottom));
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.codepad__key:active {
+  transform: scale(0.94);
+}
+
+.codepad__key--up { grid-column: 2; grid-row: 1; }
+.codepad__key--left { grid-column: 1; grid-row: 2; }
+.codepad__key--down { grid-column: 2; grid-row: 2; }
+.codepad__key--right { grid-column: 3; grid-row: 2; }
+.codepad__key--b { grid-column: 4; grid-row: 2; }
+.codepad__key--a { grid-column: 5; grid-row: 2; }
+
+.codepad__close {
+  grid-column: 5;
+  grid-row: 1;
+  width: 30px;
+  height: 30px;
+  align-self: start;
+  justify-self: end;
+  font-size: 18px;
+  line-height: 1;
+}
