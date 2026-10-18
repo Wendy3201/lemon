@@ -5792,3 +5792,193 @@ body::before {
     animation: none !important;
   }
 }
+
+/* ---------------------------------------------- power-ups running (HUD) */
+
+.hud__buffs {
+  position: absolute;
+  top: 116px;
+  right: clamp(10px, 2vw, 18px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.buff {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 12px;
+  border: 1px solid color-mix(in srgb, var(--c) 70%, transparent);
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--c) 30%, rgba(20, 18, 14, 0.75));
+  box-shadow: 0 0 14px -4px var(--c);
+  color: #fffcf2;
+  font-family: var(--font-display);
+  font-size: 14px;
+  animation: buffIn 0.3s var(--soft-ease, ease) both;
+}
+
+.buff i {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.buff.is-ending {
+  animation: buffBlink 0.35s steps(2, jump-none) infinite;
+}
+
+@keyframes buffIn {
+  from {
+    opacity: 0;
+    transform: translateX(16px) scale(0.9);
+  }
+}
+
+@keyframes buffBlink {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* ------------------------------------------------- the guide in Settings */
+
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.guide__part {
+  border: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+  border-radius: 18px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.guide__part summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.guide__part summary::-webkit-details-marker {
+  display: none;
+}
+
+.guide__part summary .ico {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
+.guide__part summary::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  margin-left: auto;
+  border-right: 2.5px solid var(--ink-faint);
+  border-bottom: 2.5px solid var(--ink-faint);
+  transform: rotate(45deg) translateY(-3px);
+  transition: transform 0.25s var(--soft-ease, ease);
+}
+
+.guide__part[open] summary::after {
+  transform: rotate(225deg) translateY(-2px);
+}
+
+.guide__part[open] summary {
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+}
+
+.guide__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 14px;
+  color: var(--ink-soft);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.guide__body b {
+  color: var(--ink);
+}
+
+.guide__body p {
+  margin: 0;
+}
+
+.guide__sub {
+  color: var(--ink) !important;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.guide__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guide__list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.guide__badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 14px -2px var(--c);
+  color: #fffcf2;
+}
+
+.guide__badge .ico {
+  width: 18px;
+  height: 18px;
+}
+
+.guide__boss {
+  align-items: flex-start !important;
+}
+
+.guide__art {
+  flex: none;
+  width: 48px;
+  height: 48px;
+}
+
+.guide__art svg {
+  width: 48px;
+  height: 48px;
+}
+
+.guide__boss small {
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+/* the Battle screen's "New here? How to play" */
+.home__guide {
+  margin: 4px auto 0;
+}

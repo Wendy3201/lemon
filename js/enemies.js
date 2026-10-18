@@ -23,14 +23,21 @@
     splitter: { r: 17, hp: 52, speed: 50, hurt: 30, xp: 3, mass: 1.6, fill: "#6FC2B0", split: 3 },
     mini: { r: 8, hp: 8, speed: 98, hurt: 16, xp: 1, mass: 0.5, fill: "#8AD9C8" },
     charger: { r: 15, hp: 58, speed: 66, hurt: 34, xp: 4, mass: 2, fill: "#D9685A", ai: "charger" },
-    bomber: { r: 11, hp: 18, speed: 100, hurt: 0, xp: 2, mass: 0.8, fill: "#E0C341", ai: "bomber" }
+    bomber: { r: 11, hp: 18, speed: 100, hurt: 0, xp: 2, mass: 0.8, fill: "#E0C341", ai: "bomber" },
+    // not a pest: a breakable crate (events.js), here so it can use B.spawn
+    crate: { r: 15, hp: 1, speed: 0, hurt: 0, xp: 0, mass: 1e6, fill: "#A0703F" }
   });
 
   var BOSSES = {
     queen: { r: 46, hp: 1, speed: 44, fill: "#7FB069" },
     hornet: { r: 38, hp: 0.85, speed: 78, fill: "#E0A93B" },
     slug: { r: 50, hp: 1.25, speed: 34, fill: "#9C8AC2" },
-    mould: { r: 48, hp: 1.1, speed: 26, fill: "#6FA8A0" }
+    mould: { r: 48, hp: 1.1, speed: 26, fill: "#6FA8A0" },
+    beetle: { r: 50, hp: 1.15, speed: 40, fill: "#7A6A4F" },
+    spider: { r: 40, hp: 1, speed: 64, fill: "#5B4A6E" },
+    worm: { r: 40, hp: 1.05, speed: 66, fill: "#B9845A" },
+    moth: { r: 38, hp: 0.9, speed: 58, fill: "#C9BEA6" },
+    fly: { r: 34, hp: 0.85, speed: 84, fill: "#4A5A3A" }
   };
 
   function blank(kind, x, y) {
@@ -227,9 +234,11 @@
       e.hp = e.maxHp = 2250 * R.ch.bossScale * Math.pow(R.dur / 180, 1.3) * kind.hp * share;
       e.speed = kind.speed;
       e.hurt = 44 * R.ch.dmgScale;
+      e.baseHurt = e.hurt; // some bosses stop hurting on touch while in the air or underground
       e.mass = 1e6;
       e.clock = 2.5 + index * 1.3; // out of step, so they do not attack in unison
       e.clock2 = 4 + index * 1.7;
+      e.clock3 = 1.4 + index * 0.9; // a moment's grace before the aimed attacks start
       e.spin = 0;
       e.dashes = 0;
       e.age = 0;
@@ -280,6 +289,13 @@
 
     if (e.boss) {
       bossThink(e, dt, nx, ny, d, slow, scale);
+      return;
+    }
+
+    if (e.golden) {
+      // runs from the lemon, zig-zagging
+      var zig = Math.sin(R.t * 3.2 + e.wob) * 0.7;
+      walk(e, -nx - ny * zig, -ny + nx * zig, e.speed * 0.8 * slow * dt);
       return;
     }
 
@@ -349,16 +365,42 @@
     }
   };
 
+  /** The angle to shoot from (x, y) so a shot at `speed` meets the lemon where
+   *  it is heading. `share` is how much of its movement to allow for: 1 is a
+   *  perfect lead, 0 aims at where it is now. Bosses use part of a lead, so
+   *  running in a straight line no longer dodges everything, but a turn does. */
+  function aimAt(x, y, speed, share, delay) {
+    var p = B.run.p;
+    var dx = p.x - x;
+    var dy = p.y - y;
+    // `delay`: time before the attack even sets off (a dash's wind-up)
+    var time = Math.sqrt(dx * dx + dy * dy) / speed + (delay || 0);
+    var tx = p.x + (p.vx || 0) * time * share;
+    var ty = p.y + (p.vy || 0) * time * share;
+    return Math.atan2(ty - y, tx - x);
+  }
+
+  /* Boss attacks. The damage of every hit is as it always was; what makes a
+     boss hard is how fast, how dense and how well aimed its attacks are.
+     Below half health (`rage`) everything comes round sooner. */
   function bossThink(e, dt, nx, ny, d, slow, scale) {
     var R = B.run;
     var p = R.p;
     var rage = e.hp < e.maxHp * 0.5 ? 0.72 : 1;
+    var angry = rage < 1;
     var i;
     var count;
     var angle;
     e.age += dt;
     e.clock -= dt;
     e.clock2 -= dt;
+    e.clock3 -= dt;
+    if (e.echoT > 0) e.echoT -= dt;
+
+    if (NEW_KINDS[e.kind]) {
+      NEW_KINDS[e.kind](e, dt, nx, ny, d, slow, scale, rage, angry);
+      return;
+    }
 
     if (e.kind === "queen") {
       walk(e, nx, ny, e.speed * slow * dt);
@@ -375,70 +417,108 @@
         R.fx.push({ type: "ring", x: e.x, y: e.y, r0: e.r, r1: e.r + 46, color: "#C8E6A0", t: 0, dur: 0.4 });
       }
       if (e.clock2 <= 0) {
-        e.clock2 = 3.6 * rage;
-        count = 10 + e.tier * 2;
-        angle = Math.random() * TAU;
-        for (i = 0; i < count; i++) enemyShot(e.x, e.y, angle + (i / count) * TAU, 125, 6, 14 * scale);
+        // two rings, the second a beat behind and turned half a gap, so the
+        // way through the first is blocked by the second: weave, do not just run
+        e.clock2 = 3 * rage;
+        e.ringCount = 14 + e.tier * 2;
+        e.ringAngle = Math.random() * TAU;
+        for (i = 0; i < e.ringCount; i++) enemyShot(e.x, e.y, e.ringAngle + (i / e.ringCount) * TAU, 150, 6, 14 * scale);
+        e.echoT = 0.42;
+      }
+      if (e.echoT !== undefined && e.echoT <= 0 && e.ringCount) {
+        for (i = 0; i < e.ringCount; i++) enemyShot(e.x, e.y, e.ringAngle + ((i + 0.5) / e.ringCount) * TAU, 150, 6, 14 * scale);
+        e.ringCount = 0;
+      }
+      if (e.clock3 <= 0) {
+        // between rings, a quick aimed spread
+        e.clock3 = 2.7 * (angry ? 0.85 : 1);
+        count = angry ? 4 : 3;
+        angle = aimAt(e.x, e.y, 230, 0.7);
+        for (i = 0; i < count; i++) enemyShot(e.x, e.y, angle + (i - (count - 1) / 2) * 0.13, 230, 6, 14 * scale);
       }
     } else if (e.kind === "hornet") {
       if (e.mode === 0) {
         walk(e, nx, ny, e.speed * slow * dt);
         if (e.clock <= 0) {
-          e.dashes = 2 + Math.floor(e.tier / 2);
-          windUp(e, nx, ny, 0.7 * rage);
+          e.dashes = 3 + Math.floor(e.tier / 2);
+          dashAt(e, 0.55 * (angry ? 0.88 : 1));
         }
       } else if (e.mode === 1) {
         if (e.clock <= 0) {
           e.mode = 2;
-          e.clock = 0.6;
+          e.clock = 0.55;
           e.struck = false;
         }
       } else if (e.mode === 2) {
-        walk(e, e.ax, e.ay, 540 * slow * dt);
+        walk(e, e.ax, e.ay, 600 * slow * dt);
         if (!e.struck && d < e.r + p.r) {
           e.struck = true;
           B.hurt(30 * scale);
         }
         if (e.clock <= 0) {
           if (--e.dashes > 0) {
-            windUp(e, nx, ny, 0.42 * rage);
+            dashAt(e, 0.36 * (angry ? 0.88 : 1));
           } else {
-            // worn out: fires a fan of stings, then hovers for a moment
+            // worn out: a fan of stings aimed where you are going, then a
+            // second fan when it is angry, then a short hover
             e.mode = 3;
-            e.clock = 1.6 * rage;
-            var base = Math.atan2(ny, nx);
-            count = 5 + e.tier;
-            for (i = 0; i < count; i++) enemyShot(e.x, e.y, base + (i - (count - 1) / 2) * 0.22, 190, 5, 14 * scale, "#F2B93B");
+            e.clock = 1.2 * rage;
+            stingFan(e, scale, 0);
+            if (angry) e.echoT = 0.28;
           }
         }
-      } else if (e.clock <= 0) {
-        e.mode = 0;
-        e.clock = 2.2 * rage;
+      } else {
+        if (e.echoT !== undefined && e.echoT <= 0 && e.echoT > -1) {
+          stingFan(e, scale, 2);
+          e.echoT = -2;
+        }
+        if (e.clock <= 0) {
+          e.mode = 0;
+          e.clock = 1.7 * rage;
+        }
       }
     } else if (e.kind === "slug") {
       walk(e, nx, ny, e.speed * slow * dt);
-      e.clock3 -= dt;
       if (e.clock3 <= 0) {
-        e.clock3 = 0.45;
+        // a thicker trail, so there is less safe ground behind it
+        e.clock3 = 0.34;
         B.addZone({ type: "puddle", x: e.x, y: e.y, r: 30, life: 6, dps: 22 * scale, slow: 0.35, color: "#8A77B8" });
       }
       if (e.clock <= 0) {
-        // lobs slime where you are standing: step out of the red circles
-        e.clock = 4.6 * rage;
-        count = 3 + e.tier;
-        for (i = 0; i < count; i++) lobSlime(e, p.x + (i ? PS.rand(-100, 100) : 0), p.y + (i ? PS.rand(-100, 100) : 0), scale);
+        // lobs slime: one where you will be, one where you are, the rest
+        // scattered around where you are heading. Step out of the red circles.
+        e.clock = 3.6 * rage;
+        count = 4 + e.tier;
+        var warn = 0.8;
+        var ahead = { x: p.x + (p.vx || 0) * warn * 0.85, y: p.y + (p.vy || 0) * warn * 0.85 };
+        for (i = 0; i < count; i++) {
+          if (i === 0) lobSlime(e, ahead.x, ahead.y, scale, warn);
+          else if (i === 1) lobSlime(e, p.x, p.y, scale, warn);
+          else lobSlime(e, ahead.x + PS.rand(-95, 95), ahead.y + PS.rand(-95, 95), scale, warn);
+        }
       }
     } else {
-      // mould: a slow spiral of spores, and now and then a litter of bombers
+      // mould: a faster spiral of spores (two, turning opposite ways, once it
+      // is angry), aimed bursts, and now and then a litter of bombers
       walk(e, nx, ny, e.speed * slow * dt);
-      e.spin += dt * (1.1 + 0.15 * e.tier);
+      e.spin += dt * (1.3 + 0.16 * e.tier);
       if (e.clock <= 0) {
         e.clock = 0.16 * rage;
         var arms = 2 + (e.tier >= 2 ? 1 : 0) + (e.tier >= 4 ? 1 : 0);
-        for (i = 0; i < arms; i++) enemyShot(e.x, e.y, e.spin + (i / arms) * TAU, 118, 5, 12 * scale, "#9BD1C6");
+        for (i = 0; i < arms; i++) enemyShot(e.x, e.y, e.spin + (i / arms) * TAU, 140, 5, 12 * scale, "#9BD1C6");
+        // the counter-spiral is thinner and fires every other time
+        e.flip = !e.flip;
+        if (angry && e.flip) {
+          for (i = 0; i < 2; i++) enemyShot(e.x, e.y, -e.spin + i * Math.PI + 0.3, 120, 5, 12 * scale, "#C9E8E1");
+        }
+      }
+      if (e.clock3 <= 0) {
+        e.clock3 = 2.6 * rage;
+        angle = aimAt(e.x, e.y, 180, 0.7);
+        for (i = 0; i < 3; i++) enemyShot(e.x, e.y, angle + (i - 1) * 0.16, 180, 5, 12 * scale, "#9BD1C6");
       }
       if (e.clock2 <= 0) {
-        e.clock2 = 7 * rage;
+        e.clock2 = 5.5 * rage;
         count = 3 + e.tier;
         if (R.enemies.length < 150) {
           for (i = 0; i < count; i++) {
@@ -450,6 +530,354 @@
     }
   }
 
+  /* ------------------------------------------------- the five newer bosses */
+  /* Each has its own way of fighting. Their hits do the same damage as the
+     older bosses' (shots 12 to 14, a slam 32, a beam 30, dust 22 a second, all
+     times the chapter's scale); what sets them apart is how they come at you. */
+
+  /** How close the lemon is to the line from (x0, y0) to (x1, y1). */
+  function distToSegment(px, py, x0, y0, x1, y1) {
+    var dx = x1 - x0;
+    var dy = y1 - y0;
+    var len = dx * dx + dy * dy || 1;
+    var k = Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / len));
+    var cx = x0 + dx * k - px;
+    var cy = y0 + dy * k - py;
+    return Math.sqrt(cx * cx + cy * cy);
+  }
+
+  /** Where the lemon will be in `time` seconds if it keeps going, `share` of the way. */
+  function ahead(time, share) {
+    var p = B.run.p;
+    return { x: p.x + (p.vx || 0) * time * share, y: p.y + (p.vy || 0) * time * share };
+  }
+
+  function ring(e, count, speed, dmg, color, offset) {
+    var start = offset === undefined ? Math.random() * TAU : offset;
+    for (var i = 0; i < count; i++) enemyShot(e.x, e.y, start + (i / count) * TAU, speed, 5, dmg, color);
+  }
+
+  function minions(e, kind, count) {
+    var R = B.run;
+    if (R.enemies.length >= 150) return;
+    for (var i = 0; i < count; i++) {
+      var a = (i / count) * TAU + Math.random();
+      B.spawn(kind, e.x + Math.cos(a) * (e.r + 24), e.y + Math.sin(a) * (e.r + 24));
+    }
+  }
+
+  var NEW_KINDS = {
+    /* Beetle: plods after you, then crouches and leaps to where you are
+       heading. It lands with a slam and a ring of shots. Angry, it leaps twice. */
+    beetle: function (e, dt, nx, ny, d, slow, scale, rage, angry) {
+      var R = B.run;
+      var i;
+      if (e.mode === 0) {
+        walk(e, nx, ny, e.speed * slow * dt);
+        if (e.clock3 <= 0) {
+          // a flick of the horn: a short aimed spread
+          e.clock3 = 2.6 * rage;
+          var a = aimAt(e.x, e.y, 210, 0.6);
+          for (i = -1; i <= 1; i++) enemyShot(e.x, e.y, a + i * 0.16, 210, 6, 14 * scale, "#C79A5B");
+        }
+        if (e.clock <= 0) {
+          var spot = ahead(1.05, 0.75);
+          var jx = spot.x - e.x;
+          var jy = spot.y - e.y;
+          var far = Math.sqrt(jx * jx + jy * jy) || 1;
+          if (far > 430) {
+            jx *= 430 / far;
+            jy *= 430 / far;
+          }
+          e.jx0 = e.x;
+          e.jy0 = e.y;
+          e.jx1 = e.x + jx;
+          e.jy1 = e.y + jy;
+          e.mode = 1;
+          e.clock = 0.4;
+          B.addZone({ type: "warn", x: e.jx1, y: e.jy1, r: 82, life: 1.05 });
+        }
+      } else if (e.mode === 1) {
+        // crouching, about to go
+        if (e.clock <= 0) {
+          e.mode = 2;
+          e.clock = 0.65;
+          e.hurt = 0; // it passes over you in the air
+        }
+      } else if (e.mode === 2) {
+        var k = Math.max(0, Math.min(1, 1 - e.clock / 0.65));
+        e.x = e.jx0 + (e.jx1 - e.jx0) * k;
+        e.y = e.jy0 + (e.jy1 - e.jy0) * k;
+        e.lift = Math.sin(k * Math.PI);
+        if (e.clock <= 0) {
+          e.lift = 0;
+          e.hurt = e.baseHurt;
+          var p = R.p;
+          var dx = p.x - e.x;
+          var dy = p.y - e.y;
+          if (dx * dx + dy * dy < (82 + p.r - 4) * (82 + p.r - 4)) B.hurt(32 * scale);
+          R.fx.push({ type: "blast", x: e.x, y: e.y, r: 82, color: "#C79A5B", t: 0, dur: 0.35 });
+          R.fx.push({ type: "ring", x: e.x, y: e.y, r0: 40, r1: 160, color: "#F2D49B", width: 6, t: 0, dur: 0.45 });
+          R.shake = Math.max(R.shake, 9);
+          PS.sfx.play("boom", null, 0);
+          ring(e, 12 + e.tier * 2, 170, 14 * scale, "#C79A5B");
+          e.mode = 3;
+          e.clock = 0.7 * rage;
+        }
+      } else if (e.clock <= 0) {
+        // back on its feet; angry, it goes straight up again once
+        if (angry && !e.again) {
+          e.again = true;
+          e.mode = 0;
+          e.clock = 0;
+        } else {
+          e.again = false;
+          e.mode = 0;
+          e.clock = 3.8 * rage;
+        }
+      }
+    },
+
+    /* Spider: keeps its distance and circles. It charges up beams along red
+       lanes (three, five when angry) that fire all at once, spits webs that
+       stick you in place, and now and then lets loose its spiderlings. */
+    spider: function (e, dt, nx, ny, d, slow, scale, rage, angry) {
+      var R = B.run;
+      var p = R.p;
+      var i;
+      if (e.mode === 0) {
+        if (d > 310) walk(e, nx, ny, e.speed * slow * dt);
+        else if (d < 210) walk(e, -nx, -ny, e.speed * 0.8 * slow * dt);
+        else walk(e, -ny * e.side, nx * e.side, e.speed * 0.75 * slow * dt);
+        if (e.clock <= 0) {
+          var spot = ahead(0.7, 0.8);
+          var base = Math.atan2(spot.y - e.y, spot.x - e.x);
+          var spread = angry ? [0, -0.3, 0.3, -0.6, 0.6] : [0, -0.32, 0.32];
+          e.beams = spread.map(function (s) { return base + s; });
+          e.bx = e.x;
+          e.by = e.y;
+          e.beams.forEach(function (a) {
+            B.addZone({ type: "lane", x: e.bx, y: e.by, angle: a, len: 560, width: 36, life: 0.7 });
+          });
+          e.mode = 1;
+          e.clock = 0.7;
+        }
+      } else if (e.clock <= 0) {
+        // the beams go off together
+        var hit = false;
+        e.beams.forEach(function (a) {
+          var x1 = e.bx + Math.cos(a) * 560;
+          var y1 = e.by + Math.sin(a) * 560;
+          if (!hit && distToSegment(p.x, p.y, e.bx, e.by, x1, y1) < 18 + p.r - 3) {
+            hit = true;
+            B.hurt(30 * scale);
+          }
+          R.fx.push({ type: "beam", x0: e.bx, y0: e.by, x1: x1, y1: y1, width: 18, color: "#DCE8FF", t: 0, dur: 0.32 });
+        });
+        PS.sfx.play("zap", null, 0);
+        R.shake = Math.max(R.shake, 4);
+        e.mode = 0;
+        e.clock = 3.8 * rage;
+        e.side = -e.side;
+      }
+      if (e.mode === 0 && !(e.echoT > 0)) {
+        // venom spat while it circles (the timer starts unset, so this fires first time)
+        e.echoT = 1.15 * rage;
+        var va = aimAt(e.x, e.y, 225, 0.75);
+        var venom = angry ? 2 : 1;
+        for (i = -venom; i <= venom; i++) enemyShot(e.x, e.y, va + i * 0.14, 225, 5, 14 * scale, "#9BE08A");
+      }
+      if (e.clock2 <= 0) {
+        // webs: one where you are heading, two either side of it
+        e.clock2 = 3.4 * rage;
+        var at = ahead(0.75, 0.8);
+        for (i = 0; i < 3; i++) {
+          var wx = at.x + (i ? (i === 1 ? -1 : 1) * 85 : 0);
+          var wy = at.y + (i ? PS.rand(-40, 40) : 0);
+          lobWeb(e, wx, wy);
+        }
+      }
+      if (e.clock3 <= 0) {
+        e.clock3 = 7 * rage;
+        minions(e, "dart", 3 + Math.floor(e.tier / 2));
+      }
+    },
+
+    /* Worm: chases you above ground, spitting aimed spreads, then burrows. The
+       mound races after you under the ground, stops, and the worm bursts up
+       where it stopped with a ring of shots. You can still hit the mound. */
+    worm: function (e, dt, nx, ny, d, slow, scale, rage, angry) {
+      var R = B.run;
+      var p = R.p;
+      if (e.mode === 0) {
+        walk(e, nx, ny, e.speed * slow * dt);
+        if (e.clock3 <= 0) {
+          e.clock3 = 1.05 * rage;
+          var a = aimAt(e.x, e.y, 230, 0.75);
+          for (var i = -2; i <= 2; i++) enemyShot(e.x, e.y, a + i * 0.15, 230, 5, 14 * scale, "#B9845A");
+        }
+        if (e.clock <= 0) {
+          e.mode = 1;
+          e.clock = 0.45;
+          e.hurt = 0;
+        }
+      } else if (e.mode === 1) {
+        // digging in
+        if (Math.random() < 0.5) B.sparks(e.x + PS.rand(-e.r, e.r), e.y + e.r * 0.5, "#7A5A38", 1, 120);
+        if (e.clock <= 0) {
+          e.mode = 2;
+          e.under = true;
+          e.clock = angry ? 1.2 : 1.6;
+        }
+      } else if (e.mode === 2) {
+        // under the ground, heading for where you will be
+        var spot = ahead(0.65, 0.85);
+        var dx = spot.x - e.x;
+        var dy = spot.y - e.y;
+        var dd = Math.sqrt(dx * dx + dy * dy) || 1;
+        walk(e, dx / dd, dy / dd, Math.min(dd, 250 * slow * dt));
+        if (Math.random() < 0.35) B.sparks(e.x, e.y, "#7A5A38", 1, 70);
+        if (e.clock <= 0) {
+          e.mode = 3;
+          e.clock = 0.6;
+          B.addZone({ type: "warn", x: e.x, y: e.y, r: 70, life: 0.6 });
+        }
+      } else if (e.clock <= 0) {
+        // bursts up
+        e.under = false;
+        e.hurt = e.baseHurt;
+        var hx = p.x - e.x;
+        var hy = p.y - e.y;
+        if (hx * hx + hy * hy < (70 + p.r - 4) * (70 + p.r - 4)) B.hurt(32 * scale);
+        R.fx.push({ type: "blast", x: e.x, y: e.y, r: 70, color: "#9C7448", t: 0, dur: 0.35 });
+        B.sparks(e.x, e.y, "#7A5A38", 16, 200);
+        R.shake = Math.max(R.shake, 7);
+        PS.sfx.play("boom", null, 0);
+        ring(e, 12 + e.tier * 2, 170, 14 * scale, "#B9845A");
+        e.trail = [];
+        e.mode = 0;
+        e.clock = 3.1 * rage;
+      }
+      // the body follows the path the head took
+      var trail = e.trail || (e.trail = []);
+      var last = trail[0];
+      if (!last || (last.x - e.x) * (last.x - e.x) + (last.y - e.y) * (last.y - e.y) > e.r * e.r * 0.36) {
+        trail.unshift({ x: e.x, y: e.y });
+        if (trail.length > 7) trail.pop();
+      }
+    },
+
+    /* Moth: flutters around you at a distance, leaving clouds of stinging
+       dust behind it, and beats its wings to send sweeping arcs of scales. */
+    moth: function (e, dt, nx, ny, d, slow, scale, rage, angry) {
+      var R = B.run;
+      var i;
+      var toward = d > 270 ? 1 : d < 190 ? -0.8 : 0.15;
+      var weave = Math.sin(e.age * 1.7) * 0.95 * e.side;
+      walk(e, nx * toward - ny * weave, ny * toward + nx * weave, e.speed * slow * dt);
+      if (e.clock3 <= 0) {
+        e.clock3 = angry ? 0.5 : 0.7;
+        B.addZone({ type: "puddle", x: e.x, y: e.y, r: 38, life: 4.5, dps: 22 * scale, slow: 0.2, color: "#E8DCC0", dust: true });
+      }
+      if (e.clock <= 0) {
+        e.clock = 3.4 * rage;
+        e.gusts = angry ? 3 : 2;
+        e.gustTurn = 0;
+        e.echoT = 0;
+      }
+      if (e.gusts > 0 && e.echoT <= 0) {
+        // an arc of scales, each gust swept a little further round
+        var base = aimAt(e.x, e.y, 135, 0.5) + e.gustTurn;
+        for (i = 0; i < 9; i++) enemyShot(e.x, e.y, base + (i - 4) * 0.17, 135, 5, 12 * scale, "#EDE3C8");
+        e.gustTurn += 0.12 * e.side;
+        e.gusts--;
+        e.echoT = 0.3;
+      }
+      if (e.clock2 <= 0) {
+        e.clock2 = 7.5 * rage;
+        minions(e, "grunt", 2 + e.tier);
+      }
+    },
+
+    /* Fly: zips round you in a circle, firing quick pairs, then vanishes and
+       reappears somewhere else (a red circle shows where) with a burst of shots. */
+    fly: function (e, dt, nx, ny, d, slow, scale, rage, angry) {
+      var R = B.run;
+      var p = R.p;
+      var i;
+      if (e.mode === 0) {
+        var radial = (d - 210) / 120;
+        walk(e, -ny * e.side + nx * radial, nx * e.side + ny * radial, e.speed * 1.4 * slow * dt);
+        if (e.clock3 <= 0) {
+          e.clock3 = 0.9;
+          var a = aimAt(e.x, e.y, 240, 0.7);
+          for (i = -1; i <= 1; i++) enemyShot(e.x, e.y, a + i * 0.1, 240, 5, 12 * scale, "#C8453E");
+        }
+        if (e.clock <= 0) {
+          // pick where to reappear and show it
+          var ang = Math.random() * TAU;
+          var spot = ahead(0.55, 0.5);
+          e.tx = spot.x + Math.cos(ang) * 200;
+          e.ty = spot.y + Math.sin(ang) * 200;
+          B.addZone({ type: "warn", x: e.tx, y: e.ty, r: 46, life: 0.55 });
+          e.mode = 1;
+          e.clock = 0.3;
+          e.hurt = 0;
+        }
+      } else if (e.mode === 1) {
+        e.fade = Math.max(0, e.clock / 0.3);
+        if (e.clock <= 0) {
+          e.x = e.tx;
+          e.y = e.ty;
+          e.mode = 2;
+          e.clock = 0.25;
+          R.fx.push({ type: "ring", x: e.x, y: e.y, r0: 10, r1: 90, color: "#C8453E", width: 4, t: 0, dur: 0.3 });
+          ring(e, 10 + e.tier, 190, 12 * scale, "#C8453E");
+          var at = aimAt(e.x, e.y, 240, 0.7);
+          var spray = angry ? 2 : 1;
+          for (i = -spray; i <= spray; i++) enemyShot(e.x, e.y, at + i * 0.12, 240, 5, 12 * scale, "#C8453E");
+        }
+      } else {
+        e.fade = Math.min(1, 1 - e.clock / 0.25);
+        if (e.clock <= 0) {
+          e.fade = 1;
+          e.hurt = e.baseHurt;
+          e.mode = 0;
+          e.clock = 2.6 * rage;
+          e.side = Math.random() < 0.5 ? -1 : 1;
+        }
+      }
+    }
+  };
+
+  /** The spider's web: thrown like the slug's slime, it lands as a patch that
+   *  holds you nearly still but does not hurt. */
+  function lobWeb(e, x, y) {
+    var R = B.run;
+    R.fx.push({ type: "lob", x0: e.x, y0: e.y, x1: x, y1: y, color: "#E8EEF5", size: 6, t: 0, dur: 0.7 });
+    B.addZone({
+      type: "warn", x: x, y: y, r: 56, life: 0.7,
+      onEnd: function (zone) {
+        B.addZone({ type: "puddle", x: zone.x, y: zone.y, r: 58, life: 5.5, dps: 0, slow: 0.55, color: "#E8EEF5", web: true });
+      }
+    });
+  }
+
+  /** The hornet's fan of stings, aimed where the lemon is heading. `fewer`
+   *  thins it (the second fan when it is angry). */
+  function stingFan(e, scale, fewer) {
+    var count = 7 + e.tier - (fewer || 0);
+    var base = aimAt(e.x, e.y, 240, 0.6);
+    for (var i = 0; i < count; i++) enemyShot(e.x, e.y, base + (i - (count - 1) / 2) * 0.2, 240, 5, 14 * scale, "#F2B93B");
+  }
+
+  /** The hornet lines up a dash at where the lemon will be when it arrives. */
+  function dashAt(e, time) {
+    // the direction is fixed when the wind-up starts, so lead for the wind-up too
+    var angle = aimAt(e.x, e.y, 600, 0.8, time);
+    windUp(e, Math.cos(angle), Math.sin(angle), time);
+  }
+
   function windUp(e, nx, ny, time) {
     e.mode = 1;
     e.clock = time;
@@ -458,11 +886,12 @@
     B.addZone({ type: "lane", x: e.x, y: e.y, angle: Math.atan2(ny, nx), len: 340, width: e.r * 1.7, life: time });
   }
 
-  function lobSlime(e, x, y, scale) {
+  function lobSlime(e, x, y, scale, warn) {
     var R = B.run;
-    R.fx.push({ type: "lob", x0: e.x, y0: e.y, x1: x, y1: y, color: "#8A77B8", size: 8, t: 0, dur: 0.95 });
+    var time = warn || 0.95;
+    R.fx.push({ type: "lob", x0: e.x, y0: e.y, x1: x, y1: y, color: "#8A77B8", size: 8, t: 0, dur: time });
     B.addZone({
-      type: "warn", x: x, y: y, r: 54, life: 0.95,
+      type: "warn", x: x, y: y, r: 54, life: time,
       onEnd: function (zone) {
         var p = R.p;
         var dx = p.x - zone.x;
@@ -527,13 +956,15 @@
 
     if (e.boss) {
       // drawn larger than the body that is hit, so it looms; nothing else about it changes
-      drawBossAura(ctx, e, R);
+      ctx.globalAlpha = e.fade === undefined ? 1 : e.fade;
+      if (!e.under) drawBossAura(ctx, e, R);
       ctx.save();
       ctx.translate(x, y);
       ctx.scale(BOSS_LOOK, BOSS_LOOK);
       ctx.translate(-x, -y);
       drawBoss(ctx, e, R, nx, ny, body);
       ctx.restore();
+      ctx.globalAlpha = 1;
       return;
     }
 
@@ -890,6 +1321,27 @@
     }
   }
 
+  /** A worm underground: a mound of earth that moves, with clods tumbling off it. */
+  function drawMound(ctx, e, R, x, y, r) {
+    var t = R.t;
+    ctx.fillStyle = "#4A3420";
+    ctx.beginPath();
+    ctx.ellipse(x, y + r * 0.25, r * 0.95, r * 0.5, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = "#6E5032";
+    ctx.beginPath();
+    ctx.ellipse(x, y + r * 0.1, r * 0.75, r * 0.38, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = "#8C6A44";
+    for (var i = 0; i < 8; i++) {
+      var a = i * 0.8 + t * 4;
+      ctx.beginPath();
+      ctx.ellipse(x + Math.cos(a) * r * 0.6, y + Math.sin(a) * r * 0.25 + r * 0.05, 6, 4, a, 0, TAU);
+      ctx.fill();
+    }
+    drawStatus(ctx, e, x, y, r);
+  }
+
   function drawBoss(ctx, e, R, nx, ny, body) {
     var x = e.x;
     var y = e.y;
@@ -902,10 +1354,18 @@
     var dk = L ? L.dark : "#4E7A3A";
     var dkHornet = L ? L.dark : "#3A2A10";
 
-    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    // a beetle in mid-leap is drawn up off the ground; its shadow stays below
+    var air = e.lift || 0;
+    ctx.fillStyle = "rgba(0,0,0," + (0.25 - air * 0.1).toFixed(3) + ")";
     ctx.beginPath();
-    ctx.ellipse(x, y + r * 0.85, r * 0.95, r * 0.28, 0, 0, TAU);
+    ctx.ellipse(x, y + r * 0.85, r * 0.95 * (1 - air * 0.3), r * 0.28 * (1 - air * 0.3), 0, 0, TAU);
     ctx.fill();
+    y -= air * 55;
+
+    if (e.under) {
+      drawMound(ctx, e, R, x, y, r);
+      return;
+    }
 
     if (L) lookBehind(ctx, L, x, y, r, t);
 
@@ -975,6 +1435,207 @@
       }
       ctx.fillStyle = "rgba(255,255,255,0.22)";
       circle(ctx, x - r * 0.3, y - r * 0.35, r * 0.2);
+    } else if (e.kind === "beetle") {
+      // six legs that step in turn, a curved horn, and a hard shell in two halves
+      ctx.strokeStyle = dk;
+      ctx.lineWidth = Math.max(4, r * 0.12);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      for (i = 0; i < 3; i++) {
+        for (var bs = -1; bs <= 1; bs += 2) {
+          var step = Math.sin(t * 7 + i * 2.1 + (bs > 0 ? Math.PI : 0)) * r * 0.08 * (e.lift ? 0 : 1);
+          var ly = y - r * 0.35 + i * r * 0.42;
+          ctx.beginPath();
+          ctx.moveTo(x + bs * r * 0.7, ly);
+          ctx.lineTo(x + bs * r * 1.18, ly + r * 0.12 + step);
+          ctx.lineTo(x + bs * r * 1.32, ly + r * 0.5 + step);
+          ctx.stroke();
+        }
+      }
+      ctx.fillStyle = dk;
+      ctx.beginPath();
+      ctx.moveTo(x - r * 0.2, y - r * 0.72);
+      ctx.quadraticCurveTo(x - r * 0.12, y - r * 1.5, x + r * 0.42, y - r * 1.62);
+      ctx.quadraticCurveTo(x + r * 0.06, y - r * 1.2, x + r * 0.2, y - r * 0.72);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = body;
+      B.ball(ctx, x, y, r);
+      ctx.strokeStyle = "rgba(20,14,10,0.45)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x, y - r * 0.5);
+      ctx.lineTo(x, y + r * 0.96);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.16)";
+      ctx.beginPath();
+      ctx.ellipse(x - r * 0.45, y + r * 0.18, r * 0.16, r * 0.42, 0.15, 0, TAU);
+      ctx.ellipse(x + r * 0.45, y + r * 0.18, r * 0.16, r * 0.42, -0.15, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = dk;
+      ctx.beginPath();
+      ctx.ellipse(x, y - r * 0.5, r * 0.6, r * 0.34, 0, Math.PI, TAU);
+      ctx.fill();
+    } else if (e.kind === "spider") {
+      // a round abdomen behind, eight jointed legs, a body with fangs and six red eyes
+      ctx.fillStyle = body;
+      B.ball(ctx, x - nx * r * 0.85, y - ny * r * 0.85 - r * 0.1, r * 0.95);
+      if (L) {
+        ctx.fillStyle = L.accent;
+        ctx.beginPath();
+        var hx = x - nx * r * 0.85;
+        var hy = y - ny * r * 0.85 - r * 0.1;
+        ctx.moveTo(hx - r * 0.18, hy - r * 0.3);
+        ctx.lineTo(hx + r * 0.18, hy - r * 0.3);
+        ctx.lineTo(hx - r * 0.18, hy + r * 0.3);
+        ctx.lineTo(hx + r * 0.18, hy + r * 0.3);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.strokeStyle = dk;
+      ctx.lineWidth = Math.max(3, r * 0.09);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      for (var sideS = -1; sideS <= 1; sideS += 2) {
+        for (i = 0; i < 4; i++) {
+          var la = (sideS > 0 ? 0 : Math.PI) + sideS * (i - 1.5) * 0.42;
+          var lift = Math.sin(t * 8 + i * 1.7 + (sideS > 0 ? 0 : 1.3)) * r * 0.1;
+          ctx.beginPath();
+          ctx.moveTo(x + Math.cos(la) * r * 0.55, y + Math.sin(la) * r * 0.45);
+          ctx.lineTo(x + Math.cos(la) * r * 1.3, y + Math.sin(la) * r * 0.9 - r * 0.55 + lift);
+          ctx.lineTo(x + Math.cos(la) * r * 1.85, y + Math.sin(la) * r * 1.35 + r * 0.25 + lift);
+          ctx.stroke();
+        }
+      }
+      ctx.fillStyle = body;
+      B.ball(ctx, x, y, r * 0.82);
+      ctx.fillStyle = "#2A1A14";
+      ctx.beginPath();
+      ctx.moveTo(x - r * 0.28, y + r * 0.45);
+      ctx.lineTo(x - r * 0.16, y + r * 0.82);
+      ctx.lineTo(x - r * 0.06, y + r * 0.48);
+      ctx.moveTo(x + r * 0.28, y + r * 0.45);
+      ctx.lineTo(x + r * 0.16, y + r * 0.82);
+      ctx.lineTo(x + r * 0.06, y + r * 0.48);
+      ctx.fill();
+      var spiderEyes = [[-0.3, -0.12, 0.13], [0.3, -0.12, 0.13], [-0.14, -0.3, 0.09], [0.14, -0.3, 0.09], [-0.45, 0.06, 0.08], [0.45, 0.06, 0.08]];
+      for (i = 0; i < spiderEyes.length; i++) {
+        var se = spiderEyes[i];
+        ctx.fillStyle = "#E5484D";
+        circle(ctx, x + se[0] * r, y + se[1] * r, se[2] * r);
+        ctx.fillStyle = "rgba(255,255,255,0.75)";
+        circle(ctx, x + se[0] * r - se[2] * r * 0.3, y + se[1] * r - se[2] * r * 0.3, se[2] * r * 0.35);
+      }
+    } else if (e.kind === "worm") {
+      // segments along the path the head took, smaller toward the tail
+      var trail = e.trail || [];
+      for (i = trail.length - 1; i >= 0; i--) {
+        var seg = trail[i];
+        var sr = r * Math.max(0.35, 0.92 - i * 0.08);
+        ctx.fillStyle = i % 2 ? e.fill : (L ? L.dark : e.fill); // only the head flashes when hit
+        B.ball(ctx, seg.x, seg.y - (e.y - y), sr);
+      }
+      // two hooked jaws, toward you
+      var jawA = Math.atan2(ny, nx);
+      ctx.strokeStyle = "#2A1A14";
+      ctx.lineWidth = Math.max(4, r * 0.13);
+      ctx.lineCap = "round";
+      for (var js = -1; js <= 1; js += 2) {
+        var open = 0.5 + Math.sin(t * 6) * 0.15;
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(jawA + js * 0.5) * r * 0.85, y + Math.sin(jawA + js * 0.5) * r * 0.85);
+        ctx.quadraticCurveTo(
+          x + Math.cos(jawA + js * open) * r * 1.45, y + Math.sin(jawA + js * open) * r * 1.45,
+          x + Math.cos(jawA + js * 0.08) * r * 1.35, y + Math.sin(jawA + js * 0.08) * r * 1.35
+        );
+        ctx.stroke();
+      }
+      ctx.fillStyle = body;
+      B.ball(ctx, x, y, r);
+      ctx.strokeStyle = "rgba(20,14,10,0.3)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x, y + r * 0.3, r * 0.85, Math.PI * 1.15, Math.PI * 1.85);
+      ctx.moveTo(x - r * 0.6, y + r * 0.62);
+      ctx.arc(x, y + r * 0.62, r * 0.6, Math.PI, TAU);
+      ctx.stroke();
+    } else if (e.kind === "moth") {
+      // four wings beating, eye-spots on the big ones, a fuzzy body, feathery feelers
+      var beat = Math.sin(t * 9);
+      for (var ms = -1; ms <= 1; ms += 2) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(ms, 1);
+        ctx.fillStyle = L ? L.accent : "#E8DCC0";
+        ctx.globalAlpha *= 0.92;
+        ctx.beginPath();
+        ctx.ellipse(r * 1.05, -r * 0.3, r * 1.05, r * (0.62 + 0.2 * beat), -0.35, 0, TAU);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(r * 0.8, r * 0.5, r * 0.62, r * (0.4 + 0.08 * beat), 0.45, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = L ? L.dark : "#5A4A38";
+        circle(ctx, r * 1.2, -r * 0.35, r * 0.24);
+        ctx.fillStyle = body;
+        circle(ctx, r * 1.2, -r * 0.35, r * 0.12);
+        ctx.restore();
+      }
+      ctx.fillStyle = body;
+      for (i = 0; i < 9; i++) {
+        var fa = (i / 9) * TAU;
+        B.ball(ctx, x + Math.cos(fa) * r * 0.62, y + Math.sin(fa) * r * 0.62, r * 0.24);
+      }
+      B.ball(ctx, x, y, r * 0.72);
+      ctx.strokeStyle = dk;
+      ctx.lineWidth = 2;
+      for (var fs = -1; fs <= 1; fs += 2) {
+        ctx.beginPath();
+        ctx.moveTo(x + fs * r * 0.2, y - r * 0.6);
+        ctx.quadraticCurveTo(x + fs * r * 0.45, y - r * 1.25, x + fs * r * 0.75, y - r * 1.4);
+        for (var f = 0; f < 4; f++) {
+          var fx0 = x + fs * r * (0.3 + f * 0.12);
+          var fy0 = y - r * (0.9 + f * 0.13);
+          ctx.moveTo(fx0, fy0);
+          ctx.lineTo(fx0 + fs * r * 0.14, fy0 - r * 0.02);
+        }
+        ctx.stroke();
+      }
+    } else if (e.kind === "fly") {
+      // buzzing glassy wings, a striped body and two huge red eyes
+      var buzz = Math.sin(t * 60) * r * 0.08;
+      ctx.fillStyle = "rgba(220,240,255,0.45)";
+      ctx.beginPath();
+      ctx.ellipse(x - r * 0.9, y - r * 0.55, r * 0.95, r * 0.38 + buzz, -0.55, 0, TAU);
+      ctx.ellipse(x + r * 0.9, y - r * 0.55, r * 0.95, r * 0.38 - buzz, 0.55, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = body;
+      B.ball(ctx, x, y, r);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, TAU);
+      ctx.clip();
+      ctx.fillStyle = dk;
+      ctx.globalAlpha *= 0.55;
+      ctx.fillRect(x - r, y + r * 0.25, r * 2, r * 0.2);
+      ctx.fillRect(x - r, y + r * 0.6, r * 2, r * 0.2);
+      ctx.restore();
+      for (var es = -1; es <= 1; es += 2) {
+        ctx.fillStyle = "#C8453E";
+        ctx.beginPath();
+        ctx.ellipse(x + es * r * 0.42, y - r * 0.2, r * 0.38, r * 0.44, es * 0.2, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.28)";
+        for (var g = 0; g < 5; g++) circle(ctx, x + es * r * (0.3 + (g % 3) * 0.1), y - r * (0.38 - Math.floor(g / 3) * 0.18), r * 0.05);
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        circle(ctx, x + es * r * 0.32, y - r * 0.4, r * 0.09);
+      }
+      ctx.strokeStyle = "#2A1A14";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x, y + r * 0.15);
+      ctx.lineTo(x, y + r * 0.55);
+      ctx.stroke();
     } else {
       // mould: a fuzzy ball that slowly turns
       ctx.fillStyle = body;
@@ -991,7 +1652,7 @@
 
     if (L) lookFront(ctx, L, x, y, r, t);
 
-    if (e.kind !== "slug") eyes(ctx, x, y, r * 0.8, nx * r * 0.1, ny * r * 0.08, true);
+    if (e.kind !== "slug" && e.kind !== "spider" && e.kind !== "fly") eyes(ctx, x, y, r * 0.8, nx * r * 0.1, ny * r * 0.08, true);
 
     // a crown, because it is the boss
     var cy = y - r * (e.kind === "queen" || e.kind === "slug" ? 0.78 : 0.95);

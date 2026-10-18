@@ -758,7 +758,16 @@
     "Coal Chute", "Boiler Room", "Cinder Lane", "Ember Pit", "Ash Hall", "The Furnace Heart",
     "Rot Roots", "Spore Garden", "Blight Tunnels", "The Gnarled Bough", "Pip Graveyard", "The Last Pip"
   ];
-  var BOSS_KINDS = ["hornet", "queen", "slug", "mould"];
+  /* Which creature each chapter's boss is, to match its name (Spider Mother is
+     a spider, Pipe Worm a worm...), in an order where no two chapters in a row
+     share one, and the paired bosses from chapter 40 on always differ. */
+  var BOSS_KIND_OF = [
+    "hornet", "queen", "slug", "mould", "beetle", "moth", "slug", "worm", "beetle", "moth",
+    "slug", "mould", "fly", "queen", "worm", "mould", "hornet", "spider", "worm", "mould",
+    "moth", "fly", "queen", "slug", "hornet", "beetle", "spider", "beetle", "spider", "mould",
+    "moth", "fly", "slug", "worm", "queen", "spider", "beetle", "mould", "beetle", "mould",
+    "hornet", "slug", "queen", "beetle", "worm", "mould", "beetle", "spider", "fly", "queen"
+  ];
   var BOSS_NAMES = [
     "The Hornet", "Aphid Queen", "Slug Baron", "Stump Rot",
     "Weevil Rex", "Moth Matriarch", "Slug Duke", "Compost Horror",
@@ -808,7 +817,7 @@
     mould: { body: "#6FA8A0", dark: "#4E7F78", accent: "#B5DCD6" }
   };
   function bossLook(n) {
-    var kind = BOSS_KINDS[(n - 1) % 4];
+    var kind = BOSS_KIND_OF[n - 1];
     if (n <= 4) {
       var o = ORIGINAL_LOOKS[kind];
       return { body: o.body, dark: o.dark, accent: o.accent, pattern: 0, feature: -1 };
@@ -832,7 +841,7 @@
       n: c,
       name: CHAPTER_NAMES[c - 1],
       zone: zoneOf(c),
-      boss: BOSS_KINDS[(c - 1) % 4],
+      boss: BOSS_KIND_OF[c - 1],
       bossName: BOSS_NAMES[c - 1],
       // boss attack patterns top out at the tier of chapter 17 to 20
       bossTier: Math.min(4, Math.floor((c - 1) / 4)),

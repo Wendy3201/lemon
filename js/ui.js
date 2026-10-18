@@ -299,6 +299,7 @@
 
           '<button class="btn btn--primary btn--xl" type="button" data-act="fight" data-key="fight">' + PS.icon("tabBattle") + "Battle</button>" +
           '<p class="hint">Move with WASD or the arrow keys, or drag on the screen. Your lemon attacks by itself.</p>' +
+          '<button class="btn btn--sm home__guide" type="button" data-act="howto" data-key="howto">' + PS.icon("info") + "New here? How to play</button>" +
         "</div>" +
         endlessCard() +
         '<footer class="foot"><span>Your progress is saved in this browser.</span>' +
@@ -993,6 +994,134 @@
     );
   }
 
+  /* ---------------------------------------------------------- how to play */
+  /* The guide in Settings: one fold-out section per topic, with the game's own
+     numbers filled in, so it stays right if the numbers change. Which sections
+     are open is remembered while the game is open. */
+
+  var GUIDE_OPEN = { basics: true };
+
+  /* one line of advice for each kind of boss, in the order they first appear */
+  var BOSS_TIPS = {
+    hornet: "Charges along a red lane. Step to the side of the lane, not back along it.",
+    queen: "Sends out two rings of shots, the second filling the gaps of the first. Weave through, and keep clear of the grunts she hatches.",
+    slug: "Lobs slime at red circles: step out of them. Its trail and the slime leave puddles that hurt and slow you.",
+    mould: "Spins out a spiral of spores. Move the same way it turns and the gaps stay open longer.",
+    beetle: "Crouches, then leaps to the red circle and slams down with a ring of shots. Get out of the circle.",
+    spider: "Red lanes are beams about to fire. White webs hold you nearly still: do not get stuck in one when the beams go off.",
+    worm: "Burrows, and a mound of earth chases you. When it stops, a red circle shows where it bursts up.",
+    moth: "Leaves clouds of stinging dust and beats its wings to send arcs of scales. Do not fight inside its dust.",
+    fly: "Vanishes and reappears at the red circle with a burst of shots in every direction. Watch for the circle."
+  };
+
+  function guideSection(id, title, icon, body) {
+    return (
+      '<details class="guide__part" data-guide="' + id + '"' + (GUIDE_OPEN[id] ? " open" : "") + ">" +
+        "<summary>" + PS.icon(icon) + "<span>" + title + "</span></summary>" +
+        '<div class="guide__body">' + body + "</div>" +
+      "</details>"
+    );
+  }
+
+  function powerBadge(key) {
+    var power = PS.B.POWERS[key];
+    var glyph = { frenzy: "bolt", giant: "area", swift: "haste" }[key];
+    var inner = glyph
+      ? PS.icon(glyph)
+      : '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><polygon fill="currentColor" points="12,2 14.9,8.6 22,9.3 16.6,14 18.2,21 12,17.3 5.8,21 7.4,14 2,9.3 9.1,8.6"/></svg>';
+    return '<span class="guide__badge" style="--c:' + power.color + '">' + inner + "</span>";
+  }
+
+  function howToPlay() {
+    var powers = PS.B && PS.B.POWERS ? PS.B.POWERS : {};
+    var powerRows = Object.keys(powers).map(function (key) {
+      var power = powers[key];
+      return "<li>" + powerBadge(key) + "<span><b>" + power.name + "</b> " + esc(power.text.toLowerCase()) + " for " + power.time + " seconds.</span></li>";
+    }).join("");
+
+    // the first chapter each kind of boss turns up in, for its picture
+    var firstOf = {};
+    var order = [];
+    for (var n = 1; n <= PS.BAL.CHAPTERS; n++) {
+      var kind = PS.chapter(n).boss;
+      if (!firstOf[kind]) {
+        firstOf[kind] = n;
+        order.push(kind);
+      }
+    }
+    var bosses = order.map(function (kind) {
+      var n = firstOf[kind];
+      return (
+        '<li class="guide__boss"><span class="guide__art">' + PS.bossArt(n) + "</span>" +
+        "<span><b>" + kind.charAt(0).toUpperCase() + kind.slice(1) + "</b> <small>from chapter " + n + ", " + esc(PS.chapter(n).bossName) + "</small><br>" + BOSS_TIPS[kind] + "</span></li>"
+      );
+    }).join("");
+
+    var rarities = PS.RARITY.map(function (r, i) { return rarityName(i); }).join(" ");
+    var giftHours = Math.round(PS.GIFT.every / 3600000);
+
+    return (
+      '<div class="guide" id="guide">' +
+        guideSection("basics", "The basics", "tabBattle",
+          '<ul class="howto">' +
+            "<li><b>Move</b> with WASD or the arrow keys, hold the mouse button down, or drag on a touch screen.</li>" +
+            "<li><b>Your lemon attacks by itself</b>, aiming at the nearest pest. Bosses, elites and the golden pest come first.</li>" +
+            "<li>Squashed pests drop <b>gems</b>. They fill the bar at the top; every time it fills you <b>level up</b> and pick one of three upgrades (click a card, or press 1, 2 or 3). <b>R</b> rerolls the cards.</li>" +
+            "<li>Last until the <b>timer</b> runs out and the <b>boss</b> arrives. Beat it to clear the chapter and open the next one.</li>" +
+            "<li><b>Esc</b> or <b>P</b> pauses. <b>Tab</b> shows or hides the damage meter, which says what is doing your damage.</li>" +
+          "</ul>") +
+        guideSection("alive", "Staying alive", "hp",
+          '<ul class="howto">' +
+            "<li>When your health falls below 30% the edges of the screen glow red.</li>" +
+            "<li><b>Lemon slices</b> heal you. Pests drop them now and then; <b>elites</b> (the big ones with a gold ring) always do, along with a magnet that pulls in every gem.</li>" +
+            "<li>Keep moving. Standing still is how the swarm surrounds you.</li>" +
+            "<li>Upgrades like <b>Thick Rind</b>, <b>Regrowth</b>, <b>Hard Shell</b> and <b>Second Wind</b> keep you going when the battle gets busy.</li>" +
+          "</ul>") +
+        guideSection("powerups", "Crates and power-ups", "gift",
+          "<p>Crates, clay jars and flower pots turn up on the field every few seconds. You can spot them by the <b>glowing ring</b> under them and the <b>yellow arrow</b> bouncing above. <b>Walk into one, or let your attacks hit it</b>, to break it open. A word pops up saying what was inside:</p>" +
+          '<ul class="howto">' +
+            "<li><b>A power-up</b> (about a third of the time): a glowing orb. Walk over it to use it.</li>" +
+            "<li><b>A lemon slice</b> (a heal), <b>a shower of coins</b>, or <b>a magnet</b>.</li>" +
+            "<li><b>A bomb</b>: pick it up and every pest on screen is squashed. It never hurts a boss.</li>" +
+          "</ul>" +
+          '<p class="guide__sub">The power-ups</p><ul class="guide__list">' + powerRows + "</ul>" +
+          "<p>A power-up shows its time left on the right of the screen and a ring around your lemon, and blinks when it is about to run out.</p>") +
+        guideSection("golden", "The golden pest", "coin",
+          "<p>Twice a chapter (and every 75 seconds in the endless swarm) a <b>golden pest</b> appears and runs away from you. An arrow at the edge of the screen points to it, and a ring around it counts down 15 seconds.</p>" +
+          "<p>Your weapon goes for it first. Catch it and it bursts into a pile of coins and experience; let it go and it is gone.</p>") +
+        guideSection("combo", "Combos", "bolt",
+          "<p>Squash pests one after another, no more than about two seconds apart, to build a <b>combo</b>. It shows on the right once it reaches ×10 and changes colour at ×25, ×50 and ×100. Your best combo is on the results screen.</p>") +
+        guideSection("bosses", "The bosses", "skull",
+          "<p>Every boss fights like the creature it is named after. Red circles and red lanes always show where an attack is about to land. Below half health a boss glows red and attacks faster. From chapter " + PS.TWIN_BOSS.from + " on, <b>two bosses</b> come at once, and both must fall.</p>" +
+          '<ul class="guide__list">' + bosses + "</ul>") +
+        guideSection("gear", "Gear and the Forge", "tabGear",
+          '<ul class="howto">' +
+            "<li>You wear six pieces of gear: a weapon, a ring, an amulet, a helmet, armour and boots. Your weapon decides how you attack.</li>" +
+            '<li>Rarities, from the bottom: <span class="rlist">' + rarities + "</span>. Rarer gear is stronger and unlocks more of its perks.</li>" +
+            "<li>Battles drop gear up to " + rarityName(PS.MAX_DROP_RARITY) + ". Anything rarer comes from the <b>Forge</b>: put in three items of the same slot and rarity, and the one you keep goes up a rarity. <b>Quick forge</b> does every forge it can at once.</li>" +
+            "<li>Spend gold to <b>level up</b> each slot. An item's rarity caps how high its slot's level counts.</li>" +
+            "<li>Some items are <b>S</b> or <b>SS grade</b>: stronger at every rarity.</li>" +
+            "<li><b>Power</b> sums up how strong you are. Each chapter shows a recommended Power; below it, the chapter will be tough.</li>" +
+          "</ul>") +
+        guideSection("shop", "The Shop", "tabShop",
+          '<ul class="howto">' +
+            "<li><b>Daily rewards</b>: claim once a day for " + PS.DAILY.length + " days in a row; the last day is the biggest. Miss a day and it starts again.</li>" +
+            "<li>A <b>free gift</b> every " + giftHours + " hours.</li>" +
+            "<li><b>Chests</b> cost gems: a Seed Crate is " + PS.CHESTS.crate.gems + ", a Gilded Chest " + PS.CHESTS.gilded.gems + ". A Gilded Chest can also hold an <b>SS shard</b>; " + PS.SHARDS.needed + " shards make an SS-grade item.</li>" +
+            "<li>Four <b>deals</b> a day, and a sack of gold for gems.</li>" +
+          "</ul>") +
+        guideSection("more", "Pets, talents and quests", "tabPets",
+          '<ul class="howto">' +
+            "<li><b>Pets</b> hatch from eggs bought with gems. Pets on your team fight beside you and add a bonus; hatching one you have, or spending gold, levels it up.</li>" +
+            "<li><b>Talents</b> are bonuses bought with gold that last for good. Max a whole tier to <b>ascend</b> and unlock stronger ones.</li>" +
+            "<li><b>Quests</b> are goals that pay gems: clear chapters, squash pests, forge, open chests and more.</li>" +
+          "</ul>") +
+        guideSection("endless", "Endless swarm", "clock",
+          "<p>Clear chapter " + PS.ENDLESS.from + " to unlock the <b>endless swarm</b>, under the chapter on the Battle screen. There is no boss and no end: the swarm keeps growing and you are paid gold for every second you last. Your best time is kept.</p>") +
+      "</div>"
+    );
+  }
+
   /* one row of the Settings pop-up: a name, a small line under it, and a control */
   function settingsToggle(name, hint, control) {
     return '<div class="settings__row"><span>' + name + "<small>" + hint + "</small></span>" + control + "</div>";
@@ -1053,12 +1182,7 @@
         '<div class="settings__row"><span>Put the settings back as they came</span>' +
           '<button class="btn btn--sm" type="button" data-act="prefs-reset" data-key="prefs-reset">Restore defaults</button></div>' +
         "<h3>How to play</h3>" +
-        '<ul class="howto">' +
-          "<li>Move with WASD or the arrow keys, or drag on the screen. The lemon attacks by itself.</li>" +
-          "<li>Gems dropped by pests fill the bar at the top. Each level, pick one of three upgrades (keys 1, 2, 3).</li>" +
-          "<li>Last until the timer runs out, then beat the boss to clear the chapter.</li>" +
-          "<li>Esc or P pauses.</li>" +
-        "</ul>" +
+        howToPlay() +
         "<h3>Your record</h3>" +
         '<dl class="facts facts--tight">' +
           "<div><dt>Battles</dt><dd>" + fmt(S.stats.runs) + " · " + fmt(S.stats.wins) + " won</dd></div>" +
@@ -2020,6 +2144,13 @@
     tab: function (node) { go(node.getAttribute("data-tab")); },
     close: function () { closeModal(); },
     settings: function () { openModal({ type: "settings", armed: false }); },
+    // the Battle screen's "How to play": Settings, opened at the guide
+    howto: function () {
+      GUIDE_OPEN.basics = true;
+      openModal({ type: "settings", armed: false });
+      var guide = $("#guide");
+      if (guide) guide.scrollIntoView({ block: "start" });
+    },
     secret: function () {
       openModal({ type: "secret", open: PS.dev.unlocked, admin: false, wrong: false });
       var input = $("#secret-input");
@@ -2824,6 +2955,11 @@
       document.addEventListener("click", onClick);
       document.addEventListener("submit", onSubmit);
       el.modal.addEventListener("close", function () { view.modal = null; });
+      // remember which parts of the guide are open, so a redraw does not fold them up
+      el.modal.addEventListener("toggle", function (e) {
+        var id = e.target && e.target.getAttribute ? e.target.getAttribute("data-guide") : null;
+        if (id) GUIDE_OPEN[id] = e.target.open;
+      }, true);
       // the volume slider: move it and the sound changes at once, no redraw to interrupt the drag
       el.modal.addEventListener("input", function (e) {
         if (e.target.id === "set-music") {

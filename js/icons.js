@@ -591,6 +591,42 @@
         dot(21, 6, 4, C.white) + dot(37, 6, 4, C.white);
       face = dot(21.6, 6.4, 1.9, C.ink) + dot(37.6, 6.4, 1.9, C.ink) + line("M24.5 32Q29 35 33.5 32", C.ink, 1.8) +
         poly("22,19 21,12.5 25,15.5 29,11 33,15.5 37,12.5 36,19", C.gold, 'stroke="' + C.goldDark + '" stroke-width="1"');
+    } else if (kind === "beetle") {
+      // six legs, a horn to one side, a shell split down the middle
+      body = line("M11 25 4 22M10 31 3 32M12 37 6 42M37 25 44 22M38 31 45 32M36 37 42 42", L.dark, 2.6) +
+        fill("M31 17Q37 9 44 8Q38 13 35.5 19Z", L.dark) +
+        dot(24, 28, 14.5, L.body) + line("M24 16V42.5", L.dark, 1.8, 'opacity="0.6"') +
+        oval(18, 30, 2.6, 6.4, C.white, 'opacity="0.18"') + oval(30, 30, 2.6, 6.4, C.white, 'opacity="0.18"');
+      face = eyes + crown;
+    } else if (kind === "spider") {
+      // eight jointed legs, a round abdomen below, six red eyes and fangs
+      body = line("M14 24 7 15 2 21M13 28 4 24 1 31M14 32 6 34 3 41M17 35 11 41 10 46M34 24 41 15 46 21M35 28 44 24 47 31M34 32 42 34 45 41M31 35 37 41 38 46", L.dark, 2) +
+        dot(24, 38, 9.5, L.body) + poly("21,34.5 27,34.5 21,41.5 27,41.5", L.accent, 'opacity="0.8"') + dot(24, 26, 12.5, L.body);
+      face = dot(19.5, 24, 2.3, "#E5484D") + dot(28.5, 24, 2.3, "#E5484D") + dot(21.6, 20.4, 1.6, "#E5484D") + dot(26.4, 20.4, 1.6, "#E5484D") +
+        dot(16.8, 27.6, 1.4, "#E5484D") + dot(31.2, 27.6, 1.4, "#E5484D") + dot(19, 23.4, 0.7, C.white) + dot(28, 23.4, 0.7, C.white) +
+        poly("20.5,31 22.2,36 23.4,31", "#2A1A14") + poly("27.5,31 25.8,36 24.6,31", "#2A1A14") + crown;
+    } else if (kind === "worm") {
+      // a segmented body curling away behind a round head with hooked jaws
+      body = dot(8, 41, 5, L.dark) + dot(13, 38.5, 6.4, L.body) + dot(19, 36, 7.6, L.dark) +
+        line("M18 38Q15 44 20 46M30 38Q33 44 28 46", "#2A1A14", 2.6) +
+        dot(24, 27, 13.5, L.body) + line("M13 23Q24 17 35 23M14.5 31Q24 26 33.5 31", L.dark, 1.6, 'opacity="0.45"');
+      face = eyes + crown;
+    } else if (kind === "moth") {
+      // four broad wings with eye-spots, a fuzzy body and feathery feelers
+      body = oval(11, 21, 11, 8, L.accent, 'transform="rotate(-25 11 21)"') + oval(37, 21, 11, 8, L.accent, 'transform="rotate(25 37 21)"') +
+        oval(12, 35, 7.5, 5, L.accent, 'opacity="0.9" transform="rotate(30 12 35)"') + oval(36, 35, 7.5, 5, L.accent, 'opacity="0.9" transform="rotate(-30 36 35)"') +
+        dot(8.5, 19.5, 3.2, L.dark) + dot(39.5, 19.5, 3.2, L.dark) + dot(8.5, 19.5, 1.5, L.body) + dot(39.5, 19.5, 1.5, L.body) +
+        line("M21 16Q17 8 12 5M27 16Q31 8 36 5M15 9.5 13.5 11M17.5 12 15.5 13.5M33 9.5 34.5 11M30.5 12 32.5 13.5", L.dark, 1.4) +
+        dot(24, 27, 11.5, L.body);
+      face = eyes + crown;
+    } else if (kind === "fly") {
+      // glassy wings, a striped body and two huge red eyes
+      body = oval(11, 17, 10, 5, C.white, 'opacity="0.55" transform="rotate(-28 11 17)"') + oval(37, 17, 10, 5, C.white, 'opacity="0.55" transform="rotate(28 37 17)"') +
+        dot(24, 28, 13.5, L.body) + line("M11.5 33H36.5M13.5 38H34.5", L.dark, 2.6, 'opacity="0.6"');
+      face = oval(18, 24.5, 5.4, 6.2, "#C8453E") + oval(30, 24.5, 5.4, 6.2, "#C8453E") +
+        dot(16.6, 22.4, 1.2, C.white, 'opacity="0.8"') + dot(28.6, 22.4, 1.2, C.white, 'opacity="0.8"') +
+        dot(19, 26, 0.7, C.white, 'opacity="0.4"') + dot(31, 26, 0.7, C.white, 'opacity="0.4"') +
+        line("M24 32V39", "#2A1A14", 1.8) + crown;
     } else {
       var fuzz = "";
       for (i = 0; i < 12; i++) {

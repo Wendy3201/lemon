@@ -27,7 +27,7 @@
 
   var KIND_NAMES = {
     grunt: "Grunt", dart: "Dart", brute: "Brute", spitter: "Spitter", splitter: "Splitter",
-    charger: "Charger", bomber: "Bomber", mini: "Mini"
+    charger: "Charger", bomber: "Bomber", mini: "Mini", crate: "Crate"
   };
 
   /* what the Player tab's boost buttons do; each adds to the run's own numbers */

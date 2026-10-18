@@ -34,6 +34,7 @@
       '<div class="hud__boss" hidden><span></span><div><i></i></div></div>' +
       '<div class="hud__toast" role="status" aria-live="polite"></div>' +
       '<div class="hud__combo" hidden aria-hidden="true"><b></b><span>combo</span></div>' +
+      '<div class="hud__buffs" aria-live="polite"></div>' +
       '<div class="hud__build"></div>' +
     '</div>' +
     '<div class="sheet" data-panel="choose" hidden>' +
@@ -118,7 +119,8 @@
     boom: ["Death blasts", "boom", "#F7D94C"],
     thorns: ["Thorns", "armor", "#8FAE65"],
     aura: ["Gear aura", "sun", "#FFD166"],
-    gear: ["Gear blasts", "revive", "#FFE66D"]
+    gear: ["Gear blasts", "revive", "#FFE66D"],
+    bomb: ["Bomb", "bomb", "#E5484D"]
   };
   var MAX_ROWS = 7;
   var meterOpen = false;
@@ -224,6 +226,7 @@
       el.bossFill = root.querySelector(".hud__boss i");
       el.toast = root.querySelector(".hud__toast");
       el.combo = root.querySelector(".hud__combo");
+      el.buffs = root.querySelector(".hud__buffs");
       el.comboText = el.combo.querySelector("b");
       el.build = root.querySelector(".hud__build");
       el.choose = root.querySelector('[data-panel="choose"]');
@@ -272,6 +275,21 @@
       setText("time", el.time, R.mode === "swarm" ? PS.clock(R.t) : R.phase === "swarm" ? PS.clock(Math.ceil(R.dur - R.t)) : "BOSS");
       setText("kills", el.killsText, PS.fmt(R.kills));
       setText("coins", el.coinsText, PS.fmt(R.coins));
+
+      // power-ups running, with the seconds left on each
+      var buffHtml = "";
+      var buffSig = "";
+      if (B.POWERS) {
+        Object.keys(R.p.buffs).forEach(function (key) {
+          var left = R.p.buffs[key];
+          if (!(left > 0) || !B.POWERS[key]) return;
+          var power = B.POWERS[key];
+          var secs = Math.ceil(left);
+          buffSig += key + secs;
+          buffHtml += '<span class="buff' + (left < 2 ? " is-ending" : "") + '" style="--c:' + power.color + '"><b>' + power.name + "</b><i>" + secs + "s</i></span>";
+        });
+      }
+      setHtml("buffs", el.buffs, buffSig, buffHtml);
 
       // the combo shows from ten squashes in a row, and grows a little with it
       var combo = R.combo >= 10 && R.comboT > 0 ? R.combo : 0;

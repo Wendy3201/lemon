@@ -34,6 +34,8 @@ GitHub Pages, Netlify or any web host. Nothing needs compiling.
 
 ## How to play
 
+The same guide is in the game: **Settings → How to play**, or the **New here? How to play** button under the Battle button. It folds out by topic (the basics, staying alive, crates and power-ups, the golden pest, combos, every boss with a tip, gear and the Forge, the Shop, pets, talents and quests, and the endless swarm), and takes its numbers from the game, so it stays right when they change.
+
 ### In battle
 
 - **Move** with WASD or the arrow keys, or hold the mouse button and the lemon
@@ -45,7 +47,13 @@ GitHub Pages, Netlify or any web host. Nothing needs compiling.
   you pick **one of three upgrades** (click a card, or press 1, 2 or 3). `R`
   rerolls the cards, once per battle unless your gear gives you more.
 - Survive until the timer runs out and the **boss** arrives. Beat the boss to
-  clear the chapter and open the next one. From chapter 40 on, **two bosses**
+  clear the chapter and open the next one. Each boss fights like the creature
+  it is named after, and there are nine: the hornet (charges), the queen
+  (rings of shots and grunts), the slug (lobbed slime and puddles), the mould
+  (spirals of spores), the beetle (leaps and slams), the spider (beams and
+  webs), the worm (burrows and bursts up under you), the moth (dust clouds and
+  wing gusts) and the fly (vanishes and reappears with a burst). Which chapter
+  has which is the `BOSS_KIND_OF` list in `js/data.js`. From chapter 40 on, **two bosses**
   arrive together (the chapter's own and the one before it, each with 65% of a
   lone boss's health), and both must fall. `PS.TWIN_BOSS` in `js/data.js` sets
   the chapter and the health share.
@@ -57,6 +65,15 @@ GitHub Pages, Netlify or any web host. Nothing needs compiling.
 - Squash pests quickly, one after another, to build a **combo**. It shows on
   the right once it reaches ten, and your best combo is on the results screen.
 - When your health drops below 30% the edges of the screen glow red.
+- **Crates, jars and flower pots** turn up on the field. Your attacks break
+  them as they pass, or just walk into one. Inside: a heal, a shower of coins,
+  a magnet, a **bomb** (squashes every pest on screen, never hurts a boss) or a
+  **power-up**: Frenzy (double attack speed), Giant (attacks half as big
+  again), Swift (much faster feet) or Star (nothing can hurt you). Power-ups
+  last 5 to 8 seconds and show a countdown on the right.
+- Twice a chapter (every 75 seconds in endless) a **golden pest** appears and
+  runs. Your weapon goes for it first; catch it within 15 seconds for a pile of
+  coins and experience, or it gets away. All of this is in `js/events.js`.
 - **Music** plays throughout: a calm tune at camp, a quick one in battle and a
   heavier one when the boss arrives. It is made in the browser like the sound
   effects (no audio files), starts with your first click, and can be switched

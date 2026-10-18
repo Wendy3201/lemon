@@ -75,7 +75,7 @@
     var fx = {};
     for (var key in stats.fx) fx[key] = stats.fx[key];
     return {
-      x: 0, y: 0, r: 13,
+      x: 0, y: 0, r: 13, vx: 0, vy: 0,
       atk: stats.atk, maxHp: stats.hp, hp: stats.hp, baseHp: stats.hp,
       crit: stats.crit, critDmg: stats.critDmg, haste: stats.haste,
       moveSpeed: 150 * (1 + stats.speed), armor: stats.armor, regen: stats.regen,
@@ -90,6 +90,7 @@
       barrierMax: stats.hp * (fx.barrier || 0), barrier: stats.hp * (fx.barrier || 0),
       revives: fx.revive || 0, rerolls: 1 + (fx.reroll || 0),
       frenzy: 0, frenzyT: 0, lvlAtk: 0, slow: 0,
+      buffs: {}, // power-ups picked up in battle: seconds left of each (events.js)
       timers: {}
     };
   }
@@ -127,7 +128,7 @@
       src: stats.weapon, dmgBy: {}, mode: mode === "swarm" ? "swarm" : "normal",
       t: 0, dur: ch.duration, phase: "swarm", over: 0, done: false,
       p: p,
-      enemies: [], shots: [], zones: [], ebullets: [], drops: [], sparks: [], texts: [], fx: [], timers: [],
+      enemies: [], shots: [], zones: [], ebullets: [], drops: [], sparks: [], texts: [], fx: [], timers: [], splats: [],
       kills: 0, combo: 0, comboT: 0, bestCombo: 0, coins: 0, dealt: 0, coinValue: Math.max(1, Math.round(ch.gold * 0.005)),
       spawnIn: 0.6,
       elites: [ch.duration * 0.35, ch.duration * 0.7],
@@ -274,6 +275,7 @@
     updatePlayer(dt);
     if (B.petUpdate) B.petUpdate(dt);
     B.director(dt);
+    if (B.events) B.events(dt);
     updateEnemies(dt);
     updateShots(dt);
     updateZones(dt);
@@ -334,12 +336,12 @@
     if (R.weaponId === "solstice" && p.fx.q && p.hp > p.maxHp * 0.7) d *= 1.5;
     return d;
   };
-  B.area = function () { return R.p.area + R.p.mods.area; };
+  B.area = function () { return (R.p.area + R.p.mods.area) * (R.p.buffs.giant > 0 ? 1.5 : 1); };
   B.count = function () { return (R.p.fx.count || 0) + R.p.mods.count; };
   B.pierce = function () { return (R.p.fx.pierce || 0) + R.p.mods.pierce; };
   B.cooldown = function (base) {
     var p = R.p;
-    return base / ((1 + p.haste + p.mods.haste + p.frenzy * 0.04) * PS.dev.cheats.hasteMul);
+    return base / ((1 + p.haste + p.mods.haste + p.frenzy * 0.04) * PS.dev.cheats.hasteMul * (p.buffs.frenzy > 0 ? 2 : 1));
   };
 
   /** How close a pest has to be before the weapon bothers to attack. */
@@ -353,7 +355,7 @@
     var p = R.p;
     var range = weaponRange();
     var near = B.nearest(p.x, p.y, range);
-    if (!near || near.boss || near.elite) return near;
+    if (!near || near.boss || near.elite || near.golden) return near;
     var dx = near.x - p.x;
     var dy = near.y - p.y;
     if (Math.sqrt(dx * dx + dy * dy) - near.r < 60) return near;
@@ -361,7 +363,7 @@
     var bigD = range * range;
     for (var i = 0; i < R.enemies.length; i++) {
       var e = R.enemies[i];
-      if (e.dead || !(e.boss || e.elite)) continue;
+      if (e.dead || !(e.boss || e.elite || e.golden)) continue;
       dx = e.x - p.x;
       dy = e.y - p.y;
       var d = dx * dx + dy * dy - e.r * e.r;
@@ -416,12 +418,18 @@
     var p = R.p;
     var move = steering();
     p.moving = Boolean(move);
+    // how fast and which way the lemon is going: bosses aim ahead of it
+    p.vx = 0;
+    p.vy = 0;
     if (move) {
-      var speed = p.moveSpeed * p.mods.speed * move.mag * (1 - p.slow) * PS.dev.cheats.moveMul;
-      p.x += move.x * speed * dt;
-      p.y += move.y * speed * dt;
+      var speed = p.moveSpeed * p.mods.speed * move.mag * (1 - p.slow) * PS.dev.cheats.moveMul * (p.buffs.swift > 0 ? 1.45 : 1);
+      p.vx = move.x * speed;
+      p.vy = move.y * speed;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
     }
     p.slow = 0;
+    for (var buff in p.buffs) if (p.buffs[buff] > 0) p.buffs[buff] -= dt;
     p.flash = Math.max(0, p.flash - dt);
     p.swing = Math.max(0, p.swing - dt);
     p.invuln = Math.max(0, p.invuln - dt);
@@ -667,7 +675,7 @@
     var list = R.enemies;
     for (var i = 0; i < list.length; i++) {
       var e = list[i];
-      if (e.dead || (ignore && ignore.indexOf(e) !== -1)) continue;
+      if (e.dead || e.prop || (ignore && ignore.indexOf(e) !== -1)) continue;
       var dx = e.x - x;
       var dy = e.y - y;
       var d = dx * dx + dy * dy - e.r * e.r;
@@ -689,7 +697,7 @@
     var tries = Math.min(10, list.length);
     for (var t = 0; t < tries; t++) {
       var e = list[Math.floor(Math.random() * list.length)];
-      if (e.dead || (ignore && ignore.indexOf(e) !== -1)) continue;
+      if (e.dead || e.prop || (ignore && ignore.indexOf(e) !== -1)) continue;
       var dx = e.x - p.x;
       var dy = e.y - p.y;
       if (dx * dx + dy * dy > range * range) continue;
@@ -714,7 +722,7 @@
       var e = list[Math.floor(Math.random() * list.length)];
       var dx = e.x - p.x;
       var dy = e.y - p.y;
-      if (!e.dead && dx * dx + dy * dy < range * range) return e;
+      if (!e.dead && !e.prop && dx * dx + dy * dy < range * range) return e;
     }
     return B.nearest(p.x, p.y, range);
   };
@@ -804,6 +812,11 @@
     var p = R.p;
     var fx = p.fx;
     e.dead = true;
+    if (e.prop) {
+      // a crate, smashed: it opens instead of counting as a kill
+      if (B.breakProp) B.breakProp(e);
+      return;
+    }
     R.kills++;
     // squash pests within a couple of seconds of each other to build a combo
     R.combo++;
@@ -812,6 +825,12 @@
     PS.sfx.play("kill", R.combo, panOf(e.x));
     dropLoot(e);
     burstSparks(e.x, e.y, e.fill, e.boss ? 40 : e.elite ? 14 : 5, e.boss ? 220 : 90);
+    if (e.golden && B.caughtGolden) B.caughtGolden(e);
+    // a splat left on the ground, fading
+    if (gfx >= 1) {
+      R.splats.push({ x: e.x, y: e.y, r: e.r * (e.boss ? 1.6 : 1.25), color: e.fill, t: 0, seed: Math.random() * 6 });
+      if (R.splats.length > 60) R.splats.shift();
+    }
 
     // on-death effects go off a beat later, so chain reactions read as chains
     if (R.procs < 14) {
@@ -1202,6 +1221,11 @@
       var d = Math.sqrt(dx * dx + dy * dy) || 1;
 
       if (d > far && !e.boss) {
+        if (e.prop) {
+          // a crate left far behind just goes
+          e.dead = true;
+          continue;
+        }
         // left far behind: bring it back round to the edge of the screen
         var angle = Math.random() * TAU;
         e.x = p.x + Math.cos(angle) * view.ring;
@@ -1235,6 +1259,11 @@
       }
 
       if (d < e.r + p.r) {
+        if (e.prop) {
+          // bumping into a crate breaks it open
+          B.hit(e, e.hp + 1, DOT);
+          continue;
+        }
         if (e.hurt) B.hurt(e.hurt * dt);
         if (thorns) B.as("thorns", function () { B.hit(e, thorns, DOT); });
         if (e.dead) continue;
@@ -1302,6 +1331,8 @@
       B.text(p.x, p.y - 24, "+" + PS.fmt(Math.round(p.maxHp * d.value)), "#9BE08A", 13);
     } else if (d.type === "magnet") {
       for (var i = 0; i < R.drops.length; i++) R.drops[i].pull = true;
+    } else if (d.type === "power" || d.type === "bomb") {
+      if (B.collectSpecial) B.collectSpecial(d);
     }
   }
 
@@ -1360,6 +1391,10 @@
 
   function updateFx(dt) {
     var i;
+    for (i = R.splats.length - 1; i >= 0; i--) {
+      R.splats[i].t += dt;
+      if (R.splats[i].t > 4) R.splats.splice(i, 1);
+    }
     for (i = R.sparks.length - 1; i >= 0; i--) {
       var s = R.sparks[i];
       s.x += s.vx * dt;
@@ -1473,11 +1508,41 @@
         ctx.arc(z.x, z.y, z.r * 0.2, 0, TAU);
         ctx.fill();
       } else if (z.type === "puddle") {
-        ctx.globalAlpha = 0.5 * fade;
+        ctx.globalAlpha = (z.web ? 0.18 : z.dust ? 0.32 : 0.5) * fade;
         ctx.fillStyle = z.color || "#7FB069";
         ctx.beginPath();
         ctx.arc(z.x, z.y, z.r, 0, TAU);
         ctx.fill();
+        if (z.web) {
+          // spokes and rings of thread
+          ctx.globalAlpha = 0.7 * fade;
+          ctx.strokeStyle = z.color;
+          ctx.lineWidth = 1.3;
+          ctx.beginPath();
+          for (var spoke = 0; spoke < 8; spoke++) {
+            var sa = (spoke / 8) * TAU;
+            ctx.moveTo(z.x, z.y);
+            ctx.lineTo(z.x + Math.cos(sa) * z.r, z.y + Math.sin(sa) * z.r);
+          }
+          for (var ringR = z.r * 0.3; ringR < z.r; ringR += z.r * 0.23) {
+            for (var rs = 0; rs <= 8; rs++) {
+              var ra = (rs / 8) * TAU;
+              if (rs) ctx.lineTo(z.x + Math.cos(ra) * ringR, z.y + Math.sin(ra) * ringR);
+              else ctx.moveTo(z.x + Math.cos(ra) * ringR, z.y + Math.sin(ra) * ringR);
+            }
+          }
+          ctx.stroke();
+        } else if (z.dust) {
+          // a few motes swirling in the cloud
+          ctx.globalAlpha = 0.5 * fade;
+          ctx.fillStyle = "#FFF6E0";
+          for (var m = 0; m < 5; m++) {
+            var ma = R.t * 1.5 + m * 1.26;
+            ctx.beginPath();
+            ctx.arc(z.x + Math.cos(ma) * z.r * 0.55, z.y + Math.sin(ma * 1.3) * z.r * 0.4, 1.8, 0, TAU);
+            ctx.fill();
+          }
+        }
       } else if (z.type === "warn") {
         var k = z.t / z.life;
         ctx.globalAlpha = 0.2 + 0.25 * k;
@@ -1551,6 +1616,8 @@
         ctx.moveTo(d.x, d.y + 2);
         ctx.lineTo(d.x + 5, d.y - 2);
         ctx.stroke();
+      } else if (d.type === "power" || d.type === "bomb") {
+        if (B.drawPickup) B.drawPickup(ctx, d, R);
       } else {
         // magnet
         ctx.strokeStyle = "#E5484D";
@@ -1798,6 +1865,22 @@
         ctx.beginPath();
         ctx.arc(f.x, f.y, f.r0 + (f.r1 - f.r0) * k, 0, TAU);
         ctx.stroke();
+      } else if (f.type === "beam") {
+        // a spider's beam: a glow along the line and a white-hot core
+        ctx.globalCompositeOperation = "lighter";
+        ctx.lineCap = "round";
+        ctx.globalAlpha = 0.45 * (1 - k);
+        ctx.strokeStyle = f.color;
+        ctx.lineWidth = f.width * 2.4;
+        ctx.beginPath();
+        ctx.moveTo(f.x0, f.y0);
+        ctx.lineTo(f.x1, f.y1);
+        ctx.stroke();
+        ctx.globalAlpha = 1 - k;
+        ctx.strokeStyle = "#FFFFFF";
+        ctx.lineWidth = f.width * 0.5;
+        ctx.stroke();
+        ctx.globalCompositeOperation = "source-over";
       } else if (f.type === "flash") {
         // a short star of light where the weapon goes off
         var size = (f.big ? 22 : 13) * (1 - k * 0.5);
@@ -1856,11 +1939,50 @@
   }
 
   /** Arrows at the screen edge pointing at a boss or elite that is out of sight. */
+  /** One pest (or crate) on the field. A pest that has just been hit squashes
+   *  for a moment; the golden pest shines. */
+  function drawOne(e) {
+    if (e.prop && B.drawProp) {
+      B.drawProp(ctx, e, R);
+      return;
+    }
+    if (e.golden && B.drawGoldenGlow) B.drawGoldenGlow(ctx, e, R);
+    if (e.flash > 0 && !e.boss && gfx >= 1) {
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.scale(1.14, 0.86);
+      ctx.translate(-e.x, -e.y);
+      B.drawEnemy(ctx, e, R);
+      ctx.restore();
+    } else {
+      B.drawEnemy(ctx, e, R);
+    }
+  }
+
+  /** Splats where pests were squashed: a blob and a few drops, fading out. */
+  function drawSplats() {
+    for (var i = 0; i < R.splats.length; i++) {
+      var s = R.splats[i];
+      ctx.globalAlpha = 0.32 * (1 - s.t / 4);
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y + s.r * 0.3, s.r, s.r * 0.55, s.seed, 0, TAU);
+      ctx.fill();
+      for (var k = 0; k < 4; k++) {
+        var a = s.seed + k * 1.7;
+        ctx.beginPath();
+        ctx.arc(s.x + Math.cos(a) * s.r * 1.4, s.y + s.r * 0.3 + Math.sin(a) * s.r * 0.8, s.r * 0.18, 0, TAU);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
   function drawPointers() {
     var p = R.p;
     for (var i = 0; i < R.enemies.length; i++) {
       var e = R.enemies[i];
-      if (!e.boss && !e.elite) continue;
+      if (!e.boss && !e.elite && !e.golden) continue;
       var dx = e.x - p.x;
       var dy = e.y - p.y;
       if (Math.abs(dx) < view.w / 2 - 10 && Math.abs(dy) < view.h / 2 - 10) continue;
@@ -1871,7 +1993,7 @@
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(angle);
-      ctx.fillStyle = e.boss ? "#E5484D" : "#F2B93B";
+      ctx.fillStyle = e.boss ? "#E5484D" : e.golden ? "#FFE66D" : "#F2B93B";
       ctx.strokeStyle = P.charcoal;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -1927,6 +2049,7 @@
     ctx.save();
     ctx.translate(ox, oy);
     drawZones();
+    drawSplats();
     drawDrops();
     if (gfx >= 1 && B.drawShadows) B.drawShadows(ctx, R);
 
@@ -1935,7 +2058,7 @@
     var i;
     for (i = 0; i < R.enemies.length; i++) {
       var e = R.enemies[i];
-      if (Math.abs(e.x - p.x) < halfW + e.r && Math.abs(e.y - p.y) < halfH + e.r) B.drawEnemy(ctx, e, R);
+      if (Math.abs(e.x - p.x) < halfW + e.r && Math.abs(e.y - p.y) < halfH + e.r) drawOne(e);
     }
 
     for (i = 0; i < R.ebullets.length; i++) {
@@ -1956,6 +2079,7 @@
     for (i = 0; i < R.shots.length; i++) B.drawShot(ctx, R.shots[i], R);
     B.drawAbilities(ctx, R);
     drawPlayer();
+    if (B.drawBuffs) B.drawBuffs(ctx, R);
     if (B.petDraw) B.petDraw(ctx, R);
     drawFx();
 

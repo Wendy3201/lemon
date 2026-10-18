@@ -242,6 +242,22 @@
       tone(480, 0.09, "sine", 0.15, { slide: 860 });
       tone(960, 0.06, "sine", 0.035, { delay: 0.025 });
     }],
+    smash: [0.08, function () {
+      // wood or clay giving way
+      noise(0.14, 0.2, { filter: "lowpass", freq: 2200, sweep: 380 });
+      tone(190, 0.09, "square", 0.06, { slide: 90, filter: 900 });
+      noise(0.05, 0.08, { filter: "bandpass", freq: 3200, delay: 0.03 });
+    }],
+    power: [0.3, function () {
+      // a quick rising sparkle
+      run([3, 5, 7, 9, 11], 0.04, "square", 0.05);
+      run([3, 5, 7, 9, 11], 0.04, "sine", 0.1);
+      bell(2349, 0.4, 0.05, 0.2);
+    }],
+    golden: [0.35, function () {
+      // shimmering, so you look for it
+      for (var i = 0; i < 6; i++) bell(1568 + i * 150, 0.25, 0.04, i * 0.05);
+    }],
     deny: [0, function () {
       tone(240, 0.08, "square", 0.06, { slide: 170, filter: 1300 });
       tone(170, 0.13, "square", 0.06, { delay: 0.075, slide: 115, filter: 1100 });
