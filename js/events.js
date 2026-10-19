@@ -5,7 +5,8 @@
  * screen, or a power-up). Power-ups last a few seconds: Frenzy (double attack
  * speed), Giant (bigger attacks), Swift (faster feet) and Star (nothing can
  * hurt you). Once or twice a chapter a golden pest appears and runs; catch it
- * before it escapes for a pile of coins and experience.
+ * before it escapes for a pile of coins and experience. Every minute or so a
+ * shrine rises nearby: stand in its circle to wake it and choose a blessing.
  *
  * battle.js calls in here: B.events each tick, B.breakProp when a crate is
  * smashed, B.caughtGolden when the golden pest is squashed, B.collectSpecial
@@ -84,9 +85,64 @@
     return e;
   }
 
+  /* Shrines: every minute and a bit, a shrine rises somewhere near the lemon.
+     Stand in its circle for SHRINE.charge seconds (stepping out drains it
+     slowly) and it offers three blessings for the rest of the battle. Left
+     alone for SHRINE.life seconds, it sinks back into the ground. */
+  var SHRINE = { first: 40, every: [70, 95], life: 30, charge: 3, r: 72 };
+
+  function spawnShrine(R) {
+    var p = R.p;
+    var angle = Math.random() * TAU;
+    var dist = PS.rand(330, 420);
+    R.shrine = { x: p.x + Math.cos(angle) * dist, y: p.y + Math.sin(angle) * dist, r: SHRINE.r, charge: 0, life: SHRINE.life, t: 0 };
+    R.fx.push({ type: "ring", x: R.shrine.x, y: R.shrine.y, r0: 10, r1: SHRINE.r, color: "#5FD3B0", width: 4, t: 0, dur: 0.5 });
+    PS.sfx.play("shrine");
+    if (!R.shrineTold) {
+      R.shrineTold = true;
+      B.toast("A shrine! Stand in its circle to wake it", 3.5);
+    }
+  }
+
+  function updateShrine(R, dt) {
+    var s = R.shrine;
+    var p = R.p;
+    s.t += dt;
+    s.life -= dt;
+    var dx = p.x - s.x;
+    var dy = p.y - s.y;
+    var inside = dx * dx + dy * dy < s.r * s.r;
+    s.inside = inside;
+    s.charge = inside ? s.charge + dt / SHRINE.charge : Math.max(0, s.charge - dt / (SHRINE.charge * 2));
+    if (s.charge >= 1) {
+      // awake: a burst of light, and the blessings to choose from
+      R.shrine = null;
+      R.shrineIn = PS.rand(SHRINE.every[0], SHRINE.every[1]);
+      R.fx.push({ type: "ring", x: s.x, y: s.y, r0: 20, r1: s.r * 2.2, color: "#5FD3B0", width: 8, t: 0, dur: 0.5 });
+      R.fx.push({ type: "blast", x: s.x, y: s.y, r: s.r, color: "#C8F7E6", t: 0, dur: 0.4 });
+      B.sparks(s.x, s.y, "#7FE3C4", 20, 180);
+      PS.sfx.play("levelup");
+      B.offer(B.rollBlessings(), "shrine");
+    } else if (s.life <= 0) {
+      R.shrine = null;
+      R.shrineIn = PS.rand(SHRINE.every[0], SHRINE.every[1]) * 0.6;
+      B.sparks(s.x, s.y, "#8D96A8", 10, 90);
+    }
+  }
+
   B.events = function (dt) {
     var R = B.run;
     if (R.phase !== "swarm" && R.phase !== "boss") return;
+    if (R.shrine) updateShrine(R, dt);
+    // the admin's "Stop spawning" keeps the field clear of these too
+    if (PS.dev.cheats.noSpawn) return;
+
+    // a new shrine now and then, but not in the closing seconds of a chapter
+    if (!R.shrine && R.phase === "swarm") {
+      if (R.shrineIn === undefined) R.shrineIn = SHRINE.first;
+      R.shrineIn -= dt;
+      if (R.shrineIn <= 0 && (R.mode === "swarm" || R.t < R.dur - 25)) spawnShrine(R);
+    }
 
     // crates: every so often, fewer while the boss is out
     if (R.crateIn === undefined) R.crateIn = 6;
@@ -181,7 +237,7 @@
       // every pest on screen is squashed; bosses only feel the shake
       var view = B.view;
       var reach = Math.max(view.w, view.h) * 0.75;
-      B.as("bomb", function () {
+      B.as("cratebomb", function () {
         R.enemies.slice().forEach(function (e) {
           if (e.dead || e.boss || e.prop) return;
           var dx = e.x - p.x;
@@ -300,6 +356,76 @@
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+  };
+
+  /** A shrine: a ring on the ground that fills while you stand in it, and a
+   *  little stone with a glowing gem in the middle. */
+  B.drawShrine = function (ctx, R) {
+    var s = R.shrine;
+    // it flickers in its last five seconds, so you know it is about to go
+    var fading = s.life < 5 && Math.sin(R.t * 14) < -0.2;
+    var rise = Math.min(1, s.t / 0.5);
+    ctx.globalAlpha = (fading ? 0.45 : 1) * rise;
+    ctx.fillStyle = s.inside ? "rgba(95,211,176,0.16)" : "rgba(95,211,176,0.08)";
+    circle(ctx, s.x, s.y, s.r);
+    ctx.strokeStyle = "rgba(127,227,196,0.6)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 8]);
+    ctx.lineDashOffset = -R.t * 18;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+    if (s.charge > 0) {
+      ctx.strokeStyle = "#5FD3B0";
+      ctx.lineWidth = 6;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, s.charge));
+      ctx.stroke();
+    }
+    // the stone
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
+    ctx.beginPath();
+    ctx.ellipse(s.x, s.y + 13, 14, 4.5, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = "#5C6B8A";
+    ctx.beginPath();
+    ctx.moveTo(s.x - 11, s.y + 13);
+    ctx.lineTo(s.x - 8, s.y - 12);
+    ctx.lineTo(s.x + 8, s.y - 12);
+    ctx.lineTo(s.x + 11, s.y + 13);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#8D96A8";
+    ctx.fillRect(s.x - 8, s.y - 12, 6, 25);
+    // the gem, brighter the more it is charged
+    var bob = Math.sin(R.t * 3) * 2;
+    var glow = 0.35 + 0.65 * s.charge;
+    ctx.globalCompositeOperation = "lighter";
+    var g = ctx.createRadialGradient(s.x, s.y - 22 + bob, 1, s.x, s.y - 22 + bob, 22);
+    g.addColorStop(0, "rgba(127,227,196," + (0.6 * glow).toFixed(3) + ")");
+    g.addColorStop(1, "rgba(127,227,196,0)");
+    ctx.fillStyle = g;
+    circle(ctx, s.x, s.y - 22 + bob, 22);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#7FE3C4";
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y - 31 + bob);
+    ctx.lineTo(s.x + 6, s.y - 22 + bob);
+    ctx.lineTo(s.x, s.y - 13 + bob);
+    ctx.lineTo(s.x - 6, s.y - 22 + bob);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#E6FFF6";
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y - 29 + bob);
+    ctx.lineTo(s.x + 3, s.y - 22 + bob);
+    ctx.lineTo(s.x - 3, s.y - 22 + bob);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
   };
 
   /** The golden pest's shine, drawn under its body. */

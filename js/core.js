@@ -265,7 +265,7 @@
   var KEY_DEV = "lemon:dev";
   var devLevel = 0;
   try { devLevel = Number(sessionStorage.getItem(KEY_DEV)) || 0; } catch (err) { /* blocked */ }
-  if (devLevel !== 1 && devLevel !== 2) devLevel = 0;
+  if (devLevel !== 2) devLevel = 0; // only the admin level is kept; the dev password is now a trap (ui.js)
 
   /* The switches a battle can run with. Both the DEV panel inside a battle and
      the lobby's "start the next battle with" card are drawn from these lists, so

@@ -42,6 +42,7 @@
     comet: "#FFB84A", nova: "#FFE66D", geyser: "#7FE3F0", flask: "#9BE08A", fangs: "#E5484D",
     thornlash: "#8FAE65", hive: "#F2B93B", staff: "#C9A6FF"
   };
+  (PS.ARMORY || []).forEach(function (w) { FLASH[w.id] = w.colors.glow; });
 
   /** "#rrggbb" and an opacity as an rgba() string, for gradients that fade out. */
   function rgba(hex, a) {
@@ -83,7 +84,7 @@
       area: 1 + stats.area, bossDmg: stats.bossDmg,
       fx: fx, // behaviour switches from gear; upgrades add to this copy
       up: {}, // level of each upgrade taken this battle
-      mods: { dmg: 1, haste: 0, count: 0, pierce: 0, area: 0, crit: 0, critDmg: 0, speed: 1, armor: 1, regen: 0 },
+      mods: { dmg: 1, haste: 0, count: 0, pierce: 0, area: 0, crit: 0, critDmg: 0, speed: 1, armor: 1, regen: 0, dash: 1 },
       level: 1, xp: 0, need: xpNeeded(1),
       aim: 0, moving: false, cd: 0.5, shots: 0, swing: 0,
       flash: 0, spin: 0, invuln: 0, sinceHit: 99, burstCd: 0,
@@ -91,6 +92,8 @@
       revives: fx.revive || 0, rerolls: 1 + (fx.reroll || 0),
       frenzy: 0, frenzyT: 0, lvlAtk: 0, slow: 0,
       buffs: {}, // power-ups picked up in battle: seconds left of each (events.js)
+      dashCd: 0, dashT: 0, dashX: 1, dashY: 0, faceX: 1, faceY: 0, // the dash: see B.dash
+      awake: {}, // abilities awakened this battle (upgrades.js)
       timers: {}
     };
   }
@@ -418,10 +421,26 @@
     var p = R.p;
     var move = steering();
     p.moving = Boolean(move);
+    if (move) {
+      p.faceX = move.x;
+      p.faceY = move.y;
+    }
     // how fast and which way the lemon is going: bosses aim ahead of it
     p.vx = 0;
     p.vy = 0;
-    if (move) {
+    p.dashCd = Math.max(0, p.dashCd - dt);
+    if (p.dashT > 0) {
+      // mid-dash: a straight, quick slide, leaving ghosts behind
+      var dashSpeed = B.DASH.dist / B.DASH.time;
+      var slide = Math.min(dt, p.dashT);
+      p.dashT -= dt;
+      p.vx = p.dashX * dashSpeed;
+      p.vy = p.dashY * dashSpeed;
+      p.x += p.vx * slide;
+      p.y += p.vy * slide;
+      p.moving = true;
+      if (gfx >= 1 && R.fx.length < 180) R.fx.push({ type: "ghost", x: p.x, y: p.y, t: 0, dur: 0.28 });
+    } else if (move) {
       var speed = p.moveSpeed * p.mods.speed * move.mag * (1 - p.slow) * PS.dev.cheats.moveMul * (p.buffs.swift > 0 ? 1.45 : 1);
       p.vx = move.x * speed;
       p.vy = move.y * speed;
@@ -492,6 +511,13 @@
   B.hurt = function (amount) {
     var p = R.p;
     if (p.invuln > 0 || PS.dev.cheats.god || R.phase === "won" || R.phase === "lost") return;
+    if (p.bubble) {
+      // the bubble shield takes the hit and bursts, pushing pests away
+      p.bubble = false;
+      p.invuln = Math.max(p.invuln, 0.6);
+      B.as("bubble", function () { B.blast(p.x, p.y, 90, B.dmg() * (1 + 0.3 * (p.up.bubble || 1)), { knock: 520, color: "#BFE0FF" }); });
+      return;
+    }
     var dmg = amount * (1 - p.armor) * p.mods.armor;
     if (p.fx.lastStand && p.hp < p.maxHp * 0.35) dmg *= 1 - p.fx.lastStand;
     if (p.fx.dmgCap) {
@@ -544,6 +570,34 @@
     p.hp = Math.min(p.maxHp, p.hp + amount);
   };
 
+  /* The dash: a quick slide the way the lemon is heading (or facing), with a
+     moment where nothing can hurt it. Space, Shift or the Dash button. */
+  B.DASH = { cd: 3.2, time: 0.16, dist: 150, safe: 0.3 };
+  B.dashCooldown = function () { return B.DASH.cd * R.p.mods.dash; };
+  B.dash = function () {
+    if (!R || R.paused || R.choices || R.devOpen || R.done) return false;
+    if (R.phase !== "swarm" && R.phase !== "boss") return false;
+    var p = R.p;
+    if (p.dashCd > 0 || p.dashT > 0) return false;
+    var move = steering();
+    p.dashX = move ? move.x : p.faceX;
+    p.dashY = move ? move.y : p.faceY;
+    p.dashT = B.DASH.time;
+    p.dashCd = B.dashCooldown();
+    p.invuln = Math.max(p.invuln, B.DASH.safe);
+    R.fx.push({ type: "ring", x: p.x, y: p.y, r0: 8, r1: 34, color: "#FFF4B8", width: 4, t: 0, dur: 0.25 });
+    PS.sfx.play("dash");
+    return true;
+  };
+
+  /** Cards that are not a level-up (a shrine's blessings): shown the same way. */
+  B.offer = function (choices, kind) {
+    R.choices = choices;
+    R.choiceKind = kind;
+    stick.on = false;
+    B.hud.choices(R);
+  };
+
   function levelUp() {
     var p = R.p;
     while (p.xp >= p.need) {
@@ -561,6 +615,7 @@
 
   function openChoices() {
     R.pending--;
+    R.choiceKind = "level";
     R.choices = B.rollChoices();
     PS.sfx.play("levelup");
     stick.on = false;
@@ -589,7 +644,7 @@
   B.reroll = function () {
     if (!R || !R.choices || R.p.rerolls <= 0) return;
     R.p.rerolls--;
-    R.choices = B.rollChoices();
+    R.choices = R.choiceKind === "shrine" ? B.rollBlessings() : B.rollChoices();
     B.hud.choices(R);
   };
 
@@ -1746,6 +1801,16 @@
     for (var i = 0; i < R.fx.length; i++) {
       var f = R.fx[i];
       var k = f.t / f.dur;
+      if (f.type === "ghost") {
+        // the lemon's afterimage, left behind by a dash
+        ctx.globalAlpha = 0.32 * (1 - k);
+        ctx.fillStyle = P.lemon;
+        ctx.beginPath();
+        ctx.ellipse(f.x, f.y, p.r * 1.1, p.r, 0, 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        continue;
+      }
       if (f.type === "blast") {
         ctx.globalAlpha = 0.45 * (1 - k);
         ctx.fillStyle = f.color;
@@ -1980,9 +2045,12 @@
 
   function drawPointers() {
     var p = R.p;
-    for (var i = 0; i < R.enemies.length; i++) {
-      var e = R.enemies[i];
-      if (!e.boss && !e.elite && !e.golden) continue;
+    var list = R.enemies;
+    // a shrine waiting somewhere off screen gets an arrow too
+    if (R.shrine) list = list.concat([{ x: R.shrine.x, y: R.shrine.y, shrine: true }]);
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (!e.boss && !e.elite && !e.golden && !e.shrine) continue;
       var dx = e.x - p.x;
       var dy = e.y - p.y;
       if (Math.abs(dx) < view.w / 2 - 10 && Math.abs(dy) < view.h / 2 - 10) continue;
@@ -1993,7 +2061,7 @@
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(angle);
-      ctx.fillStyle = e.boss ? "#E5484D" : e.golden ? "#FFE66D" : "#F2B93B";
+      ctx.fillStyle = e.boss ? "#E5484D" : e.golden ? "#FFE66D" : e.shrine ? "#5FD3B0" : "#F2B93B";
       ctx.strokeStyle = P.charcoal;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -2051,6 +2119,7 @@
     drawZones();
     drawSplats();
     drawDrops();
+    if (R.shrine && B.drawShrine) B.drawShrine(ctx, R);
     if (gfx >= 1 && B.drawShadows) B.drawShadows(ctx, R);
 
     var halfW = view.w / 2 + 70;
@@ -2166,6 +2235,11 @@
       if (MOVE_CODES[e.code]) {
         keys[e.code] = true;
         e.preventDefault();
+        return;
+      }
+      if ((e.code === "Space" || e.code === "ShiftLeft" || e.code === "ShiftRight") && !R.choices && !R.paused) {
+        e.preventDefault();
+        if (!e.repeat) B.dash();
         return;
       }
       if (R.choices) {

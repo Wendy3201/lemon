@@ -52,6 +52,7 @@
     hammer: "heavy", mace: "heavy",
     staff: "magic", storm: "magic", eclipse: "magic", comet: "magic", nova: "magic", geyser: "magic", hive: "magic"
   };
+  (PS.ARMORY || []).forEach(function (w) { FAMILY[w.id] = PS.ARCH[w.arch].sound; });
 
   /* gems picked up in quick succession climb the scale */
   var gemChain = 0;
@@ -257,6 +258,23 @@
     golden: [0.35, function () {
       // shimmering, so you look for it
       for (var i = 0; i < 6; i++) bell(1568 + i * 150, 0.25, 0.04, i * 0.05);
+    }],
+    dash: [0.15, function () {
+      // a quick whoosh
+      noise(0.16, 0.13, { filter: "bandpass", freq: 900, sweep: 3200, q: 1.2 });
+      tone(330, 0.08, "triangle", 0.05, { slide: 660 });
+    }],
+    shrine: [0.5, function () {
+      // a low hum, then a chime: something old waking up
+      tone(196, 0.7, "sine", 0.09, { slide: 220 });
+      bell(1174.66, 0.6, 0.05, 0.12);
+      bell(1567.98, 0.6, 0.04, 0.24);
+    }],
+    awaken: [0.5, function () {
+      // rising, then a big bright chord
+      run([0, 2, 4, 7, 9, 11], 0.05, "triangle", 0.09);
+      chord([SCALE[5], SCALE[7], SCALE[9]], 1, "sine", 0.08, 0.32);
+      bell(SCALE[11], 0.9, 0.06, 0.34);
     }],
     deny: [0, function () {
       tone(240, 0.08, "square", 0.06, { slide: 170, filter: 1300 });

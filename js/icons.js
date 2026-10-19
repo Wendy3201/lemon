@@ -134,6 +134,17 @@
     glass: line("M4 13.5a8 6.5 0 1 0 16 0a8 6.5 0 1 0-16 0M13 7l-2.5 4 3.5 2-2.5 4.5M12 7c0-3 2-4.5 4.5-4.5", null, 2),
     echo: dot(5, 12, 2.6) + line("M10 6.5a8 8 0 0 1 0 11M14.5 4a12 12 0 0 1 0 16M19 2a16 16 0 0 1 0 20", null, 2.2),
     sun: dot(12, 12, 4.6) + rays(12, 12, 7.2, 10.6, 8, 2.2),
+    frostnova: ring(12, 12, 9.5, null, 1.6, 'stroke-dasharray="2 2.5"') + line("M12 6v12M6.8 9l10.4 6M17.2 9 6.8 15", null, 1.8),
+    mine: rays(12, 13, 6.6, 10, 8, 1.8) + dot(12, 13, 5.6) + dot(12, 13, 1.8, "#E5484D"),
+    sunbeam: dot(6.5, 17.5, 3.6) + line("M9.5 14.5 21 3", null, 3) + line("M10.5 19 20.5 9", null, 1.4, 'opacity="0.6"'),
+    rain: oval(6.5, 9, 3, 3.6) + oval(16, 6.5, 3, 3.6) + oval(11.5, 17, 3, 3.6) + line("M6.5 2.5v2M16 0.5v1.5M11.5 10.5v2", null, 1.4),
+    bee: oval(7.5, 8, 4.2, 2.6, null, 'opacity="0.55" transform="rotate(-30 7.5 8)"') + oval(16.5, 8, 4.2, 2.6, null, 'opacity="0.55" transform="rotate(30 16.5 8)"') +
+      oval(12, 14, 6.6, 5.2) + box(9.2, 9.4, 1.7, 9.2, 0.8, "#fff", 'opacity="0.75"') + box(13.4, 9.4, 1.7, 9.2, 0.8, "#fff", 'opacity="0.75"'),
+    vine: line("M3.5 20.5C9 19 6.5 12.5 11.5 11.5S17.5 6 14 3", null, 2.4) + oval(8, 13, 3, 1.7, null, 'transform="rotate(-30 8 13)"') +
+      oval(16.5, 8.5, 3, 1.7, null, 'transform="rotate(40 16.5 8.5)"'),
+    bubble: ring(12, 12, 8.5, null, 2) + oval(9, 8.5, 2.6, 1.4, null, 'transform="rotate(-35 9 8.5)"'),
+    field: ring(12, 12, 9.5, null, 1.6, 'stroke-dasharray="3 3"') + line("M13 5.5 9.5 12H14.5L11 18.5", null, 2.2),
+    dash: oval(15.5, 12, 6.2, 5.4) + line("M2.5 8h6.5M1.5 12h7M2.5 16h6.5", null, 2.2),
     startUp: line("M5 12.5l7-7 7 7M5 19.5l7-7 7 7", null, 2.8),
     skull: fill("M12 2.5c-5 0-8.5 3.4-8.5 7.8 0 2.7 1.3 4.8 3.3 6.1V19c0 .8.7 1.5 1.5 1.5h7.4c.8 0 1.5-.7 1.5-1.5v-2.6c2-1.3 3.3-3.4 3.3-6.1 0-4.4-3.5-7.8-8.5-7.8zM8.6 9a2.3 2.3 0 1 1 0 4.6A2.3 2.3 0 0 1 8.6 9zm6.8 0a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6zM11 16h2v2.5h-2z", null, 'fill-rule="evenodd"'),
     chart: box(3.5, 13, 4.6, 8, 1.2) + box(9.7, 8, 4.6, 13, 1.2) + box(15.9, 3, 4.6, 18, 1.2),
@@ -502,6 +513,386 @@
         poly("15,15 13.5,6 19,10.5 24,4 29,10.5 34.5,6 33,15", C.gold, 'stroke="' + C.goldDark + '" stroke-width="1"');
     })()
   };
+
+  /* The armory's weapons (armory.js): one picture per attack style in the
+     element's colours, with a badge for the element in the corner. */
+  var STYLE_ART = {
+    bolt: function (c) {
+      return group("rotate(-35 24 24)",
+        box(4, 19, 30, 10, 3.4, c.dark) + box(30, 20.5, 15, 7, 2.4, c.main) + box(7, 20.5, 25, 2.6, 1.3, c.light, 'opacity="0.7"') +
+        box(9, 27, 7, 13, 2.4, c.dark) + dot(45, 24, 3.2, c.glow));
+    },
+    spread: function (c) {
+      return group("rotate(-30 24 26)",
+        box(2, 20, 13, 11, 3.4, c.dark) + poly("13,20.5 30,19 41,11 41,40 30,32 13,30.5", c.main) +
+        poly("13,20.5 30,19 41,11 41,17 30,23 13,24", c.light, 'opacity="0.55"') + box(39, 10, 4, 31, 2, c.dark)) +
+        dot(39, 5, 2.2, c.glow) + dot(44, 10, 1.8, c.glow) + dot(34, 2.5, 1.5, c.glow);
+    },
+    burst: function (c) {
+      return line("M6 14Q2 23 6 32M42 14Q46 23 42 32", c.glow, 2.4, 'opacity="0.8"') +
+        line("M10.5 17Q8.5 23 10.5 29M37.5 17Q39.5 23 37.5 29", c.glow, 2, 'opacity="0.6"') +
+        ring(24, 6, 3, c.dark, 2.4) +
+        fill("M24 8C15 8 14.5 19 14 28L10 34H38L34 28C33.5 19 33 8 24 8z", c.main) +
+        fill("M24 8C19 8 17.5 15 17 26L15 33H20C20.5 22 21 12 24 8z", c.light, 'opacity="0.5"') +
+        box(9, 33, 30, 4, 2, c.dark) + dot(24, 40, 3.6, c.dark);
+    },
+    homing: function (c) {
+      return fill("M7 32Q9 15 25 12L40 7Q43 25 31 37Q18 46 7 32z", c.main) + fill("M40 7Q43 25 31 37Q36 22 40 7z", c.dark, 'opacity="0.55"') +
+        line("M16 17Q15 31 25 38", c.light, 2.4, 'opacity="0.7"') +
+        oval(41, 14, 4.2, 8.4, c.dark, 'transform="rotate(-18 41 14)"') + oval(41, 14, 2.2, 6, c.glow, 'transform="rotate(-18 41 14)"') +
+        dot(9, 36, 3.2, c.dark) + dot(33, 4, 1.8, c.glow) + dot(25.5, 3.4, 2.2, c.glow) + dot(18, 6, 2.6, c.light);
+    },
+    slash: function (c) {
+      return tilt(fill("M21 1Q34 12 28.5 30H19.5Q26 16 21 1z", c.main) + fill("M22 4Q30 13 26 29H24Q26.5 15 22 4z", c.light, 'opacity="0.8"') +
+        box(13, 30, 22, 4.6, 2.3, c.dark) + box(21.5, 34.6, 5, 8, 1.2, C.woodDark) + dot(24, 44.4, 3, c.dark));
+    },
+    thrust: function (c) {
+      return spear(c.dark, poly("24,-1 30,10 24,17 18,10", c.main) + poly("24,2 26.8,10 24,14.5", c.light) +
+        poly("18,10 14,6.5 17.5,13.5", c.main) + poly("30,10 34,6.5 30.5,13.5", c.main), c.main);
+    },
+    slam: function (c) {
+      return tilt(box(22, 15, 4, 30, 1.6, C.wood) + box(9, 2, 30, 16, 3.6, c.dark) + box(9, 2, 30, 5.4, 2.6, c.main) +
+        box(12, 9, 24, 2.4, 1.2, c.light, 'opacity="0.6"') + box(21.2, 19, 5.6, 3, 1, c.dark));
+    },
+    lob: function (c) {
+      return line("M33 9Q38 1 43 5", c.glow, 1.6, 'stroke-dasharray="2 3"') + dot(43, 7, 3.6, c.dark) + dot(42.2, 6, 1.4, c.light) +
+        group("rotate(28 22 30)", box(14, 9, 16, 26, 4, c.dark) + box(12, 7, 20, 6, 3, c.main) + box(16, 13, 3, 20, 1.5, c.light, 'opacity="0.5"')) +
+        box(6, 35, 32, 8, 3.4, C.woodDark) + dot(13, 43, 3.4, C.wood) + dot(31, 43, 3.4, C.wood);
+    },
+    chain: function (c) {
+      return staff(c.dark, dot(24, 9.5, 7.6, c.glow, 'opacity="0.35"') + dot(24, 9.5, 5.6, c.main) + dot(22.4, 7.8, 1.8, C.white) +
+        box(21.2, 16, 5.6, 3, 1, c.dark)) +
+        line("M24 1 20.5 6.5H24.5L21 12", c.light, 2.2) + line("M45 17 41.5 22H45L42 27", c.light, 1.8);
+    },
+    boomerang: function (c) {
+      var teeth = "";
+      for (var i = 0; i < 8; i++) teeth += poly("24,2 29,9.5 21.5,8.5", c.dark, 'transform="rotate(' + i * 45 + ' 24 24)"');
+      return teeth + ring(24, 24, 12.5, c.dark, 9) + ring(24, 24, 12.5, c.main, 6.4) + ring(24, 24, 12.5, c.light, 1.6, 'opacity="0.8"');
+    },
+    zone: function (c) {
+      return box(11, 37, 4, 8, 1.5, c.dark) + box(33, 37, 4, 8, 1.5, c.dark) +
+        fill("M8 19H40Q41.5 39 24 41Q6.5 39 8 19z", c.dark) + fill("M10 21H24V40Q10 38 10 21z", c.main, 'opacity="0.35"') +
+        box(5, 16, 38, 6, 3, c.main) + oval(24, 17.5, 15, 2.6, c.light) +
+        dot(18, 12, 3, c.glow) + dot(27, 8, 2.2, c.glow) + dot(31, 13, 1.8, c.glow) + dot(22, 4, 1.5, c.glow);
+    },
+    beam: function (c) {
+      return line("M8 42 31 15", c.dark, 4.6) + line("M8 42 31 15", c.main, 2.4) +
+        dot(34, 12, 10, c.glow, 'opacity="0.3"') + poly(star(34, 12, 8.5, 3, 4), c.light) + dot(34, 12, 2.6, C.white) +
+        line("M40 20 45 25M38 4 41 1M26 6 22 3", c.glow, 1.8, 'opacity="0.8"');
+    }
+  };
+
+  function elementBadge(el, c) {
+    if (el === "plain") return "";
+    var inner;
+    if (el === "frost") inner = line("M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9", c.light, 3);
+    else if (el === "shadow") inner = fill("M15.5 2.5a9.5 9.5 0 1 0 6 16.5A10 10 0 0 1 15.5 2.5z", c.light);
+    else if (el === "radiant") inner = poly(star(12, 12, 10.5, 4.2, 4), c.light);
+    else if (el === "briar") inner = poly(star(12, 12, 11, 5.4, 7), c.light) + dot(12, 12, 3.4, c.dark);
+    else inner = fill(el === "fire" ? FLAME : el === "shock" ? BOLT : DROP, c.light);
+    return dot(39.5, 39.5, 8.4, C.white) + dot(39.5, 39.5, 7, c.dark) + group("translate(33.5 33.5) scale(0.5)", inner);
+  }
+
+  (PS.ARMORY || []).forEach(function (w) {
+    ART[w.id] = group("translate(24 24) scale(0.92) translate(-24 -24)", STYLE_ART[w.arch](w.colors)) + elementBadge(w.el, w.colors);
+  });
+
+  /* short strokes round a circle, each turned by `twist`: the wraps of a coil */
+  function spokes(cx, cy, r0, r1, n, color, width, twist) {
+    var d = "";
+    for (var i = 0; i < n; i++) {
+      var a = (i / n) * Math.PI * 2;
+      d += "M" + (cx + Math.cos(a) * r0).toFixed(1) + " " + (cy + Math.sin(a) * r0).toFixed(1) +
+        "L" + (cx + Math.cos(a + twist) * r1).toFixed(1) + " " + (cy + Math.sin(a + twist) * r1).toFixed(1);
+    }
+    return line(d, color, width);
+  }
+
+  /* a closed loop whose radius wobbles k times round: one strand of a twist */
+  function wobble(cx, cy, r, amp, k, phase) {
+    var d = "";
+    for (var i = 0; i <= 72; i++) {
+      var a = (i / 72) * Math.PI * 2;
+      var rr = r + amp * Math.sin(k * a + phase);
+      d += (i ? "L" : "M") + (cx + Math.cos(a) * rr).toFixed(1) + " " + (cy + Math.sin(a) * rr).toFixed(1);
+    }
+    return d + "Z";
+  }
+
+  function halfShade(d, c) {
+    return fill(d, c.dark, 'opacity="0.35"');
+  }
+
+  /* The armory's rings, amulets, helmets, armour and boots: one picture per
+     kind, in the theme's colours (main, light, dark, glow). */
+  var KIND_ART = {
+    // rings
+    band: function (c) {
+      return ring(24, 27, 13, c.dark, 8) + ring(24, 27, 13, c.main, 5.4) + line("M13.5 20A13 13 0 0 1 22 14.2", c.light, 2, 'opacity="0.85"') +
+        dot(24, 14, 1.6, c.glow) + dot(24, 40, 1.6, c.glow);
+    },
+    signet: function (c) {
+      return ringArt(c.main, c.dark, box(15, 5, 18, 14, 4, c.dark) + box(16.5, 6.5, 15, 11, 3, c.main) + poly(star(24, 12, 4.5, 2, 5), c.light));
+    },
+    loop: function (c) {
+      return ring(19, 29, 10, c.dark, 6) + ring(19, 29, 10, c.main, 3.6) + ring(29, 23, 10, c.dark, 6) + ring(29, 23, 10, c.main, 3.6) +
+        line("M21 21A10 10 0 0 1 27.5 13.2", c.light, 1.4) + dot(29, 13, 3, c.glow);
+    },
+    coil: function (c) {
+      return ringArt(c.main, c.dark, "") + spokes(24, 29, 9.5, 14.5, 10, c.light, 1.6, 0.4) + dot(24, 14, 3.6, c.glow);
+    },
+    knot: function (c) {
+      var knot = "M24 12C20 6 14 6 14 12S20 18 24 12 28 6 34 12 28 18 24 12z";
+      return ringArt(c.main, c.dark, line(knot, c.dark, 4.6) + line(knot, c.light, 2.2));
+    },
+    hoop: function (c) {
+      return ring(24, 21, 15, c.dark, 4) + ring(24, 21, 15, c.main, 2.4) + line("M15 33v5M24 36v6M33 33v5", c.dark, 1.4) +
+        dot(15, 39.5, 2.8, c.glow) + dot(24, 43.5, 3, c.light) + dot(33, 39.5, 2.8, c.glow);
+    },
+    seal: function (c) {
+      return ringArt(c.main, c.dark, box(14, 3, 20, 16, 2, c.dark) + box(16, 5, 16, 12, 1.5, c.main) + box(19, 8, 10, 6, 1, c.light, 'opacity="0.75"'));
+    },
+    twist: function (c) {
+      return ring(24, 27, 12.5, c.dark, 8) + fill(wobble(24, 27, 12.5, 2.2, 7, 0), "none", 'stroke="' + c.main + '" stroke-width="2.6"') +
+        fill(wobble(24, 27, 12.5, 2.2, 7, Math.PI), "none", 'stroke="' + c.light + '" stroke-width="2.6"');
+    },
+    ringlet: function (c) {
+      return ringArt(c.main, c.dark, dot(17, 15.5, 3, c.glow) + dot(24, 13, 3.8, c.light) + dot(31, 15.5, 3, c.glow));
+    },
+    spiral: function (c) {
+      return ringArt(c.main, c.dark, dot(24, 11, 9, c.dark) +
+        line("M24 11a1.5 1.5 0 0 1 3 0a3 3 0 0 1-6 0a4.5 4.5 0 0 1 9 0a6 6 0 0 1-12 0", c.glow, 1.8));
+    },
+    clasp: function (c) {
+      return ringArt(c.main, c.dark, box(12, 7, 11, 11, 3, c.main) + box(25, 7, 11, 11, 3, c.main) + box(20, 8.5, 8, 8, 1.6, c.dark) +
+        dot(24, 12.5, 2, c.glow) + line("M14 10h6M28 10h6", c.light, 1.2, 'opacity="0.7"'));
+    },
+    bangle: function (c) {
+      var studs = "";
+      for (var i = 0; i < 6; i++) {
+        var a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+        studs += dot((24 + Math.cos(a) * 17).toFixed(1), (26 + Math.sin(a) * 13).toFixed(1), 2, c.glow);
+      }
+      return oval(24, 26, 17, 13, "none", 'stroke="' + c.dark + '" stroke-width="9"') + oval(24, 26, 17, 13, "none", 'stroke="' + c.main + '" stroke-width="6"') +
+        studs + line("M9 22Q12 14 20 13", c.light, 1.6, 'opacity="0.8"');
+    },
+
+    // amulets
+    pendant: function (c) {
+      return amulet(group("translate(24 31) scale(1.3) translate(-12 -12)", fill(DROP, c.dark)) +
+        group("translate(24 31.6) scale(1.05) translate(-12 -12)", fill(DROP, c.main)) + oval(20.8, 33, 1.8, 3, c.light, 'opacity="0.8"'));
+    },
+    charm: function (c) {
+      return amulet(line("M24 34 28 45", c.dark, 2.2) + dot(19.5, 29.5, 5, c.main) + dot(28.5, 29.5, 5, c.main) + dot(19.5, 37.5, 5, c.main) +
+        dot(28.5, 37.5, 5, c.main) + dot(24, 33.5, 3, c.dark) + dot(18, 28, 1.5, c.light) + dot(27, 28, 1.5, c.light));
+    },
+    locket: function (c) {
+      return amulet(oval(24, 32, 9.5, 11, c.dark) + oval(24, 31.5, 8, 9.5, c.main) + line("M24 22.5v18", c.dark, 1.2, 'opacity="0.6"') +
+        dot(30.5, 31.5, 1.6, c.glow) + oval(20.5, 27.5, 2, 3, c.light, 'opacity="0.7"'));
+    },
+    talisman: function (c) {
+      return amulet(group("rotate(45 24 32)", box(16.5, 24.5, 15, 15, 2.4, c.dark) + box(18.5, 26.5, 11, 11, 1.6, c.main)) +
+        line("M24 26v12M20.5 30 24 33.5 27.5 30", c.light, 1.8));
+    },
+    medallion: function (c) {
+      return amulet(dot(24, 32, 10.5, c.dark) + dot(24, 32, 8.6, c.main) + poly(star(24, 32, 6.5, 2.7, 5), c.light) + ring(24, 32, 8.6, c.glow, 0.9));
+    },
+    amulet: function (c) {
+      return amulet(fill("M11 32Q24 19 37 32Q24 45 11 32z", c.main) + line("M11 32Q24 19 37 32Q24 45 11 32z", c.dark, 1.8) +
+        dot(24, 32, 5.2, c.dark) + dot(24, 32, 2.8, c.glow) + dot(22.6, 30.6, 1, "#FFFCF2"));
+    },
+    totem: function (c) {
+      return amulet(poly("17,24 24,18 31,24", c.dark) + box(17.5, 23, 13, 20, 3, c.dark) + box(19, 24.5, 10, 17, 2, c.main) +
+        dot(21.6, 30, 1.7, c.dark) + dot(26.4, 30, 1.7, c.dark) + box(21, 34, 6, 2.2, 1, c.dark) + box(19, 38, 10, 1.6, 0.8, c.light));
+    },
+    token: function (c) {
+      return amulet(dot(24, 32, 10, c.dark) + dot(24, 32, 8.4, c.main) + ring(24, 32, 6, c.light, 1.2, 'opacity="0.8"') + dot(24, 32, 2.8, c.dark) +
+        dot(18.5, 27.5, 1.4, c.glow));
+    },
+    choker: function (c) {
+      return line("M7 9Q24 26 41 9", c.dark, 5.6) + line("M7 9Q24 26 41 9", c.main, 3.4) + dot(14, 15, 1.6, c.light) + dot(34, 15, 1.6, c.light) +
+        poly("24,18 30,25 24,34 18,25", c.dark) + poly("24,20 28,25 24,31.5 20,25", c.glow) + poly("24,20 28,25 20,25", c.light);
+    },
+    torc: function (c) {
+      return line("M13 12Q7 33 24 35Q41 33 35 12", c.dark, 6.4) + line("M13 12Q7 33 24 35Q41 33 35 12", c.main, 4) +
+        line("M13 12Q7 33 24 35Q41 33 35 12", c.light, 1.2, 'stroke-dasharray="2 3" opacity="0.8"') + dot(13, 11, 4, c.glow) + dot(35, 11, 4, c.glow);
+    },
+    relic: function (c) {
+      return amulet(poly("24,19 30.5,27 27.5,44 20.5,44 17.5,27", c.dark) + poly("24,21.5 28.5,27.5 26,42 22,42 19.5,27.5", c.main) +
+        poly("24,21.5 28.5,27.5 24,42", c.light, 'opacity="0.5"'));
+    },
+    emblem: function (c) {
+      return amulet(dot(24, 21, 1.8, c.dark) + group("translate(24 33) scale(1) translate(-12 -12)", fill(SHIELD, c.dark)) +
+        group("translate(24 33) scale(0.78) translate(-12 -12)", fill(SHIELD, c.main)) + line("M24 26v13M19 31h10", c.light, 2));
+    },
+
+    // helmets
+    cap: function (c) {
+      return fill(DOME, c.main) + halfShade("M24 11Q40 11 40 31H24Z", c) + box(5, 29.5, 38, 6, 3, c.dark) + line("M24 12V7", c.dark, 2.2) +
+        dot(24, 6, 2.8, c.glow);
+    },
+    helm: function (c) {
+      return fill("M9 32Q9 9 24 9Q39 9 39 32Z", c.main) + halfShade("M24 9Q39 9 39 32H24Z", c) + box(7, 30, 34, 6, 2.5, c.dark) +
+        box(22, 14, 4, 25, 1.5, c.dark) + dot(13, 33, 1.5, c.light) + dot(35, 33, 1.5, c.light) + line("M14 15Q18 11 22 11", c.light, 1.6, 'opacity="0.7"');
+    },
+    hood: function (c) {
+      return fill("M24 4Q40 14 40 41H8Q8 14 24 4z", c.main) + halfShade("M24 4Q40 14 40 41H24z", c) + oval(24, 28, 9.5, 10.5, c.dark) +
+        dot(20.5, 28, 1.7, c.glow) + dot(27.5, 28, 1.7, c.glow);
+    },
+    crown: function (c) {
+      return poly("7,34 6,14 15,23 19,10 24,23 29,10 33,23 42,14 41,34", c.main) + poly("7,34 6,14 15,23 19,10 24,23 24,34", c.light, 'opacity="0.35"') +
+        box(6.5, 32, 35, 8, 2.6, c.dark) + dot(15, 36, 2.2, c.glow) + dot(24, 36, 2.4, c.light) + dot(33, 36, 2.2, c.glow) +
+        dot(6, 13, 2, c.light) + dot(19, 9, 2, c.light) + dot(29, 9, 2, c.light) + dot(42, 13, 2, c.light);
+    },
+    circlet: function (c) {
+      return oval(24, 27, 17, 8, "none", 'stroke="' + c.dark + '" stroke-width="5"') + oval(24, 27, 17, 8, "none", 'stroke="' + c.main + '" stroke-width="2.8"') +
+        poly("24,27 30,35 24,43 18,35", c.dark) + poly("24,29.5 28,35 24,40.5 20,35", c.glow) + poly("24,29.5 28,35 20,35", c.light, 'opacity="0.6"');
+    },
+    visor: function (c) {
+      return line("M24 9V3", c.dark, 3.4) + fill("M8 34Q8 9 24 9Q40 9 40 34Z", c.main) + halfShade("M24 9Q40 9 40 34H24Z", c) +
+        box(11, 19, 26, 7, 3.5, c.dark) + line("M14 22.5H34", c.glow, 1.6) + box(6, 32, 36, 6, 2.5, c.dark);
+    },
+    bonnet: function (c) {
+      return fill("M7 30Q7 7 24 7Q41 7 41 30Q41 37 34 37H14Q7 37 7 30z", c.main) + oval(24, 28, 11, 8, c.dark, 'opacity="0.3"') +
+        line("M7 22Q24 15 41 22", c.light, 1.6, 'opacity="0.7"') + line("M13 36Q11 42 7 45M35 36Q37 42 41 45", c.glow, 2.4) + dot(24, 38, 3, c.glow);
+    },
+    mask: function (c) {
+      return fill("M8 13Q24 5 40 13Q41 30 24 43Q7 30 8 13z", c.main) + halfShade("M24 9Q32 9 40 13Q41 30 24 43z", c) +
+        fill("M12 20Q17 15 21.5 20Q17 24.5 12 20z", c.dark) + fill("M26.5 20Q31 15 36 20Q31 24.5 26.5 20z", c.dark) +
+        dot(17, 20, 1.3, c.glow) + dot(31, 20, 1.3, c.glow) + line("M17 31l2.3 3 2.3-3 2.4 3 2.3-3 2.4 3 2.3-3", c.dark, 1.6) + line("M24 8v7", c.light, 2);
+    },
+    bandana: function (c) {
+      return fill("M5 23Q24 13 42 23V31Q24 22 5 31z", c.main) + dot(13, 24, 1.3, c.light) + dot(20, 21, 1.3, c.light) + dot(27, 21, 1.3, c.light) +
+        dot(34, 23, 1.3, c.light) + fill("M40 25L47 19L45.5 31z", c.dark) + fill("M40 28L46.5 36L38.5 34z", c.dark) + dot(41, 27, 3.2, c.main);
+    },
+    beret: function (c) {
+      return group("rotate(-12 24 26)", oval(24, 26, 19, 9.5, c.main) + oval(24, 31, 15, 4.5, c.dark) + box(22.5, 13, 3, 5, 1.4, c.dark) +
+        oval(17, 22, 6, 2.4, c.light, 'opacity="0.5"')) + dot(33, 21, 2.2, c.glow);
+    },
+    tricorne: function (c) {
+      return poly("3,30 13,13 24,19 35,13 45,30 24,37", c.main) + poly("3,30 24,37 45,30 24,31", c.dark) +
+        line("M3 30 13 13 24 19 35 13 45 30", c.glow, 1.6) + dot(24, 25, 2.8, c.light) + dot(24, 25, 1.3, c.dark);
+    },
+    halo: function (c) {
+      return oval(24, 17, 17.5, 7.5, "none", 'stroke="' + c.glow + '" stroke-width="9" opacity="0.45"') +
+        oval(24, 17, 17.5, 7.5, "none", 'stroke="' + c.main + '" stroke-width="5"') + oval(24, 17, 17.5, 7.5, "none", 'stroke="' + c.light + '" stroke-width="2"') +
+        poly(star(10, 35, 5, 1.8, 4), c.main) + poly(star(37, 34, 4, 1.5, 4), c.main) + poly(star(24, 40, 6, 2.2, 4), c.light);
+    },
+
+    // armour
+    vest: function (c) {
+      return fill(VEST, c.main) + halfShade("M24 12H28L34 8 41 15 36 21V41H24Z", c) + line("M20 12Q24 17 28 12", c.light, 2) +
+        line("M24 17V41", c.dark, 1.2, 'opacity="0.6"') + dot(21, 24, 1.5, c.glow) + dot(21, 31, 1.5, c.glow);
+    },
+    plate: function (c) {
+      return fill(PLATE, c.main) + halfShade("M24 6.7Q31 7 37 10L39 29Q32 37 24 41Z", c) + oval(19, 19, 4.5, 6, c.light, 'opacity="0.55"') +
+        dot(14, 12.5, 1.6, c.glow) + dot(34, 12.5, 1.6, c.glow);
+    },
+    mail: function (c) {
+      var links = "";
+      for (var y = 17; y <= 37; y += 4.5) {
+        for (var x = 15.5; x <= 33; x += 4.4) links += ring(x.toFixed(1), y.toFixed(1), 1.7, c.main, 1.2);
+      }
+      return fill(VEST, c.dark) + links + line("M20 12Q24 17 28 12", c.light, 2.2);
+    },
+    coat: function (c) {
+      return fill("M14 6 20 9H28L34 6 41 13 37 19V44H11V19L7 13Z", c.main) + halfShade("M24 10H28L34 6 41 13 37 19V44H24Z", c) +
+        poly("20,9 24,17 28,9", c.dark) + line("M24 16V44", c.dark, 1.6) +
+        dot(27, 21, 1.5, c.glow) + dot(27, 28, 1.5, c.glow) + dot(27, 35, 1.5, c.glow);
+    },
+    cloak: function (c) {
+      return fill("M16 6H32L41 42Q24 46 7 42Z", c.main) + halfShade("M24 6H32L41 42Q32 44.5 24 45Z", c) +
+        line("M16 6Q24 12 32 6", c.dark, 2.4) + line("M19 14 14 40M29 14 34 40", c.light, 1.2, 'opacity="0.5"') + dot(24, 9.5, 3.6, c.glow);
+    },
+    tunic: function (c) {
+      return fill("M14 8 20 11H28L34 8 41 15 36 20 37 42H11L12 20 7 15Z", c.main) + halfShade("M24 11H28L34 8 41 15 36 20 37 42H24Z", c) +
+        box(11.5, 27, 25, 4.5, 1.5, c.dark) + box(22, 26.5, 4, 5.5, 1, c.glow) + line("M20 11L24 17L28 11", c.light, 2);
+    },
+    jerkin: function (c) {
+      return fill(VEST, c.main) + halfShade("M24 12H28L34 8 41 15 36 21V41H24Z", c) + line("M24 13V41", c.dark, 1.2) +
+        line("M21 16l6 4M27 16l-6 4M21 23l6 4M27 23l-6 4M21 30l6 4M27 30l-6 4", c.light, 1.4) + box(12, 36, 24, 3, 1, c.dark, 'opacity="0.6"');
+    },
+    cuirass: function (c) {
+      return fill(PLATE, c.main) + halfShade("M24 6.7Q31 7 37 10L39 29Q32 37 24 41Z", c) + line("M24 8V40", c.light, 2, 'opacity="0.7"') +
+        dot(12.5, 14, 1.4, c.dark) + dot(12.5, 21, 1.4, c.dark) + dot(35.5, 14, 1.4, c.dark) + dot(35.5, 21, 1.4, c.dark) +
+        line("M14 28Q24 34 34 28", c.glow, 1.6);
+    },
+    robe: function (c) {
+      return fill("M17 6H31L35 16 41 44H7L13 16Z", c.main) + halfShade("M24 6H31L35 16 41 44H24Z", c) +
+        poly("15,14 19,14 36,41 31.5,43", c.glow, 'opacity="0.85"') + line("M17 6Q24 14 31 6", c.dark, 2.2);
+    },
+    poncho: function (c) {
+      return poly("24,6 45,30 24,40 3,30", c.main) + poly("24,6 45,30 24,40", c.dark, 'opacity="0.3"') +
+        line("M9 27 24 34 39 27", c.light, 2.4) + line("M13 22.5 24 28 35 22.5", c.glow, 2.2) + oval(24, 10, 4.5, 3, c.dark) +
+        line("M8 33v4M14 36v4M20 38.5v4M28 38.5v4M34 36v4M40 33v4", c.dark, 1.4);
+    },
+    apron: function (c) {
+      return line("M19 7Q12 3 10 10M29 7Q36 3 38 10", c.dark, 1.6) + box(19, 6, 10, 9, 2, c.main) + fill("M15 14H33V42Q24 45 15 42Z", c.main) +
+        halfShade("M24 14H33V42Q29 43.5 24 44Z", c) + line("M15 20H7M33 20H41", c.dark, 1.8) + box(19, 27, 10, 8, 1.5, c.dark, 'opacity="0.45"') +
+        line("M17 17l2.5 2.5M31 17l-2.5 2.5M18 39l2-2M30 39l-2-2", c.glow, 1.6);
+    },
+    mantle: function (c) {
+      return fill("M5 21Q7 8 24 8Q41 8 43 21L38 31Q24 25 10 31Z", c.main) + halfShade("M24 8Q41 8 43 21L38 31Q31 28 24 27.6Z", c) +
+        line("M10 31Q14 27 17 29.5M17 29.5Q21 26 24 27.6M24 27.6Q27 26 31 29.5M31 29.5Q34 27 38 31", c.light, 1.6, 'opacity="0.7"') +
+        box(18, 9, 12, 5, 2.5, c.dark) + dot(24, 15.5, 2.6, c.glow);
+    },
+
+    // boots
+    boots: function (c) {
+      return boot(c.main, c.light, c.dark, line("M18 14h8M18 19h8", c.dark, 1.6, 'opacity="0.6"') + dot(37, 33, 1.6, c.glow));
+    },
+    greaves: function (c) {
+      return boot(c.main, c.light, c.dark, box(14, 12, 16, 4, 1.5, c.dark, 'opacity="0.6"') + box(14, 19, 16, 4, 1.5, c.dark, 'opacity="0.6"') +
+        dot(17, 14, 1, c.glow) + dot(27, 14, 1, c.glow) + dot(17, 21, 1, c.glow) + dot(27, 21, 1, c.glow));
+    },
+    sandals: function (c) {
+      return fill(BOOT, c.light, 'opacity="0.2"') + box(10, 38, 34, 5, 2.5, c.dark) +
+        line("M16 14H28M20 14V27M15 38 21 28M27 38 21 28M24 38 35 31M33 38 39 32", c.main, 3) + dot(21, 28, 2.4, c.glow);
+    },
+    clogs: function (c) {
+      return fill("M8 26Q8 18 20 18H32Q42 18 43 30V36H8Z", c.main) + fill("M8 26Q8 21 14 21V26z", c.dark) + box(6, 35, 38, 7, 3, c.dark) +
+        oval(25, 22.5, 7, 2.4, c.light, 'opacity="0.6"') + dot(36, 27, 2, c.glow);
+    },
+    slippers: function (c) {
+      return fill("M6 31Q6 22 18 22H32Q43 22 43 32V36H6Z", c.main) + halfShade("M24 22H32Q43 22 43 32V36H24Z", c) + box(5, 35, 39, 4.5, 2.2, c.dark) +
+        dot(33, 22.5, 5.2, c.light) + dot(33, 22.5, 3, c.glow);
+    },
+    striders: function (c) {
+      return boot(c.main, c.light, c.dark, fill("M15 20Q2 18 3 6Q8 12 15 12Z", c.glow, 'opacity="0.9"') + fill("M15 25Q4 26 3 17Q9 21 15 19Z", c.light) +
+        line("M32 33l6 2", c.light, 2));
+    },
+    treads: function (c) {
+      return boot(c.main, c.light, c.dark, box(11, 40, 34, 4.6, 1.5, c.dark) + line("M14 44.5v2.5M19 44.5v2.5M24 44.5v2.5M29 44.5v2.5M34 44.5v2.5M39 44.5v2.5", c.dark, 2.4) +
+        fill(FLAME, c.glow, 'transform="translate(6 30) scale(0.42)"'));
+    },
+    wraps: function (c) {
+      return fill(BOOT, c.light) + line("M15 10H29M15 15H29M15 20H29M16 26 30 30M20 32 41 34", c.main, 2.6) + box(11.5, 39, 33, 4.4, 2, c.dark) +
+        line("M29 8l4-4", c.main, 2);
+    },
+    sabatons: function (c) {
+      return boot(c.main, c.light, c.dark, line("M15 12H29M15 18H29M15 24H29M22 28 27 37M30 30 33 38M36 32 38 39", c.dark, 1.6, 'opacity="0.7"') +
+        dot(22, 9, 1.2, c.glow) + dot(22, 15, 1.2, c.glow) + dot(22, 21, 1.2, c.glow));
+    },
+    moccasins: function (c) {
+      return fill("M7 31Q7 23 16 23H30Q42 23 43 33V36H7Z", c.main) + halfShade("M24 23H30Q42 23 43 33V36H24Z", c) +
+        line("M12 27Q24 21 37 28", c.light, 1.4, 'stroke-dasharray="2 2"') + box(6, 35, 38, 4, 2, c.dark) +
+        dot(17, 24.5, 1.6, c.glow) + dot(21, 23.8, 1.6, c.glow) + dot(25, 23.8, 1.6, c.glow);
+    },
+    stompers: function (c) {
+      return fill("M12 4H31V24L41 28Q45 30 45 36V40H10V26Q10 24 12 22Z", c.main) + halfShade("M24 4H31V24L41 28Q45 30 45 36V40H24Z", c) +
+        box(10, 3, 23, 6, 2.5, c.dark) + box(8, 38, 39, 8, 3, c.dark) + line("M15 12l9 4M15 17l9 4M24 12l-9 4M24 17l-9 4", c.light, 1.4) +
+        poly("11,46 13,42 15,46", c.glow) + poly("26,46 28,42 30,46", c.glow) + poly("40,46 42,42 44,46", c.glow);
+    },
+    waders: function (c) {
+      return fill("M15 1H29V25L39 30Q43 32 43 37V40H13V28Q13 26 15 24Z", c.main) + halfShade("M22 1H29V25L39 30Q43 32 43 37V40H22Z", c) +
+        box(13, 1, 18, 5, 2, c.light) + box(11.5, 39, 33, 4.4, 2, c.dark) + line("M18 9V24", c.light, 1.4, 'opacity="0.5"') +
+        dot(26, 3.5, 1.4, c.glow);
+    }
+  };
+
+  (PS.GEAR || []).forEach(function (g) {
+    ART[g.id] = group("translate(24 24) scale(0.92) translate(-24 -24)", KIND_ART[g.kind](g.colors)) + elementBadge(g.theme, g.colors);
+  });
 
   /* A boss picture for a chapter: the body of its fighting kind in the
      chapter's own colours, with that chapter's pattern and extra part. */

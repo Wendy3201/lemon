@@ -35,7 +35,13 @@
     { pattern: "planks", props: ["nail", "cobweb", "crack", "pebble"], mote: "dust", motes: "240,220,200", shade: 0.5 },
     { pattern: "tiles", props: ["puddle", "puddle", "grate", "pebble", "crack"], mote: "bubble", motes: "170,235,245", shade: 0.55 },
     { pattern: "cracks", props: ["ember", "ember", "crack", "pebble"], mote: "ember", motes: "255,150,80", shade: 0.5, glow: "255,110,50" },
-    { pattern: null, props: ["spore", "spore", "root", "mushroom", "crack"], mote: "spore", motes: "220,150,255", shade: 0.55, glow: "190,90,230" }
+    { pattern: null, props: ["spore", "spore", "root", "mushroom", "crack"], mote: "spore", motes: "220,150,255", shade: 0.55, glow: "190,90,230" },
+    // chapters 51 to 100
+    { pattern: "tiles", props: ["crack", "crack", "pebble", "leaf", "nail"], mote: "dust", motes: "220,225,245", shade: 0.5 },
+    { pattern: null, props: ["puddle", "puddle", "tuft", "tuft", "leaf", "flower"], mote: "bubble", motes: "170,240,215", shade: 0.5, glow: "80,200,160" },
+    { pattern: "tiles", props: ["puddle", "crack", "pea", "pebble"], mote: "steam", motes: "225,240,255", shade: 0.5, glow: "150,210,255" },
+    { pattern: null, props: ["root", "root", "tuft", "flower", "crack"], mote: "pollen", motes: "255,175,205", shade: 0.55 },
+    { pattern: "furrows", props: ["apple", "apple", "flower", "flower", "tuft", "leaf"], mote: "pollen", motes: "255,230,140", shade: 0.4, glow: "255,205,90" }
   ];
 
   function hash(x, y) {

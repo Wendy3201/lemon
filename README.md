@@ -3,7 +3,7 @@
 **A Lemon game.** You steer a lemon through swarms of garden pests. It attacks
 by itself; you dodge, grab gems, and pick an upgrade every level. Between
 battles you collect gear, forge it into rarer gear, open chests, learn talents
-and watch your Power climb through fifty chapters.
+and watch your Power climb through a hundred chapters in fifteen zones.
 
 Plain HTML, CSS and JavaScript. No build step, no framework, no dependencies,
 no accounts, no tracking. It works offline once the folder is on your computer.
@@ -74,6 +74,19 @@ The same guide is in the game: **Settings → How to play**, or the **New here? 
 - Twice a chapter (every 75 seconds in endless) a **golden pest** appears and
   runs. Your weapon goes for it first; catch it within 15 seconds for a pile of
   coins and experience, or it gets away. All of this is in `js/events.js`.
+- **Dash** with Space or Shift (or the round button at the bottom right on a
+  phone): a quick slide the way you are heading, safe from everything for a
+  moment, back after about 3 seconds. The **Quick Feet** card makes it come
+  back sooner. `B.DASH` in `js/battle.js` holds the numbers.
+- Every minute or so a **shrine** rises nearby (a green arrow points to it).
+  Stand in its circle for 3 seconds to wake it, then choose one of three
+  **blessings** for the rest of the battle: Fury, Haste, the Grove, Stone,
+  Wings, Stars or Plenty. Left alone for 30 seconds it sinks away again
+  (`SHRINE` in `js/events.js`, the blessings in `js/upgrades.js`).
+- Max out an ability and its **awakening** turns up at your next level-up: a
+  gold card that makes it work as if it were three levels past its max, under
+  a new name (Orbit Peel becomes Peel Tempest, Frost Nova becomes Deep
+  Freeze...).
 - **Music** plays throughout: a calm tune at camp, a quick one in battle and a
   heavier one when the boss arrives. It is made in the browser like the sound
   effects (no audio files), starts with your first click, and can be switched
@@ -174,6 +187,70 @@ you untick the box.
 Melee swings (blade, spear, hammer, Solstice) also knock enemy shots out of
 the air.
 
+**The armory** (`js/armory.js`) adds 84 more weapons, for 107 in all, and 96
+more of every other slot (101 rings, 101 amulets, 101 helmets, 101 armour,
+101 boots). Each
+one pairs an attack style with an element, and its name says which: a
+*Frost Mortar* lobs shells that slow, a *Cinder Sabre* slashes and sets pests
+alight.
+
+| Style | How it attacks | | Element | What its hits do |
+| --- | --- | --- | --- | --- |
+| Repeater | Quick bolts | | Orchard | Nothing extra; A grade |
+| Blunderbuss | A spray of pellets | | Cinder | Burn |
+| Bell | A ring of shots all round | | Frost | Slow |
+| Seeker | Homing shots | | Volt | Pests take more damage for a while |
+| Sabre | A wide slash | | Venom | Poison, and heal as pests fall |
+| Pike | A long stab | | Shadow | Bigger attacks; always S grade |
+| Maul | A ground slam | | Radiant | Crits; S or SS grade |
+| Mortar | Shells into the crowd | | | |
+| Chakram | Out and back | | | |
+| Cauldron | A hurting puddle | | | |
+| Rod | Chain lightning | | | |
+| Wand | A beam through a line | | | |
+
+Their perks follow the style (Rare and Legendary are stats, Epic is the
+empowered attack, Mythic adds one more of whatever the weapon fires) and
+the element (the hidden ??? perk).
+
+The other gear is made the same way from a kind and a theme. There are twelve
+kinds per slot: rings (Band, Signet, Loop, Coil, Knot, Hoop, Seal, Twist,
+Ringlet, Spiral, Clasp, Bangle), amulets (Pendant, Charm, Locket, Talisman,
+Medallion, Amulet, Totem, Token, Choker, Torc, Relic, Emblem), helmets (Cap,
+Helm, Hood, Crown, Circlet, Visor, Bonnet, Mask, Bandana, Beret, Tricorne,
+Halo), armour (Vest, Plate, Mail, Coat, Cloak, Tunic, Jerkin, Cuirass, Robe,
+Poncho, Apron, Mantle) and boots (Boots, Greaves, Sandals, Clogs, Slippers,
+Striders, Treads, Wraps, Sabatons, Moccasins, Stompers, Waders). The kind sets
+the main stat and the perks from Rare to Mythic. The theme (the seven elements
+plus **Briar**) sets what the piece always does and its ??? perk:
+
+| Theme | Always | ??? perk |
+| --- | --- | --- |
+| Orchard | +5% XP | A free upgrade at the start of every battle |
+| Cinder | Pests near you burn | Burning pests explode |
+| Frost | Pests near you are slowed | +25% damage to slowed pests |
+| Volt | Pests you hit take more damage | Pests explode when they die |
+| Venom | Heal for every pest squashed | Finishes off pests below 6% |
+| Shadow | +4% move speed | Every attack repeats for 20% |
+| Radiant | Crit chance and crit damage | Boss damage and crit chance |
+| Briar | Thorns | A burst of thorns when you get hurt |
+
+The new rings, amulets, helmets, armour and boots go up to S grade, and S
+pieces get 50% bigger numbers on their stat perks. None of them is SS: in
+those slots SS stays with the five hand-made pieces, which are still the best
+there are, so the most Power the game allows is the same 272M as before. A
+chest's list folds out by slot, since it now holds hundreds of items.
+
+### Abilities
+
+Level-up cards include abilities that fight beside your weapon. Besides the
+older ones, there are eight newer ones: **Frost Nova** (a chilling ring every few
+seconds), **Seed Mines** (dropped as you go, burst when a pest steps near),
+**Sunbeam** (a beam turning round you), **Lemon Rain** (lemons dropped on
+pests), **Bee Buddies** (bees that circle and sting), **Vine Lash** (whips
+the nearest pests), **Bubble Shield** (blocks one hit, then bursts) and
+**Static Field** (zaps pests that come close and softens them up).
+
 ---
 
 ## What's in the folder
@@ -184,6 +261,8 @@ lemon/
 ├── style.css         theme colours, layout, every screen
 ├── js/
 │   ├── core.js       the PS namespace, safe storage, events, number formatting
+│   ├── armory.js     the 84 weapons made from an attack style and an element,
+│   │                 and the 480 other pieces made from a kind and a theme
 │   ├── data.js       ALL the numbers: rarities, gear and perks, talents,
 │   │                 chapters, quests, chest odds, prices, balance curves
 │   ├── icons.js      every icon and item picture, drawn in code as SVG
@@ -217,7 +296,10 @@ Most tweaks are one line in `js/data.js`.
   already work are listed by use in `battle.js`, `weapons.js` and
   `upgrades.js` (search for `fx.`).
 - **A new weapon** also needs an entry in `js/weapons.js` saying how it
-  attacks. Copy the closest existing one.
+  attacks. Copy the closest existing one. Or add an element (or a style) to
+  `js/armory.js`: a new element makes 12 weapons at once, each with a name,
+  perks, a picture and a sound, and a new style needs its attack in the `STYLE`
+  table in `js/weapons.js` and its picture in `STYLE_ART` in `js/icons.js`.
 - **Prices, odds and rewards:** `PS.CHESTS`, `PS.GIFT`, `PS.DROP_GRADE`,
   `PS.TALENTS`, `PS.QUESTS` and `PS.BAL`.
 - **Difficulty:** `HP_SCALE` and `DMG_SCALE` say how much tougher and harder
@@ -225,17 +307,29 @@ Most tweaks are one line in `js/data.js`.
   health, and `REC_POWER` is the number shown as "recommended". They were
   fitted by simulating thousands of battles against the gear a player
   naturally has by each chapter, so if you make gear or gold much more
-  generous, raise them to match.
+  generous, raise them to match. Chapters 1 to 20 come straight from the fit
+  and 21 to 50 climb by `LATE` per chapter, both as they always were (chapter
+  50 recommends 12.8M). Chapters 51 to 100 keep climbing until chapter 100
+  recommends `MAX_POWER`, 272M: a fully maxed lemon (every talent at the top
+  tier, the best pets, the hand-made SS gear at ??? and slot level 80). The
+  pests there grow by `END.pests` (7.8%) a chapter, tuned with simulated
+  battles so that a fully maxed lemon only just beats chapter 100 and one a
+  little short of max (205M) cannot. If gear or talents change what a maxed
+  lemon reaches, change `MAX_POWER` to match.
+- **More chapters:** `CHAPTER_COUNT` in `js/data.js`, plus a name, a boss name,
+  a boss kind and a featured pest for each new one in the lists below it.
+  Chapters 51 to 100 are ten to a zone: the Rooftops, the Pond, the Ice Box,
+  the Thorn Wilds and the Golden Grove (their floors are in `js/arena.js`).
 - **A new upgrade card:** add it to `UPGRADES` in `js/upgrades.js`.
-- **Two passwords.** The dev password (`PS.dev.password` in `js/core.js`) opens the battle tools only: the Battle section of the lobby dev menu and the DEV panel in a battle (Cheats, Upgrades, Run). The admin password (`PS.dev.adminPassword`) opens everything. The admin prompt is hidden: click the lemon logo at the top twice, then type the key code up, up, down, down, left, right, left, right, B, A anywhere in the menus, then enter the password. On a phone, the second logo tap brings up a small pad of arrow, B and A buttons to tap instead. (Once the admin is unlocked for the tab, the key code alone reopens the menu.)
+- **Two passwords.** The dev password (`PS.dev.password` in `js/core.js`) is now a **trap**: whoever types it into the `?` button's box loses their whole save, and a "womp womp" message tells them so. It opens nothing. The admin password (`PS.dev.adminPassword`) opens everything. The admin prompt is hidden: click the lemon logo at the top twice, then type the key code up, up, down, down, left, right, left, right, B, A anywhere in the menus, then enter the password. On a phone, the second logo tap brings up a small pad of arrow, B and A buttons to tap instead. (Once the admin is unlocked for the tab, the key code alone reopens the menu.)
 - **The admin menu in the lobby** has twelve sections down the left. *Overview* (every computed stat), *Gear* (give items, set each slot's level), *Owned* (change an item's rarity, wear it, remove it, clean out the bag), *Pets* (give any pet at any level, fill the team, open the slots), *Money*, *Shop* (open chests without paying, set the pity counters, set the gift timer), *Progress* (chapters and talents), *Quests* (complete or claim any quest, set the counters they read), *Chapters* (every chapter with Play and Clear to here), *Battle* (start any chapter or swarm mode with cheats and a built-up lemon), *Settings* and *Save*. Every change it makes is remembered: the **Undo** button at the top takes back the last one, and the Save section lists the last thirty so you can go back to any of them. The Save section also keeps named **snapshots** of the save in this browser and can download the save as a file or load one.
 - **The DEV / admin panel in a battle** opens from the DEV button or the ` key. As admin it has six tabs: *Cheats* (godmode, one-hit kills, freeze the pests, stop spawning, vacuum, and multipliers for damage, attack speed, move speed, XP and game speed), *Upgrades* (search, filter by tier, take or max any card), *Player* (health, stat boosts, auto-levelling, swap weapon, build presets), *Spawn* (any pest, elites, the boss, a training dummy for reading damage per second, status effects on every pest, pickups), *Run* (skip the clock, set the boss's health, restart on any chapter) and *Stats* (a read-out of the whole run). The switches themselves are listed in `PS.dev` in `js/core.js`, so adding one there adds it to the lobby and the battle panel together.
-- **The password on the `?` button** is the dev password. It is
-  checked in the browser, so anyone who reads the file can see it. Entering it
-  once (here or on the construction page) unlocks developer tools for that tab:
-  a **DEV button in every battle** (godmode, one-hit kills, game speed, take or
-  max any upgrade, level up, skip to the boss) and a tabbed dev menu in the
-  lobby (the admin password opens all of it, see above).
+- **The password on the `?` button** is the dev password, and it wipes the
+  save (see above). Both passwords are checked in the browser, so anyone who
+  reads the files can see them. The admin password, through the logo and the
+  key code, unlocks developer tools for that tab: a **DEV button in every
+  battle** (godmode, one-hit kills, game speed, take or max any upgrade, level
+  up, skip to the boss) and the tabbed admin menu in the lobby.
   The lobby menu can give or remove any item, set gold and
   gems to an exact figure, and start **Swarm mode**, an endless battle with no
   boss and a swarm that keeps growing, with pests as tough as the chapter you

@@ -486,6 +486,32 @@
       P(7, "Every eruption is followed by a second, bigger one", null, { q: 1 }, 0.5)
     ]);
 
+  /* The armory's rings, amulets, helmets, armour and boots (armory.js) share
+     their perks across grades, so S pieces get bigger numbers on their stat
+     perks instead: level with the hand-made S pieces, and never past the
+     hand-made SS item of their slot, which stays the best there is. (Armory
+     weapons keep their perks as they are; their grade shows in the main stat.) */
+  var GEAR_GRADE = { A: 1, S: 1.5 };
+  function graded(stats, grade) {
+    if (!stats) return null;
+    var out = {};
+    for (var key in stats) out[key] = Math.round(stats[key] * GEAR_GRADE[grade] * 10000) / 10000;
+    return out;
+  }
+
+  /* the armory: every attack style paired with every element (armory.js) */
+  PS.ARMORY.forEach(function (w) {
+    var arch = PS.ARCH[w.arch];
+    var el = PS.ELEMENT[w.el];
+    def(w.id, "weapon", w.grade, w.name, 10, (arch.blurb + " " + el.blurb).trim(), el.innate, [
+      P(2, null, arch.perk2),
+      P(3, arch.empText, null, { emp: arch.emp }, 0.1),
+      P(4, null, arch.perk4),
+      P(5, arch.countText, null, { count: 1 }, 0.3),
+      P(7, el.top.text, el.top.s || null, el.top.fx, 0.4)
+    ]);
+  });
+
   /* more armour, boots, rings, amulets and helmets */
 
   def("warden", "helmet", "S", "Grove Warden's Hood", 44,
@@ -559,6 +585,21 @@
       P(5, null, { xp: 0.15, gold: 0.2 }),
       P(7, "Come back to life once per battle, and every level-up adds 3% damage", null, { revive: 1, levelAtk: 0.03 }, 0.5)
     ]);
+
+  /* the armory's rings, amulets, helmets, armour and boots: every kind of each
+     with every theme (armory.js) */
+  PS.GEAR.forEach(function (g) {
+    var theme = PS.GEAR_THEME[g.theme];
+    var perks = g.perks.map(function (perk, i) {
+      var at = i + 2; // Rare, Epic, Legendary, Mythic
+      return perk.fx ? P(at, perk.text, null, perk.fx, perk.pw) : P(at, null, graded(perk, g.grade));
+    });
+    var top = theme.top;
+    perks.push(P(7, top.text, graded(top.s, g.grade), top.fx, top.fx ? (top.pw || 0.3) : 0));
+    // an always-on effect keeps its numbers (they are in its words); always-on stats grow with the grade
+    var innate = theme.innate.text ? theme.innate : { s: graded(theme.innate.s, g.grade) };
+    def(g.id, g.slot, g.grade, g.name, g.base, (g.blurb + " " + theme.blurb).trim(), innate, perks);
+  });
 
   /* quick lookups: PS.POOL[slot][grade] -> [item ids] */
   PS.POOL = {};
@@ -659,7 +700,8 @@
      Gold grows 1.35x a chapter, the same slope as level and talent prices. */
 
   var FITTED_COUNT = 20; // the chapters the tables below were fitted for
-  var CHAPTER_COUNT = 50;
+  var CHAPTER_COUNT = 100;
+  var TUNED_COUNT = 50; // the late stretch below was tuned when the game ended at chapter 50
 
   var HP_SCALE = [1, 1.5, 2.6, 4.2, 6.6, 10.5, 16.5, 26, 41, 64, 100, 158, 260, 420, 800, 1250, 2000, 3000, 3800, 4600];
   var DMG_SCALE = [0.85, 1.1, 1.4, 1.9, 2.6, 3.7, 5.2, 7.3, 10.3, 14.5, 20.5, 28.9, 42, 62, 100, 145, 205, 280, 370, 470];
@@ -679,16 +721,34 @@
   }
 
   /* Chapters 21 to 50 carry on from chapter 20: every number grows by this
-     factor per chapter. They were tuned with simulated battles, so that the
-     very best gear (SS-grade ??? at slot level 80, every talent) can only just
-     finish the last chapters, and ordinary Surpass / ??? gear stalls well
-     before them. Raise a number to make that stretch harder, lower to ease it. */
+     factor per chapter. They were tuned with simulated battles; raise a
+     number to make that stretch harder, lower to ease it. */
   var LATE = { hp: 1.09, dmg: 1.09, boss: 1.09, power: 1.066 };
-  for (var j = FITTED_COUNT; j < CHAPTER_COUNT; j++) {
+  for (var j = FITTED_COUNT; j < TUNED_COUNT; j++) {
     HP_SCALE[j] = HP_SCALE[j - 1] * LATE.hp;
     DMG_SCALE[j] = DMG_SCALE[j - 1] * LATE.dmg;
     BOSS_SCALE[j] = BOSS_SCALE[j - 1] * LATE.boss;
     REC_POWER[j] = Math.round((REC_POWER[j - 1] * LATE.power) / 10) * 10;
+  }
+
+  /* Chapters 51 to 100 keep climbing until the last one asks for MAX_POWER:
+     the most Power the game allows (every talent at the top tier, the best
+     pets, the hand-made SS gear at ??? and slot level 80). The recommended
+     Power grows by the same factor every chapter to get there. The pests grow
+     by END.pests a chapter, tuned with simulated battles so that a fully
+     maxed lemon can only just beat chapter 100. If gear or talents change what
+     a maxed lemon reaches, change MAX_POWER to match. */
+  var MAX_POWER = 272000000;
+  var END = {
+    power: Math.pow(MAX_POWER / REC_POWER[TUNED_COUNT - 1], 1 / (CHAPTER_COUNT - TUNED_COUNT)),
+    pests: 1.078
+  };
+  for (var k = TUNED_COUNT; k < CHAPTER_COUNT; k++) {
+    var climb = k - TUNED_COUNT + 1;
+    HP_SCALE[k] = HP_SCALE[TUNED_COUNT - 1] * Math.pow(END.pests, climb);
+    DMG_SCALE[k] = DMG_SCALE[TUNED_COUNT - 1] * Math.pow(END.pests, climb);
+    BOSS_SCALE[k] = BOSS_SCALE[TUNED_COUNT - 1] * Math.pow(END.pests, climb);
+    REC_POWER[k] = Math.round((REC_POWER[TUNED_COUNT - 1] * Math.pow(END.power, climb)) / 10) * 10;
   }
 
   PS.BAL = {
@@ -739,11 +799,18 @@
     { name: "The Attic", floor: "#2A2523", dot: "rgba(230,205,190,0.08)", prop: "#443A36", accent: "#C9A58D" },
     { name: "The Drains", floor: "#17262B", dot: "rgba(150,225,235,0.08)", prop: "#24404A", accent: "#4FB6C9" },
     { name: "The Furnace", floor: "#2E1C18", dot: "rgba(255,170,110,0.09)", prop: "#4B2B22", accent: "#F2784B" },
-    { name: "The Rotten Core", floor: "#221A2C", dot: "rgba(225,160,255,0.08)", prop: "#38284A", accent: "#C46BE0" }
+    { name: "The Rotten Core", floor: "#221A2C", dot: "rgba(225,160,255,0.08)", prop: "#38284A", accent: "#C46BE0" },
+    { name: "The Rooftops", floor: "#24262E", dot: "rgba(200,210,235,0.08)", prop: "#363A47", accent: "#8E9BC4" },
+    { name: "The Pond", floor: "#162D29", dot: "rgba(160,240,210,0.09)", prop: "#22443D", accent: "#5FC9A6" },
+    { name: "The Ice Box", floor: "#1B2633", dot: "rgba(210,235,255,0.10)", prop: "#2B3B4E", accent: "#9BDCFF" },
+    { name: "The Thorn Wilds", floor: "#2A1A20", dot: "rgba(255,180,205,0.08)", prop: "#432630", accent: "#E07A9C" },
+    { name: "The Golden Grove", floor: "#2B2614", dot: "rgba(255,232,150,0.10)", prop: "#463D1E", accent: "#F2C94C" }
   ];
-  /* chapters 1-20 are four to a zone; the rest are six to a zone */
+  /* chapters 1-20 are four to a zone, 21-50 six to a zone, and 51-100 ten */
   function zoneOf(c) {
-    return c <= FITTED_COUNT ? Math.floor((c - 1) / 4) : 5 + Math.floor((c - FITTED_COUNT - 1) / 6);
+    if (c <= FITTED_COUNT) return Math.floor((c - 1) / 4);
+    if (c <= TUNED_COUNT) return 5 + Math.floor((c - FITTED_COUNT - 1) / 6);
+    return 10 + Math.floor((c - TUNED_COUNT - 1) / 10);
   }
 
   var CHAPTER_NAMES = [
@@ -756,7 +823,17 @@
     "Attic Stairs", "Dusty Trunks", "Cobweb Beams", "The Old Cradle", "Moth Loft", "Chimney Flue",
     "Drain Mouth", "Pipe Maze", "Sludge Run", "Rusty Grate", "Gutter Falls", "The Sump",
     "Coal Chute", "Boiler Room", "Cinder Lane", "Ember Pit", "Ash Hall", "The Furnace Heart",
-    "Rot Roots", "Spore Garden", "Blight Tunnels", "The Gnarled Bough", "Pip Graveyard", "The Last Pip"
+    "Rot Roots", "Spore Garden", "Blight Tunnels", "The Gnarled Bough", "Pip Graveyard", "The Last Pip",
+    "Gutter Ledge", "Slate Slopes", "Chimney Stacks", "Weather Vane", "Crow's Perch",
+    "The Skylight", "Lead Flashing", "Aerial Mast", "Moss Tiles", "The Ridge Line",
+    "Lily Pads", "Reed Beds", "Frogspawn Shallows", "Duckweed Mat", "The Muddy Bank",
+    "Stepping Stones", "Dragonfly Reach", "Sunken Log", "Willow Roots", "The Deep End",
+    "Frost Door", "Ice Tray", "Frozen Peas", "Freezer Burn", "Rime Shelves",
+    "Snowdrift Drawer", "Icicle Hall", "Cold Store", "Permafrost", "The Frozen Heart",
+    "Bramble Gate", "Nettle Path", "Rose Thicket", "Hawthorn Hedge", "Thistledown",
+    "Blackberry Maze", "Gorse Hill", "Briar Hollow", "Spine Wood", "The Thorn Throne",
+    "Sunlit Path", "Honey Meadow", "Amber Orchard", "Golden Boughs", "Pollen Haze",
+    "Gilded Roots", "The Old Orchard", "Seed Vault", "Sun Temple", "The First Tree"
   ];
   /* Which creature each chapter's boss is, to match its name (Spider Mother is
      a spider, Pipe Worm a worm...), in an order where no two chapters in a row
@@ -766,7 +843,12 @@
     "slug", "mould", "fly", "queen", "worm", "mould", "hornet", "spider", "worm", "mould",
     "moth", "fly", "queen", "slug", "hornet", "beetle", "spider", "beetle", "spider", "mould",
     "moth", "fly", "slug", "worm", "queen", "spider", "beetle", "mould", "beetle", "mould",
-    "hornet", "slug", "queen", "beetle", "worm", "mould", "beetle", "spider", "fly", "queen"
+    "hornet", "slug", "queen", "beetle", "worm", "mould", "beetle", "spider", "fly", "queen",
+    "slug", "beetle", "moth", "hornet", "fly", "spider", "worm", "queen", "mould", "beetle",
+    "worm", "hornet", "queen", "slug", "beetle", "spider", "fly", "mould", "moth", "worm",
+    "hornet", "slug", "beetle", "mould", "spider", "moth", "fly", "queen", "worm", "beetle",
+    "hornet", "spider", "queen", "beetle", "moth", "slug", "fly", "worm", "mould", "queen",
+    "beetle", "hornet", "slug", "moth", "fly", "worm", "spider", "mould", "hornet", "queen"
   ];
   var BOSS_NAMES = [
     "The Hornet", "Aphid Queen", "Slug Baron", "Stump Rot",
@@ -778,7 +860,17 @@
     "Cobweb Warden", "Trunk Mimic", "Beam Spider", "Cradle Rot", "Moth Lord", "Soot Fiend",
     "Drain Eel", "Pipe Worm", "Sludge Mother", "Grate Crawler", "Gutter Gator", "Sump Tyrant",
     "Coal Beetle", "Boiler Brute", "Cinder Wasp", "Ember Slug", "Ash Queen", "Furnace Colossus",
-    "Root Strangler", "Spore Mother", "Blight Rex", "The Gnarled One", "Pip Reaper", "The Rot Sovereign"
+    "Root Strangler", "Spore Mother", "Blight Rex", "The Gnarled One", "Pip Reaper", "The Rot Sovereign",
+    "Gutter Slug", "Slate Weevil", "Soot Moth", "Vane Hornet", "Carrion Fly",
+    "Glass Spider", "Lead Worm", "Mast Queen", "Tile Moss", "Ridge Tyrant",
+    "Lily Leech", "Reed Hornet", "Spawn Mother", "Duckweed Snail", "Mud Beetle",
+    "Pond Skater", "Dragonfly Ace", "Log Rot", "Willow Moth", "The Deep Leech",
+    "Frost Hornet", "Ice Slug", "Pea Weevil", "Freezer Mould", "Rime Spider",
+    "Snow Moth", "Icicle Fly", "Cold Store Queen", "Permafrost Worm", "The Frozen Colossus",
+    "Bramble Wasp", "Nettle Spider", "Rose Aphid Queen", "Hedge Beetle", "Thistle Moth",
+    "Bramble Slug", "Gorse Fly", "Briar Worm", "Spine Mould", "The Thorn Queen",
+    "Sun Beetle", "Honey Wasp", "Amber Slug", "Gilded Moth", "Pollen Fly",
+    "Golden Worm", "Orchard Spider", "Vault Mould", "Temple Hornet", "The Last Pest"
   ];
   /* the pest that turns up twice as often in each chapter */
   var FEATURED = [
@@ -786,13 +878,21 @@
     "bomber", "brute", "dart", "spitter", "splitter", "bomber", "charger", "spitter", "brute", null,
     "splitter", "charger", "bomber", "spitter", "brute", "dart", "splitter", "charger", "bomber", "spitter",
     "brute", "dart", "splitter", "charger", "bomber", "spitter", "brute", "dart", "splitter", "charger",
-    "bomber", "spitter", "brute", "dart", "splitter", "charger", "bomber", "spitter", "brute", "brute"
+    "bomber", "spitter", "brute", "dart", "splitter", "charger", "bomber", "spitter", "brute", "brute",
+    "dart", "spitter", "charger", "splitter", "bomber", "brute", "dart", "charger", "spitter", "splitter",
+    "bomber", "brute", "spitter", "dart", "charger", "splitter", "bomber", "brute", "dart", "spitter",
+    "charger", "splitter", "brute", "bomber", "dart", "spitter", "charger", "splitter", "brute", "bomber",
+    "spitter", "dart", "splitter", "charger", "brute", "bomber", "spitter", "dart", "splitter", "charger",
+    "brute", "bomber", "dart", "spitter", "splitter", "charger", "brute", "bomber", "spitter", "brute"
   ];
   /* first clear of a zone boss hands out a special item: [grade, slot or null] */
   var MILESTONES = {
     4: ["S", "weapon"], 8: ["S", null], 12: ["S", "weapon"], 16: ["SS", null], 20: ["SS", "weapon"],
     24: ["S", "weapon"], 28: ["SS", null], 32: ["S", null], 36: ["SS", "weapon"], 40: ["SS", null],
-    44: ["SS", null], 48: ["SS", "weapon"], 50: ["SS", null]
+    44: ["SS", null], 48: ["SS", "weapon"], 50: ["SS", null],
+    54: ["S", null], 58: ["S", "weapon"], 62: ["SS", null], 66: ["S", null], 70: ["SS", "weapon"],
+    74: ["S", null], 78: ["SS", null], 82: ["S", "weapon"], 86: ["SS", null], 90: ["SS", "weapon"],
+    94: ["SS", null], 98: ["SS", null], 100: ["SS", "weapon"]
   };
 
   /* Every boss looks different. The four kinds above decide how a boss fights;
@@ -952,8 +1052,8 @@
 
   PS.QUESTS = [
     { id: "chapters", name: "Pest Control", stat: "best", text: "Clear chapter {n}",
-      tiers: [1, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50],
-      gems: [40, 40, 50, 60, 70, 80, 100, 120, 140, 160, 200, 400, 250, 300, 350, 400, 500, 800] },
+      tiers: [1, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100],
+      gems: [40, 40, 50, 60, 70, 80, 100, 120, 140, 160, 200, 400, 250, 300, 350, 400, 500, 800, 500, 600, 700, 800, 1500] },
     { id: "kills", name: "Squasher", stat: "kills", text: "Squash {n} pests",
       tiers: [100, 500, 2000, 5000, 15000, 40000, 100000], gems: [30, 40, 60, 80, 100, 150, 250] },
     { id: "forge", name: "Blacksmith", stat: "forges", text: "Forge {n} times", first: "Forge an item",

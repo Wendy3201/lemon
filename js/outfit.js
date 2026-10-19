@@ -36,6 +36,16 @@
     firstwind: { c: "#FFFCF2", d: "#C98A1B" },
     firstseed: { c: "#8FAE65", d: "#F2B93B" }
   };
+  /* the armory's gear (armory.js) wears its theme's colours */
+  var HELMET_SHAPE = { crown: "crown", halo: "halo", hood: "point", circlet: "band", bandana: "band" };
+  (PS.GEAR || []).forEach(function (g) {
+    LOOK[g.id] = { c: g.colors.main, d: g.colors.dark, shape: HELMET_SHAPE[g.kind] || "dome" };
+  });
+  var PLAIN = { c: "#C79A5B", d: "#70492A", shape: "dome" };
+
+  function lookOf(item) {
+    return LOOK[item.id] || PLAIN;
+  }
 
   function trim(item) {
     return item.r >= 1 ? PS.RARITY[item.r].color : null;
@@ -53,7 +63,7 @@
   function boots(ctx, p, y, t) {
     var item = p.outfit.boots;
     if (!item) return;
-    var look = LOOK[item.id];
+    var look = lookOf(item);
     for (var side = -1; side <= 1; side += 2) {
       var step = p.moving ? Math.sin(t * 14 + (side > 0 ? Math.PI : 0)) * 1.8 : 0;
       var fx = p.x + side * 6.5;
@@ -77,7 +87,7 @@
   function armor(ctx, p, y) {
     var item = p.outfit.armor;
     if (!item) return;
-    var look = LOOK[item.id];
+    var look = lookOf(item);
     ctx.save();
     ctx.beginPath();
     ctx.ellipse(p.x, y, 14, 12, 0, 0, TAU);
@@ -120,7 +130,7 @@
   function amulet(ctx, p, y) {
     var item = p.outfit.amulet;
     if (!item) return;
-    var look = LOOK[item.id];
+    var look = lookOf(item);
     ctx.strokeStyle = "#6F654F";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -139,7 +149,7 @@
   function helmet(ctx, p, y, t) {
     var item = p.outfit.helmet;
     if (!item) return;
-    var look = LOOK[item.id];
+    var look = lookOf(item);
     var edge = trim(item);
     var x = p.x;
     ctx.fillStyle = look.c;
@@ -181,6 +191,31 @@
       ctx.beginPath();
       ctx.arc(x, y - 11.5, 1.4, 0, TAU);
       ctx.fill();
+      return;
+    }
+
+    if (look.shape === "point") {
+      // a hood, drawn up to a point
+      ctx.beginPath();
+      ctx.moveTo(x - 13.4, y - 6.5);
+      ctx.quadraticCurveTo(x - 12, y - 16, x, y - 21);
+      ctx.quadraticCurveTo(x + 12, y - 16, x + 13.4, y - 6.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      return;
+    }
+
+    if (look.shape === "band") {
+      // a circlet or bandana round the brow
+      ctx.beginPath();
+      ctx.moveTo(x - 12.5, y - 7);
+      ctx.quadraticCurveTo(x, y - 12.5, x + 12.5, y - 7);
+      ctx.lineTo(x + 12, y - 3.5);
+      ctx.quadraticCurveTo(x, y - 9, x - 12, y - 3.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
       return;
     }
 

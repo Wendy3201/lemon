@@ -905,6 +905,328 @@
     held: function (ctx, k) { drawStaff(ctx, k, "#3A5C7A", "#DDF4FF", "#7FD4F5"); }
   };
 
+  /* ---------------------------------------------------------- the armory */
+  /* The weapons made in armory.js: one attack and one held drawing per style,
+     coloured by the element. The element's own effect (burning, chilling...)
+     comes from the item, so every hit applies it without anything here. */
+
+  var STYLE = {
+    bolt: {
+      cd: 0.5, range: 380, pierces: true,
+      attack: function (c, aim, target, empowered, mult) {
+        var size = Math.sqrt(B.area());
+        var dmg = B.dmg() * 0.95 * mult;
+        var n = 1 + B.count();
+        for (var i = 0; i < n; i++) {
+          B.shoot({ angle: aim + (i - (n - 1) / 2) * 0.15, speed: 460, range: 380, r: 4.5 * size, dmg: dmg, pierce: B.pierce(), sprite: "pip", color: c.main });
+        }
+        if (empowered) B.shoot({ angle: aim, speed: 400, range: 460, r: 11 * size, dmg: dmg * 3, pierce: 999, sprite: "pip", color: c.light, bounce: 0 });
+      },
+      held: function (ctx, k, c) {
+        ctx.fillStyle = c.dark;
+        ctx.fillRect(6 - k * 3, 2, 16, 7);
+        ctx.fillRect(8 - k * 3, 8, 5, 7);
+        ctx.fillStyle = c.main;
+        ctx.fillRect(18 - k * 3, 3, 10, 5);
+        ctx.fillStyle = c.glow;
+        ctx.beginPath();
+        ctx.arc(29 - k * 3, 5.5, 2.6 + k * 2, 0, TAU);
+        ctx.fill();
+      }
+    },
+    spread: {
+      cd: 0.85, range: 250, pierces: true,
+      attack: function (c, aim, target, empowered, mult) {
+        var area = B.area();
+        var dmg = B.dmg() * 0.62 * mult;
+        var n = 5 + 2 * B.count();
+        var i;
+        for (i = 0; i < n; i++) {
+          B.shoot({
+            angle: aim + (i - (n - 1) / 2) * 0.13 + PS.rand(-0.04, 0.04), speed: 470, range: 230, r: 4.2 * Math.sqrt(area),
+            dmg: dmg, pierce: B.pierce(), sprite: "pip", color: c.main, bounce: 0
+          });
+        }
+        if (empowered) {
+          for (i = 0; i < 12; i++) B.shoot({ angle: aim + (i / 12) * TAU, speed: 440, range: 210, r: 4, dmg: dmg, pierce: B.pierce(), sprite: "pip", color: c.light, bounce: 0 });
+        }
+      },
+      held: function (ctx, k, c) {
+        ctx.fillStyle = c.dark;
+        ctx.fillRect(4 - k * 3, 2, 10, 8);
+        ctx.fillStyle = c.main;
+        ctx.beginPath();
+        ctx.moveTo(12 - k * 3, 2);
+        ctx.lineTo(30 - k * 3, -2);
+        ctx.lineTo(30 - k * 3, 14);
+        ctx.lineTo(12 - k * 3, 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = c.light;
+        ctx.fillRect(28 - k * 3, -3, 3, 18);
+      }
+    },
+    burst: {
+      cd: 1.0, reach: function () { return 230 * B.area(); },
+      attack: function (c, aim, target, empowered, mult) {
+        var p = B.run.p;
+        var area = Math.sqrt(B.area());
+        var dmg = B.dmg() * 0.75 * mult;
+        var n = 10 + 3 * B.count();
+        var ringOut = function (turn) {
+          for (var i = 0; i < n; i++) {
+            B.shoot({ x: p.x, y: p.y, angle: aim + turn + (i / n) * TAU, speed: 380, range: 250 * area, r: 5 * area, dmg: dmg, pierce: B.pierce() + 1, sprite: "orb", color: c.main, bounce: 0 });
+          }
+        };
+        ringOut(0);
+        if (empowered) B.later(0.2, function () { ringOut(Math.PI / n); });
+        B.run.fx.push({ type: "ring", x: p.x, y: p.y, r0: 10, r1: 40, color: c.glow, width: 4, t: 0, dur: 0.25 });
+      },
+      held: function (ctx, k, c) {
+        ctx.fillStyle = c.main;
+        ctx.beginPath();
+        ctx.moveTo(8, 12);
+        ctx.quadraticCurveTo(10, -6, 22, -2);
+        ctx.quadraticCurveTo(28, 8, 26, 14);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = c.glow;
+        ctx.globalAlpha = 0.3 + k * 0.6;
+        ctx.beginPath();
+        ctx.arc(18, 6, 12 + k * 6, 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    },
+    homing: {
+      cd: 0.9, range: 380,
+      attack: function (c, aim, target, empowered, mult) {
+        var n = 3 + 2 * B.count() + (empowered ? 6 : 0);
+        for (var i = 0; i < n; i++) {
+          B.shoot({ angle: aim + PS.rand(-0.9, 0.9), speed: 320, range: 520, r: 4, dmg: B.dmg() * 0.58 * mult, homing: 6, pierce: B.pierce(), sprite: "pip", color: c.main, bounce: 0 });
+        }
+      },
+      held: function (ctx, k, c) {
+        ctx.fillStyle = c.main;
+        ctx.beginPath();
+        ctx.moveTo(6, 4);
+        ctx.lineTo(24 + k * 3, -3);
+        ctx.lineTo(24 + k * 3, 13);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = c.dark;
+        ctx.fillRect(22 + k * 3, -4, 4, 18);
+      }
+    },
+    slash: {
+      cd: 0.62, reach: function () { return 105 * B.area(); },
+      attack: function (c, aim, target, empowered, mult) {
+        var area = B.area();
+        var dmg = B.dmg() * 1.55 * mult;
+        var opts = { knock: 260, color: c.light };
+        if (empowered) {
+          B.sweep(aim, Math.PI, 112 * area, dmg * 1.2, opts);
+          return;
+        }
+        for (var i = 0; i <= B.count(); i++) B.sweep(aim + SIDES[i % 4], 1.15, 105 * area, dmg, opts);
+      },
+      held: function (ctx, k, c) { drawBlade(ctx, k, 26, 7, c.light, c.main); }
+    },
+    thrust: {
+      cd: 0.7, reach: function () { return 180 * B.area(); },
+      attack: function (c, aim, target, empowered, mult) {
+        var area = B.area();
+        var dmg = B.dmg() * 1.9 * mult;
+        var dirs = [];
+        for (var i = 0; i <= B.count(); i++) dirs.push(aim + SIDES[i % 4]);
+        if (empowered) dirs.push(aim - 0.45, aim + 0.45);
+        dirs.forEach(function (d) { B.thrust(d, 185 * area, 40, dmg, { color: c.light, knock: 200 }); });
+      },
+      held: function (ctx, k, c) { drawSpear(ctx, k, c.dark, c.main); }
+    },
+    slam: {
+      cd: 1.15, reach: function () { return 84 * B.area(); },
+      attack: function (c, aim, target, empowered, mult) {
+        var p = B.run.p;
+        var r = 92 * B.area();
+        var dmg = B.dmg() * 1.85 * mult * (empowered ? 1.5 : 1);
+        B.blast(p.x, p.y, r, dmg, { knock: 420, stun: empowered ? 1.2 : 0, color: c.light, swat: true });
+        var again = function () { B.blast(p.x, p.y, r, dmg * 0.7, { knock: 300, color: c.main, swat: true }); };
+        for (var i = 1; i <= B.count(); i++) B.later(0.18 * i, again);
+      },
+      held: function (ctx, k, c) {
+        ctx.rotate(-0.9 + (1 - k) * 0.9);
+        ctx.strokeStyle = WOOD;
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(8, 5);
+        ctx.lineTo(26, 5);
+        ctx.stroke();
+        ctx.fillStyle = c.dark;
+        ctx.fillRect(21, -4, 12, 18);
+        ctx.fillStyle = c.main;
+        ctx.fillRect(21, -4, 12, 6);
+      }
+    },
+    lob: {
+      cd: 1.05, range: 400,
+      attack: function (c, aim, target, empowered, mult) {
+        var R = B.run;
+        var area = B.area();
+        var n = 1 + B.count() + (empowered ? 2 : 0);
+        var used = [];
+        for (var i = 0; i < n; i++) {
+          var spot = B.cluster(400, 90, used) || target;
+          used.push(spot);
+          (function (x, y) {
+            var r = 54 * area;
+            R.fx.push({ type: "lob", x0: R.p.x, y0: R.p.y, x1: x, y1: y, color: c.dark, size: 7, t: 0, dur: 0.45 });
+            R.fx.push({ type: "ring", x: x, y: y, r0: r * 1.4, r1: r * 0.3, color: c.main, width: 3, t: 0, dur: 0.45 });
+            B.later(0.45, function () {
+              B.blast(x, y, r, B.dmg() * 1.8 * mult, { color: c.main, knock: 160 });
+              R.shake = Math.max(R.shake, 3);
+            });
+          })(spot.x, spot.y);
+        }
+      },
+      held: function (ctx, k, c) {
+        ctx.fillStyle = c.dark;
+        ctx.beginPath();
+        ctx.arc(16 + k * 4, 5, 7, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = WOOD;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(20 + k * 4, 0);
+        ctx.quadraticCurveTo(24 + k * 4, -6, 27 + k * 4, -5);
+        ctx.stroke();
+        ctx.fillStyle = c.glow;
+        ctx.beginPath();
+        ctx.arc(27 + k * 4, -5, 2.2, 0, TAU);
+        ctx.fill();
+      }
+    },
+    chain: {
+      cd: 0.85, range: 340,
+      attack: function (c, aim, target, empowered, mult) {
+        var p = B.run.p;
+        var area = B.area();
+        var chains = empowered ? 3 : 1;
+        var used = [];
+        for (var i = 0; i < chains; i++) {
+          var first = i === 0 ? target : B.randomNear(340);
+          if (!first) break;
+          used = B.chain(p.x, p.y, first, B.dmg() * 1.25 * mult, 4 + 2 * B.count(), 150 * area, used);
+        }
+      },
+      held: function (ctx, k, c) { drawStaff(ctx, k, c.dark, c.light, c.main); }
+    },
+    boomerang: {
+      cd: 0.95, range: 300,
+      attack: function (c, aim, target, empowered, mult) {
+        var area = B.area();
+        var n = 1 + B.count() + (empowered ? 2 : 0);
+        for (var i = 0; i < n; i++) {
+          B.shoot({
+            angle: aim + (i - (n - 1) / 2) * 0.32, speed: 430, range: 99999, r: 12 * Math.sqrt(area),
+            dmg: B.dmg() * mult, pierce: 99999, sprite: "chakram", color: c.main, spin: 18, bounce: 0,
+            rang: { out: true, gone: 0, dist: 250 * area, trips: 1 }
+          });
+        }
+      },
+      held: function (ctx, k, c) {
+        if (k > 0.2) return;
+        ctx.strokeStyle = c.main;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(18, 5, 7, 0, TAU);
+        ctx.stroke();
+        ctx.strokeStyle = c.light;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    },
+    zone: {
+      cd: 1.0, range: 380,
+      attack: function (c, aim, target, empowered, mult) {
+        var area = B.area();
+        var n = 1 + B.count() + (empowered ? 2 : 0);
+        var used = [];
+        for (var i = 0; i < n; i++) {
+          var spot = B.cluster(380, 80, used) || target;
+          used.push(spot);
+          (function (x, y) {
+            lobTo(x, y, c.main, function () {
+              B.blast(x, y, 40 * area, B.dmg() * 0.9 * mult, { color: c.light, quiet: true });
+              B.addZone({ type: "fire", x: x, y: y, r: 46 * area, life: 2.6, dps: B.dmg() * 0.75 * mult, color: c.main, core: c.light });
+            });
+          })(spot.x, spot.y);
+        }
+      },
+      held: function (ctx, k, c) {
+        ctx.fillStyle = c.dark;
+        ctx.beginPath();
+        ctx.moveTo(8 + k * 4, 2);
+        ctx.lineTo(24 + k * 4, 2);
+        ctx.lineTo(21 + k * 4, 13);
+        ctx.lineTo(11 + k * 4, 13);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = c.main;
+        ctx.fillRect(8 + k * 4, 0, 16, 4);
+      }
+    },
+    beam: {
+      cd: 0.75, reach: function () { return 300 * B.area(); },
+      attack: function (c, aim, target, empowered, mult) {
+        var R = B.run;
+        var p = R.p;
+        var len = 300 * B.area();
+        var n = 1 + B.count();
+        var dirs = [];
+        var i;
+        for (i = 0; i < n; i++) dirs.push(aim + (i - (n - 1) / 2) * 0.22);
+        if (empowered) for (i = -2; i <= 2; i++) if (i) dirs.push(aim + i * 0.3);
+        dirs.forEach(function (d) {
+          B.thrust(d, len, 18, B.dmg() * 1.45 * mult, { color: c.light });
+          R.fx.push({ type: "beam", x0: p.x, y0: p.y, x1: p.x + Math.cos(d) * len, y1: p.y + Math.sin(d) * len, width: 10, color: c.main, t: 0, dur: 0.22 });
+        });
+      },
+      held: function (ctx, k, c) {
+        ctx.strokeStyle = c.dark;
+        ctx.lineWidth = 2.6;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(6, 7);
+        ctx.lineTo(24, 2);
+        ctx.stroke();
+        ctx.fillStyle = c.glow;
+        ctx.globalAlpha = 0.35 + k * 0.5;
+        ctx.beginPath();
+        ctx.arc(26, 1.5, 6 + k * 4, 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = c.light;
+        ctx.beginPath();
+        ctx.arc(26, 1.5, 3, 0, TAU);
+        ctx.fill();
+      }
+    }
+  };
+
+  (PS.ARMORY || []).forEach(function (w) {
+    var style = STYLE[w.arch];
+    var arch = PS.ARCH[w.arch];
+    var c = w.colors;
+    W[w.id] = {
+      cd: style.cd, range: style.range, reach: style.reach, pierces: style.pierces,
+      countName: arch.countName, countText: arch.countText,
+      attack: function (aim, target, empowered, mult) { style.attack(c, aim, target, empowered, mult); },
+      held: function (ctx, k) { style.held(ctx, k, c); }
+    };
+  });
+
   /* ------------------------------------------------------- held + flying */
 
   Object.keys(W).forEach(function (id) {
@@ -925,7 +1247,7 @@
     if (v < 80 || s.age < 0.02) return;
     var nx = s.vx / v;
     var ny = s.vy / v;
-    var len = Math.min(52, v * 0.075, s.age * v) * (s.sprite === "rang" ? 0.6 : 1);
+    var len = Math.min(52, v * 0.075, s.age * v) * (s.sprite === "rang" || s.sprite === "chakram" ? 0.6 : 1);
     var color = s.sprite === "shard" ? VOID : s.color;
     var tx = s.x - nx * len;
     var ty = s.y - ny * len;
@@ -1048,6 +1370,28 @@
         ctx.lineTo(s.r * 0.3, 0);
         ctx.lineTo(-s.r * 0.8, s.r * 0.5);
         ctx.stroke();
+        ctx.restore();
+        break;
+      case "chakram":
+        // a spinning ring with teeth
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(s.rot);
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = Math.max(2.5, s.r * 0.35);
+        ctx.beginPath();
+        ctx.arc(0, 0, s.r * 0.7, 0, TAU);
+        ctx.stroke();
+        ctx.fillStyle = s.color;
+        for (var tooth = 0; tooth < 6; tooth++) {
+          var ta = (tooth / 6) * TAU;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(ta) * s.r * 0.55, Math.sin(ta) * s.r * 0.55);
+          ctx.lineTo(Math.cos(ta + 0.35) * s.r * 1.2, Math.sin(ta + 0.35) * s.r * 1.2);
+          ctx.lineTo(Math.cos(ta + 0.75) * s.r * 0.6, Math.sin(ta + 0.75) * s.r * 0.6);
+          ctx.closePath();
+          ctx.fill();
+        }
         ctx.restore();
         break;
       default:

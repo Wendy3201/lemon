@@ -5982,3 +5982,200 @@ body::before {
 .home__guide {
   margin: 4px auto 0;
 }
+
+/* -------------------------------------- "womp womp" (the dev password trap) */
+
+.womp {
+  text-align: center;
+}
+
+.womp__art {
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 4px;
+  transform: rotate(18deg);
+  filter: saturate(0.5) brightness(0.92);
+  animation: wompDroop 1.6s ease-in-out infinite alternate;
+}
+
+.womp__art svg {
+  width: 100%;
+  height: 100%;
+}
+
+.womp h2 {
+  font-family: var(--font-display);
+  font-size: 40px;
+  letter-spacing: 0.02em;
+}
+
+@keyframes wompDroop {
+  to {
+    transform: rotate(26deg) translateY(4px);
+  }
+}
+
+/* ----- chest contents: one folding part per slot ----- */
+.chestinfo__part {
+  margin: 8px 0;
+  border: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+  border-radius: 16px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.chestinfo__part summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  list-style: none;
+}
+
+.chestinfo__part summary::-webkit-details-marker {
+  display: none;
+}
+
+.chestinfo__part summary small {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  font-family: var(--font-body, inherit);
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.chestinfo__part summary::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-right: 2.5px solid var(--ink-faint);
+  border-bottom: 2.5px solid var(--ink-faint);
+  transform: rotate(45deg) translateY(-3px);
+  transition: transform 0.25s var(--soft-ease, ease);
+}
+
+.chestinfo__part[open] summary::after {
+  transform: rotate(225deg) translateY(-2px);
+}
+
+.chestinfo__part .chestinfo__list {
+  padding: 0 8px 8px;
+}
+
+.chestinfo__part .chestinfo__item {
+  background: var(--surface);
+}
+
+/* ----- the dash button: bottom right, sweeping back to full as it recharges ----- */
+.hud__dash {
+  position: absolute;
+  right: clamp(10px, 2vw, 18px);
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  width: 60px;
+  height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border: 2px solid rgba(255, 244, 184, 0.35);
+  border-radius: 50%;
+  background: rgba(20, 18, 14, 0.62);
+  color: var(--lemon-bright, #f7d94c);
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: manipulation;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+}
+
+.hud__dash::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(rgba(10, 9, 7, 0.68) calc(var(--left, 0) * 360deg), transparent 0);
+  pointer-events: none;
+}
+
+.hud__dash .ico {
+  position: relative;
+  width: 26px;
+  height: 26px;
+}
+
+.hud__dash small {
+  position: relative;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.hud__dash.is-ready {
+  border-color: var(--lemon-bright, #f7d94c);
+  box-shadow: 0 0 14px rgba(247, 217, 76, 0.45);
+}
+
+.hud__dash:active {
+  transform: scale(0.94);
+}
+
+@media (hover: none) {
+  .hud__dash {
+    width: 68px;
+    height: 68px;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .hud__dash .ico {
+    width: 30px;
+    height: 30px;
+  }
+
+  .hud__dash small {
+    display: none;
+  }
+}
+
+/* the upgrade chips along the bottom stop short of the dash button */
+.hud__build {
+  right: calc(clamp(10px, 2vw, 18px) + 70px);
+}
+
+@media (hover: none) {
+  .hud__build {
+    right: calc(clamp(10px, 2vw, 18px) + 78px);
+  }
+}
+
+/* ----- awakenings: a gold card, and a gold chip with a star ----- */
+.upcard--awaken {
+  background: linear-gradient(180deg, #fff1b8, #fff9e6 60%);
+  box-shadow: 0 0 0 2px #ffd54a, 0 0 26px rgba(255, 213, 74, 0.55), 0 14px 34px -14px rgba(0, 0, 0, 0.7);
+  animation: deal 0.3s cubic-bezier(0.2, 1.3, 0.4, 1) both, awakenGlow 1.6s ease-in-out 0.3s infinite;
+}
+
+@keyframes awakenGlow {
+  50% {
+    box-shadow: 0 0 0 2px #ffd54a, 0 0 40px rgba(255, 213, 74, 0.8), 0 14px 34px -14px rgba(0, 0, 0, 0.7);
+  }
+}
+
+.chip--awake {
+  box-shadow: 0 0 10px rgba(255, 213, 74, 0.55);
+}
+
+.chip--awake b {
+  color: #ffd54a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upcard--awaken {
+    animation: none;
+  }
+}

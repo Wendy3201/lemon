@@ -36,6 +36,8 @@
       '<div class="hud__combo" hidden aria-hidden="true"><b></b><span>combo</span></div>' +
       '<div class="hud__buffs" aria-live="polite"></div>' +
       '<div class="hud__build"></div>' +
+      '<button class="hud__dash" type="button" data-hud="dash" aria-label="Dash (Space)" title="Dash (Space or Shift)">' +
+        PS.icon("dash") + "<small>Space</small></button>" +
     '</div>' +
     '<div class="sheet" data-panel="choose" hidden>' +
       '<div class="choose">' +
@@ -93,11 +95,12 @@
     return petChips() + (p.order || []).map(function (id) {
       var up = B.upgrade(id);
       var level = p.up[id];
-      var name = typeof up.name === "function" ? up.name(level, R) : up.name;
+      var awake = p.awake && p.awake[id];
+      var name = awake ? B.awakenedName(id) : typeof up.name === "function" ? up.name(level, R) : up.name;
       return (
-        '<span class="chip" style="--tier:' + B.UP_TIERS[up.tier].color + '" title="' + PS.esc(name) + '">' +
+        '<span class="chip' + (awake ? " chip--awake" : "") + '" style="--tier:' + (awake ? B.SPECIAL_TIERS.awaken.color : B.tierInfo(up.tier).color) + '" title="' + PS.esc(name) + '">' +
         PS.icon(up.icon) + (withNames ? "<em>" + PS.esc(name) + "</em>" : "") +
-        (up.max > 1 ? "<b>" + level + "</b>" : "") + "</span>"
+        (awake ? "<b>★</b>" : up.max > 1 ? "<b>" + level + "</b>" : "") + "</span>"
       );
     }).join("");
   }
@@ -120,7 +123,15 @@
     thorns: ["Thorns", "armor", "#8FAE65"],
     aura: ["Gear aura", "sun", "#FFD166"],
     gear: ["Gear blasts", "revive", "#FFE66D"],
-    bomb: ["Bomb", "bomb", "#E5484D"]
+    cratebomb: ["Crate bomb", "bomb", "#E5484D"],
+    frostnova: ["Frost Nova", "frostnova", "#9BDCFF"],
+    mines: ["Seed Mines", "mine", "#C79A5B"],
+    sunbeam: ["Sunbeam", "sunbeam", "#FFD166"],
+    rain: ["Lemon Rain", "rain", "#F7D94C"],
+    bees: ["Bee Buddies", "bee", "#F2B93B"],
+    lash: ["Vine Lash", "vine", "#8FC46A"],
+    bubble: ["Bubble burst", "bubble", "#BFE0FF"],
+    field: ["Static Field", "field", "#FFE14A"]
   };
   var MAX_ROWS = 7;
   var meterOpen = false;
@@ -148,7 +159,8 @@
         rows.push({ name: PS.ITEMS[key].name, icon: PS.itemIcon(key), color: "#F7D94C", dmg: dmg, weapon: true });
       } else {
         var s = SOURCES[key] || [key, "xp", "#CDBF9C"];
-        rows.push({ name: s[0], icon: PS.icon(s[1]), color: s[2], dmg: dmg });
+        var awake = R.p.awake && R.p.awake[key];
+        rows.push({ name: awake ? B.awakenedName(key) : s[0], icon: PS.icon(s[1]), color: awake ? "#FFD54A" : s[2], dmg: dmg });
       }
     });
     if (!rows.length) return "";
@@ -196,6 +208,7 @@
     else if (action === "resume") B.resume();
     else if (action === "meter") B.hud.toggleMeter();
     else if (action === "reroll") B.reroll();
+    else if (action === "dash") B.dash();
     else if (action === "dev") B.devPanel.open();
     else if (action === "quit") {
       if (quitArmed) {
@@ -237,6 +250,7 @@
       el.pauseWhere = root.querySelector(".pausebox__where");
       el.pauseBuild = root.querySelector(".pausebox__build");
       el.quit = root.querySelector('[data-hud="quit"]');
+      el.dash = root.querySelector(".hud__dash");
       el.kills.innerHTML = PS.icon("skull") + "<b></b>";
       el.coins.innerHTML = PS.icon("coin") + "<b></b>";
       el.killsText = el.kills.querySelector("b");
@@ -269,12 +283,22 @@
         shown.low = hp < 0.3;
         el.hpFill.classList.toggle("is-low", shown.low);
       }
-      setText("hpText", el.hpText, PS.fmt(Math.ceil(Math.max(0, p.hp))) + " / " + PS.fmt(Math.round(p.maxHp)));
+      // health rounds up (1 hp left is not 0), but never past the rounded maximum
+      var maxShown = Math.round(p.maxHp);
+      setText("hpText", el.hpText, PS.fmt(Math.min(maxShown, Math.ceil(Math.max(0, p.hp)))) + " / " + PS.fmt(maxShown));
       setWidth("xp", el.xp, p.xp / p.need);
       setText("lvl", el.lvl, "Lv " + p.level);
       setText("time", el.time, R.mode === "swarm" ? PS.clock(R.t) : R.phase === "swarm" ? PS.clock(Math.ceil(R.dur - R.t)) : "BOSS");
       setText("kills", el.killsText, PS.fmt(R.kills));
       setText("coins", el.coinsText, PS.fmt(R.coins));
+
+      // the dash button fills back up as the dash recharges
+      var dashLeft = p.dashCd > 0 ? Math.ceil((p.dashCd / B.dashCooldown()) * 40) / 40 : 0;
+      if (shown.dash !== dashLeft) {
+        shown.dash = dashLeft;
+        el.dash.style.setProperty("--left", dashLeft);
+        el.dash.classList.toggle("is-ready", !dashLeft);
+      }
 
       // power-ups running, with the seconds left on each
       var buffHtml = "";
@@ -358,12 +382,13 @@
       if (!open) return;
       openedAt = performance.now();
       var p = R.p;
-      el.chooseTitle.textContent = R.t < 0.5 && p.level === 1 ? "A head start! Pick an upgrade" : "Level " + p.level + "! Pick an upgrade";
+      el.chooseTitle.textContent = R.choiceKind === "shrine" ? "The shrine wakes! Choose a blessing for the rest of the battle"
+        : R.t < 0.5 && p.level === 1 ? "A head start! Pick an upgrade" : "Level " + p.level + "! Pick an upgrade";
       el.cards.innerHTML = R.choices.map(function (choice, index) {
-        var tier = B.UP_TIERS[choice.tier];
+        var tier = B.tierInfo(choice.tier);
         var progress = choice.max === 1 || choice.max === Infinity ? "" : choice.level === 1 ? "New" : "Level " + (choice.level - 1) + " → " + choice.level;
         return (
-          '<button class="upcard" type="button" data-pick="' + index + '" style="--tier:' + tier.color + '">' +
+          '<button class="upcard' + (choice.tier === "awaken" ? " upcard--awaken" : "") + '" type="button" data-pick="' + index + '" style="--tier:' + tier.color + '">' +
             '<span class="upcard__key" aria-hidden="true">' + (index + 1) + "</span>" +
             '<span class="upcard__icon">' + PS.icon(choice.icon) + "</span>" +
             '<span class="upcard__tier">' + tier.name + "</span>" +

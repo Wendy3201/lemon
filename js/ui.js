@@ -1089,6 +1089,12 @@
         guideSection("golden", "The golden pest", "coin",
           "<p>Twice a chapter (and every 75 seconds in the endless swarm) a <b>golden pest</b> appears and runs away from you. An arrow at the edge of the screen points to it, and a ring around it counts down 15 seconds.</p>" +
           "<p>Your weapon goes for it first. Catch it and it bursts into a pile of coins and experience; let it go and it is gone.</p>") +
+        guideSection("moves", "Dash, shrines and awakenings", "dash",
+          '<ul class="howto">' +
+            "<li><b>Dash</b> with <b>Space</b> or <b>Shift</b>, or the round button at the bottom right on a phone: a quick slide the way you are heading, and nothing can hurt you for a moment. It comes back after about " + Math.round(PS.B.DASH.cd) + " seconds; the button fills up as it does. <b>Quick Feet</b> cards make it come back sooner.</li>" +
+            "<li>Every minute or so a <b>shrine</b> rises nearby, and a green arrow points to it. Stand in its circle for 3 seconds (stepping out drains it) and it offers <b>three blessings</b> to choose from, each lasting the rest of the battle. Leave it for 30 seconds and it sinks back into the ground.</li>" +
+            "<li>Max out an ability and its <b>awakening</b> turns up at your next level-up: a gold card that makes it work as if it were three levels past its max. Orbit Peel becomes Peel Tempest, Frost Nova becomes Deep Freeze, and so on.</li>" +
+          "</ul>") +
         guideSection("combo", "Combos", "bolt",
           "<p>Squash pests one after another, no more than about two seconds apart, to build a <b>combo</b>. It shows on the right once it reaches ×10 and changes colour at ×25, ×50 and ×100. Your best combo is on the results screen.</p>") +
         guideSection("bosses", "The bosses", "skull",
@@ -1097,6 +1103,8 @@
         guideSection("gear", "Gear and the Forge", "tabGear",
           '<ul class="howto">' +
             "<li>You wear six pieces of gear: a weapon, a ring, an amulet, a helmet, armour and boots. Your weapon decides how you attack.</li>" +
+            "<li>There are " + PS.ITEM_ORDER.filter(function (id) { return PS.ITEMS[id].slot === "weapon"; }).length + " weapons and " +
+              PS.ITEM_ORDER.filter(function (id) { return PS.ITEMS[id].slot !== "weapon"; }).length + " other pieces of gear to find. Most names are two words: the second says what it is (a <b>Mortar</b> lobs shells, a <b>Chakram</b> flies out and back, a <b>Visor</b> is a helmet), the first what it adds (<b>Cinder</b> burns, <b>Frost</b> slows, <b>Volt</b> softens pests up, <b>Venom</b> poisons and heals you, <b>Shadow</b> is quick and reaches far, <b>Radiant</b> finds weak spots, <b>Briar</b> is covered in thorns).</li>" +
             '<li>Rarities, from the bottom: <span class="rlist">' + rarities + "</span>. Rarer gear is stronger and unlocks more of its perks.</li>" +
             "<li>Battles drop gear up to " + rarityName(PS.MAX_DROP_RARITY) + ". Anything rarer comes from the <b>Forge</b>: put in three items of the same slot and rarity, and the one you keep goes up a rarity. <b>Quick forge</b> does every forge it can at once.</li>" +
             "<li>Spend gold to <b>level up</b> each slot. An item's rarity caps how high its slot's level counts.</li>" +
@@ -1898,6 +1906,21 @@
   }
 
   /** What a chest can hold: every item it can roll, weapons first. */
+  /* Which slots are unfolded in a chest's list ("A:weapon" and so on). */
+  var CHEST_OPEN = { "A:weapon": true };
+
+  function chestList(grade, slotKey, rarity) {
+    var ids = (PS.POOL[slotKey] || {})[grade] || [];
+    return ids.map(function (id) {
+      var def = PS.ITEMS[id];
+      return (
+        '<li class="chestinfo__item">' + tile({ id: id, r: rarity }, { plain: true, cls: "tile--mini" }) +
+          '<span class="chestinfo__text"><strong>' + esc(def.name) + "</strong><small>" + esc(def.blurb) + "</small></span>" +
+        "</li>"
+      );
+    }).join("");
+  }
+
   function chestInfoModal(modal) {
     var chest = PS.CHESTS[modal.kind];
     if (!chest) return null;
@@ -1905,21 +1928,18 @@
     var open = [];
     chest.odds.forEach(function (share, r) { if (share > 0) open.push(r); });
     var shown = open.indexOf(modal.r) !== -1 ? modal.r : open[0];
+    // one folding part per slot; a part's list is only drawn once it is opened
     function section(grade, note, rarity) {
       var rows = "";
       PS.SLOTS.forEach(function (slot) {
         var ids = (PS.POOL[slot.key] || {})[grade] || [];
         if (!ids.length) return;
-        rows += '<h4 class="chestinfo__slot">' + slot.plural + "</h4>";
-        rows += '<ul class="chestinfo__list">' + ids.map(function (id) {
-          var def = PS.ITEMS[id];
-          return (
-            '<li class="chestinfo__item">' + tile({ id: id, r: rarity }, { plain: true, cls: "tile--mini" }) +
-              '<span class="chestinfo__text"><strong>' + esc(def.name) + "</strong>" +
-              (slot.key === "weapon" ? "<small>" + esc(def.blurb) + "</small>" : "") + "</span>" +
-            "</li>"
-          );
-        }).join("") + "</ul>";
+        var key = grade + ":" + slot.key;
+        rows +=
+          '<details class="chestinfo__part" data-chestpart="' + key + '" data-r="' + rarity + '"' + (CHEST_OPEN[key] ? " open" : "") + ">" +
+            '<summary class="chestinfo__slot">' + slot.plural + " <small>" + ids.length + "</small></summary>" +
+            '<ul class="chestinfo__list">' + (CHEST_OPEN[key] ? chestList(grade, slot.key, rarity) : "") + "</ul>" +
+          "</details>";
       });
       return note + rows;
     }
@@ -1967,6 +1987,18 @@
         '<div class="modal__actions">' +
           '<button class="btn btn--primary" type="button" data-act="close" data-key="m-ok" autofocus>Nice</button>' +
         "</div>" +
+      "</div>"
+    );
+  }
+
+  /** What someone sees after putting in the dev password: their save is gone. */
+  function wompModal() {
+    return (
+      '<div class="notice womp">' +
+        '<div class="womp__art">' + PS.art("lemon") + "</div>" +
+        '<h2 id="modal-title">womp womp</h2>' +
+        "<p>That was the dev password. All your data has been reset.</p>" +
+        '<div class="modal__actions"><button class="btn btn--primary" type="button" data-act="close" data-key="m-ok" autofocus>OK</button></div>' +
       "</div>"
     );
   }
@@ -2030,6 +2062,7 @@
     else if (modal.type === "secret") html = modal.open ? devMenu(modal) : secretModal(modal);
     else if (modal.type === "quick") html = quickModal(modal);
     else if (modal.type === "notice") html = noticeModal();
+    else if (modal.type === "womp") html = wompModal();
     else if (modal.type === "hatch") html = hatchModal(modal);
     else if (modal.type === "chestinfo") html = chestInfoModal(modal);
     if (html === null) {
@@ -2886,9 +2919,21 @@
   function onSubmit(e) {
     if (e.target.getAttribute("data-form") !== "secret") return;
     e.preventDefault();
+    if (!view.modal) return;
     var input = $("#secret-input");
     // the ordinary prompt takes the dev password; the one the key code opens takes the admin one
     var good = view.modal.admin ? PS.dev.adminPassword : PS.dev.password;
+    // The plain dev password is a trap now: whoever finds it and puts it in
+    // loses their save. Only the admin password (behind the logo and the key
+    // code) opens anything.
+    if (input && !view.modal.admin && input.value === PS.dev.password) {
+      PS.dev.lock();
+      view.forge = null;
+      st.reset();
+      PS.sfx.play("lose");
+      openModal({ type: "womp" });
+      return;
+    }
     if (input && input.value === good) {
       PS.dev.unlock(view.modal.admin ? 2 : 1);
       view.modal.open = true;
@@ -2954,11 +2999,22 @@
 
       document.addEventListener("click", onClick);
       document.addEventListener("submit", onSubmit);
-      el.modal.addEventListener("close", function () { view.modal = null; });
+      // the close event arrives a moment late: if another pop-up opened in between, it stays
+      el.modal.addEventListener("close", function () { if (!el.modal.open) view.modal = null; });
       // remember which parts of the guide are open, so a redraw does not fold them up
       el.modal.addEventListener("toggle", function (e) {
         var id = e.target && e.target.getAttribute ? e.target.getAttribute("data-guide") : null;
         if (id) GUIDE_OPEN[id] = e.target.open;
+        // a chest's slot list: remember it, and draw its items the first time it opens
+        var part = e.target && e.target.getAttribute ? e.target.getAttribute("data-chestpart") : null;
+        if (part) {
+          CHEST_OPEN[part] = e.target.open;
+          var list = e.target.querySelector(".chestinfo__list");
+          if (e.target.open && list && !list.firstChild) {
+            var bits = part.split(":");
+            list.innerHTML = chestList(bits[0], bits[1], Number(e.target.getAttribute("data-r")));
+          }
+        }
       }, true);
       // the volume slider: move it and the sound changes at once, no redraw to interrupt the drag
       el.modal.addEventListener("input", function (e) {
