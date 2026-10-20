@@ -1033,6 +1033,30 @@
   /* Endless swarm opens once this chapter is cleared. Its pests are as tough
      as the furthest chapter you have cleared. */
   PS.ENDLESS = { from: 40 };
+  /* The daily challenge: once `from` is cleared, one chapter a day (`behind`
+     chapters short of your furthest) with a twist that changes every day.
+     Winning it pays `gems` and a free `chest` once a day, on top of the
+     chapter's normal pay. A twist can set: dmg (your damage), hurt (damage
+     you take), speed (your speed), xp (experience), pest (pests' size r,
+     health hp, speed and xp), shrine (time between shrines), shrineCharge
+     (seconds to wake one) and elites (seconds between elites). */
+  PS.CHALLENGE = {
+    from: 5, behind: 2, gems: 80, chest: "gilded",
+    twists: [
+      { id: "glass", name: "Glass Cannon", icon: "glass", text: "You hit twice as hard, and so do the pests.", dmg: 2, hurt: 2 },
+      { id: "giants", name: "Giants", icon: "area", text: "Pests are bigger and much tougher, and drop twice the experience.", pest: { r: 1.3, hp: 1.6, xp: 2 } },
+      { id: "rush", name: "Rush Hour", icon: "speed", text: "Pests are a third faster. You are a little faster too.", pest: { speed: 1.33 }, speed: 1.15 },
+      { id: "shrines", name: "Shrine Day", icon: "sun", text: "Shrines rise twice as often and wake in 2 seconds.", shrine: 0.5, shrineCharge: 2 },
+      { id: "elites", name: "Elite Hunt", icon: "skull", text: "An elite pest every 30 seconds.", elites: 30 },
+      { id: "learner", name: "Fast Learner", icon: "xp", text: "Double experience, but pests hit 40% harder.", xp: 2, hurt: 1.4 }
+    ]
+  };
+  /* The collection book: every different item you have ever owned counts
+     once, even after it is forged away or sold. Each step pays its gems once;
+     the last step is every item in the game. */
+  PS.BOOK = [10, 25, 50, 100, 150, 200, 300, 400, 500, PS.ITEM_ORDER.length].map(function (at, i) {
+    return { at: at, gems: [20, 30, 50, 80, 100, 120, 150, 200, 300, 1000][i] };
+  });
   /* From this chapter on, two bosses arrive together: the chapter's own and
      the one from the chapter before. Each has `hp` of a lone boss's health. */
   PS.TWIN_BOSS = { from: 40, hp: 0.65 };

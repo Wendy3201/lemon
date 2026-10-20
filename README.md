@@ -34,7 +34,7 @@ GitHub Pages, Netlify or any web host. Nothing needs compiling.
 
 ## How to play
 
-The same guide is in the game: **Settings → How to play**, or the **New here? How to play** button under the Battle button. It folds out by topic (the basics, staying alive, crates and power-ups, the golden pest, combos, every boss with a tip, gear and the Forge, the Shop, pets, talents and quests, and the endless swarm), and takes its numbers from the game, so it stays right when they change.
+The same guide is in the game: **Settings → How to play**, or the **New here? How to play** button under the Battle button. It folds out by topic (the basics, staying alive, crates and power-ups, the golden pest, combos, every boss with a tip, gear and the Forge, the Shop, pets, talents and quests, the daily challenge, and the endless swarm), and takes its numbers from the game, so it stays right when they change.
 
 ### In battle
 
@@ -83,6 +83,12 @@ The same guide is in the game: **Settings → How to play**, or the **New here? 
   **blessings** for the rest of the battle: Fury, Haste, the Grove, Stone,
   Wings, Stars or Plenty. Left alone for 30 seconds it sinks away again
   (`SHRINE` in `js/events.js`, the blessings in `js/upgrades.js`).
+- **Elite pests** (the big ones with a gold ring) come twice a chapter. From
+  chapter 3 on each has a **trait**, named over its head: **Swift** (much
+  faster, less health), **Healer** (mends the pests around it every second),
+  **Summoner** (calls in three pests every few seconds) or **Splitting**
+  (breaks into two smaller copies when squashed). `TRAITS` in
+  `js/enemies.js` holds the numbers.
 - Max out an ability and its **awakening** turns up at your next level-up: a
   gold card that makes it work as if it were three levels past its max, under
   a new name (Orbit Peel becomes Peel Tempest, Frost Nova becomes Deep
@@ -100,8 +106,8 @@ and fireflies at night. It stays still when Animations is set to Off.
 
 | Tab | What it is for |
 | --- | --- |
-| **Battle** | Pick a chapter and fight. Shows your Power against the chapter's recommended Power. Once chapter 40 is cleared, **Endless swarm** opens below it: no boss and no end, pests as tough as your furthest chapter, gold for every second you last, and your best time kept. |
-| **Equipment** | Six slots: weapon, ring, amulet, helmet, armour, boots. Level slots up with gold, swap gear, and open the **Forge**. |
+| **Battle** | Pick a chapter and fight. Shows your Power against the chapter's recommended Power. Once chapter 5 is cleared, the **daily challenge** opens below it: a chapter two short of your furthest with a twist that changes at midnight (Glass Cannon, Giants, Rush Hour, Shrine Day, Elite Hunt or Fast Learner). Winning it pays 80 gems and a free Gilded Chest once a day, on top of the chapter's normal pay. Once chapter 40 is cleared, **Endless swarm** opens too: no boss and no end, pests as tough as your furthest chapter, gold for every second you last, and your best time kept. |
+| **Equipment** | Six slots: weapon, ring, amulet, helmet, armour, boots. Level slots up with gold, swap gear, and open the **Forge**. The **Collection** button shows every item in the game, slot by slot: the ones you have ever owned in colour, the rest as shadows. Finding 10, 25, 50, 100, 150, 200, 300, 400, 500 and all 612 pays gems (20 up to 1,000). |
 | **Shop** | **Daily rewards** (a seven-day streak: gold, gems and free chests, with 100 gems and three Gilded Chests on day 7; miss a day and it starts again), a free gift every four hours, chests bought with gems (a fixed price: 10 for a Seed Crate, 40 for a Gilded Chest), four deals a day (never S-grade), and gold for gems. |
 | **Pets** | Hatch pets from eggs bought with gems in the Shop (Common 70%, Uncommon 18%, Rare 9%, Epic 3%; never S or SS). You start with one team slot and can unlock a second (150 gems) and a third (400 gems); every pet in your team fights beside you and gives its stat bonus. Hatching a duplicate, or spending gold, levels it up. |
 | **Talents** | Permanent bonuses bought with gold. Max every talent in a tier and you can **ascend**: tier II and tier III repeat the talents at a bigger bonus and a much bigger price, and add Lucky Star, Wide Swing and Giant Slayer. |
@@ -321,6 +327,12 @@ Most tweaks are one line in `js/data.js`.
   Chapters 51 to 100 are ten to a zone: the Rooftops, the Pond, the Ice Box,
   the Thorn Wilds and the Golden Grove (their floors are in `js/arena.js`).
 - **A new upgrade card:** add it to `UPGRADES` in `js/upgrades.js`.
+- **The daily challenge:** `PS.CHALLENGE` in `js/data.js` sets when it opens,
+  how far behind your best it is, its reward and the twists. A twist is a
+  list of numbers (your damage, damage taken, speed, experience, the pests'
+  size, health and speed, how often shrines and elites come), so a new one
+  is one line. The day picks the twist, so everyone gets the same one.
+- **Collection rewards:** `PS.BOOK` in `js/data.js`.
 - **Two passwords.** The dev password (`PS.dev.password` in `js/core.js`) is now a **trap**: whoever types it into the `?` button's box loses their whole save, and a "womp womp" message tells them so. It opens nothing. The admin password (`PS.dev.adminPassword`) opens everything. The admin prompt is hidden: click the lemon logo at the top twice, then type the key code up, up, down, down, left, right, left, right, B, A anywhere in the menus, then enter the password. On a phone, the second logo tap brings up a small pad of arrow, B and A buttons to tap instead. (Once the admin is unlocked for the tab, the key code alone reopens the menu.)
 - **The admin menu in the lobby** has twelve sections down the left. *Overview* (every computed stat), *Gear* (give items, set each slot's level), *Owned* (change an item's rarity, wear it, remove it, clean out the bag), *Pets* (give any pet at any level, fill the team, open the slots), *Money*, *Shop* (open chests without paying, set the pity counters, set the gift timer), *Progress* (chapters and talents), *Quests* (complete or claim any quest, set the counters they read), *Chapters* (every chapter with Play and Clear to here), *Battle* (start any chapter or swarm mode with cheats and a built-up lemon), *Settings* and *Save*. Every change it makes is remembered: the **Undo** button at the top takes back the last one, and the Save section lists the last thirty so you can go back to any of them. The Save section also keeps named **snapshots** of the save in this browser and can download the save as a file or load one.
 - **The DEV / admin panel in a battle** opens from the DEV button or the ` key. As admin it has six tabs: *Cheats* (godmode, one-hit kills, freeze the pests, stop spawning, vacuum, and multipliers for damage, attack speed, move speed, XP and game speed), *Upgrades* (search, filter by tier, take or max any card), *Player* (health, stat boosts, auto-levelling, swap weapon, build presets), *Spawn* (any pest, elites, the boss, a training dummy for reading damage per second, status effects on every pest, pickups), *Run* (skip the clock, set the boss's health, restart on any chapter) and *Stats* (a read-out of the whole run). The switches themselves are listed in `PS.dev` in `js/core.js`, so adding one there adds it to the lobby and the battle panel together.
@@ -344,7 +356,7 @@ Everything is stored in this browser's `localStorage`. Nothing is uploaded.
 
 | Key | What it holds |
 | --- | --- |
-| `lemon:pips:save` | the whole save: gold, gems, gear, levels, talents, chapters, quests |
+| `lemon:pips:save` | the whole save: gold, gems, gear, levels, talents, chapters, quests, the daily challenge and the collection |
 | `lemon:theme` | `"light"` or `"dark"` |
 
 Every read and write is wrapped in `try/catch`. In a private window, or when a

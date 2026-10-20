@@ -477,14 +477,7 @@
   function spawnPest(R, kind, angle, near, plain) {
     var dist = near ? PS.rand(90, 170) : B.view.ring;
     var e = B.spawn(kind, R.p.x + Math.cos(angle) * dist, R.p.y + Math.sin(angle) * dist);
-    if (spawn.elite && !plain) {
-      e.elite = true;
-      e.r *= 1.55;
-      e.hp = e.maxHp = e.hp * 4;
-      e.hurt *= 1.5;
-      e.xp *= 10;
-      e.mass *= 3;
-    }
+    if (spawn.elite && !plain) B.eliteUp(e);
     return e;
   }
 

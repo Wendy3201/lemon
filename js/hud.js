@@ -407,7 +407,7 @@
       if (!R.paused) return;
       quitArmed = false;
       el.quit.textContent = "Give up";
-      el.pauseWhere.textContent = "Chapter " + R.ch.n + " · " + R.ch.name + " · " + PS.clock(R.t);
+      el.pauseWhere.textContent = (R.twist ? "Daily challenge: " + R.twist.name + " · " : "") + "Chapter " + R.ch.n + " · " + R.ch.name + " · " + PS.clock(R.t);
       var build = buildMarkup(R, true);
       el.pauseBuild.innerHTML = build || '<p class="pausebox__empty">No upgrades yet. Grab gems to level up.</p>';
     },

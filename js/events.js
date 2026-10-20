@@ -7,6 +7,7 @@
  * hurt you). Once or twice a chapter a golden pest appears and runs; catch it
  * before it escapes for a pile of coins and experience. Every minute or so a
  * shrine rises nearby: stand in its circle to wake it and choose a blessing.
+ * (Elite pests and their traits live in enemies.js.)
  *
  * battle.js calls in here: B.events each tick, B.breakProp when a crate is
  * smashed, B.caughtGolden when the golden pest is squashed, B.collectSpecial
@@ -91,6 +92,15 @@
      alone for SHRINE.life seconds, it sinks back into the ground. */
   var SHRINE = { first: 40, every: [70, 95], life: 30, charge: 3, r: 72 };
 
+  /** Seconds until the next shrine, and to wake one: a daily challenge's
+   *  Shrine Day shortens both. */
+  function shrineGap(R) {
+    return PS.rand(SHRINE.every[0], SHRINE.every[1]) * ((R.twist && R.twist.shrine) || 1);
+  }
+  function shrineCharge(R) {
+    return (R.twist && R.twist.shrineCharge) || SHRINE.charge;
+  }
+
   function spawnShrine(R) {
     var p = R.p;
     var angle = Math.random() * TAU;
@@ -113,11 +123,12 @@
     var dy = p.y - s.y;
     var inside = dx * dx + dy * dy < s.r * s.r;
     s.inside = inside;
-    s.charge = inside ? s.charge + dt / SHRINE.charge : Math.max(0, s.charge - dt / (SHRINE.charge * 2));
+    var wake = shrineCharge(R);
+    s.charge = inside ? s.charge + dt / wake : Math.max(0, s.charge - dt / (wake * 2));
     if (s.charge >= 1) {
       // awake: a burst of light, and the blessings to choose from
       R.shrine = null;
-      R.shrineIn = PS.rand(SHRINE.every[0], SHRINE.every[1]);
+      R.shrineIn = shrineGap(R);
       R.fx.push({ type: "ring", x: s.x, y: s.y, r0: 20, r1: s.r * 2.2, color: "#5FD3B0", width: 8, t: 0, dur: 0.5 });
       R.fx.push({ type: "blast", x: s.x, y: s.y, r: s.r, color: "#C8F7E6", t: 0, dur: 0.4 });
       B.sparks(s.x, s.y, "#7FE3C4", 20, 180);
@@ -125,7 +136,7 @@
       B.offer(B.rollBlessings(), "shrine");
     } else if (s.life <= 0) {
       R.shrine = null;
-      R.shrineIn = PS.rand(SHRINE.every[0], SHRINE.every[1]) * 0.6;
+      R.shrineIn = shrineGap(R) * 0.6;
       B.sparks(s.x, s.y, "#8D96A8", 10, 90);
     }
   }
@@ -139,7 +150,7 @@
 
     // a new shrine now and then, but not in the closing seconds of a chapter
     if (!R.shrine && R.phase === "swarm") {
-      if (R.shrineIn === undefined) R.shrineIn = SHRINE.first;
+      if (R.shrineIn === undefined) R.shrineIn = SHRINE.first * ((R.twist && R.twist.shrine) || 1);
       R.shrineIn -= dt;
       if (R.shrineIn <= 0 && (R.mode === "swarm" || R.t < R.dur - 25)) spawnShrine(R);
     }

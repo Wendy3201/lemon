@@ -116,8 +116,9 @@
     window.addEventListener("resize", resize);
   };
 
-  /** mode "swarm" is the dev menu's endless sandbox: no boss, nothing is saved. */
-  B.start = function (chapterNumber, mode) {
+  /** mode "swarm" is the endless swarm: no boss, gold only. `twistId` is a
+   *  daily challenge twist (PS.CHALLENGE.twists). */
+  B.start = function (chapterNumber, mode, twistId) {
     var ch = PS.chapter(chapterNumber);
     var stats = PS.state.calc();
     var p = makePlayer(stats);
@@ -138,8 +139,10 @@
       hordes: [ch.duration * 0.25, ch.duration * 0.5, ch.duration * 0.75],
       boss: null, reachedBoss: false,
       paused: false, choices: null, pending: p.fx.startUp || 0,
-      shake: 0, procs: 0, leeched: 0, hurtWindow: 0, windowT: 0, toast: "", toastT: 0
+      shake: 0, procs: 0, leeched: 0, hurtWindow: 0, windowT: 0, toast: "", toastT: 0,
+      twist: null, hurtMul: 1, pestMul: null
     };
+    PS.CHALLENGE.twists.forEach(function (tw) { if (tw.id === twistId) applyTwist(tw); });
     keys = Object.create(null);
     stick.on = false;
     resize();
@@ -152,6 +155,21 @@
     raf = requestAnimationFrame(frame);
     return R;
   };
+
+  /** A daily challenge's twist: see PS.CHALLENGE in data.js for what each number does. */
+  function applyTwist(tw) {
+    var p = R.p;
+    R.twist = tw;
+    if (tw.dmg) p.mods.dmg *= tw.dmg;
+    if (tw.speed) p.moveSpeed *= tw.speed;
+    if (tw.xp) p.xpMul *= tw.xp;
+    R.hurtMul = tw.hurt || 1;
+    R.pestMul = tw.pest || null;
+    if (tw.elites) {
+      R.elites = [];
+      for (var t = tw.elites; t < R.dur - 5; t += tw.elites) R.elites.push(t);
+    }
+  }
 
   /** Tear the run down once the results have been read. */
   B.stop = function () {
@@ -518,7 +536,7 @@
       B.as("bubble", function () { B.blast(p.x, p.y, 90, B.dmg() * (1 + 0.3 * (p.up.bubble || 1)), { knock: 520, color: "#BFE0FF" }); });
       return;
     }
-    var dmg = amount * (1 - p.armor) * p.mods.armor;
+    var dmg = amount * R.hurtMul * (1 - p.armor) * p.mods.armor;
     if (p.fx.lastStand && p.hp < p.maxHp * 0.35) dmg *= 1 - p.fx.lastStand;
     if (p.fx.dmgCap) {
       var room = p.maxHp * p.fx.dmgCap - R.hurtWindow;
@@ -698,7 +716,8 @@
         level: R.p.level,
         coins: R.coins,
         boss: R.reachedBoss,
-        combo: R.bestCombo
+        combo: R.bestCombo,
+        twist: R.twist ? R.twist.id : null
       });
     }
     result.dealt = R.dealt;

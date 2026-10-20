@@ -43,6 +43,9 @@
       quests: {},
       daily: { last: "", streak: 0 }, // the day of the last daily claim, and which day of 7 it was
       endless: { best: 0, ch: 0, kills: 0 }, // the longest endless swarm survived
+      challenge: { won: "", count: 0 }, // the day the daily challenge was last won, and how many in all
+      found: {}, // every item id ever owned, for the collection book
+      book: 0, // how many collection steps have been claimed
       stats: {
         kills: 0, runs: 0, wins: 0, forges: 0, chests: 0, upgrades: 0, talents: 0,
         bestLevel: 0, bestPower: 0, maxRarity: 0, grade: 0, time: 0, earned: 0, eggs: 0, bestCombo: 0
@@ -56,6 +59,7 @@
       var item = { u: save.uid++, id: id, r: 0 };
       save.items.push(item);
       save.eq[PS.ITEMS[id].slot] = item.u;
+      save.found[id] = 1;
     });
     return save;
   }
@@ -164,6 +168,16 @@
     save.endless.best = num(endless.best, 0, 0, 1e7);
     save.endless.ch = Math.floor(num(endless.ch, 0, 0, PS.BAL.CHAPTERS));
     save.endless.kills = Math.floor(num(endless.kills, 0, 0, 1e9));
+    var challenge = raw.challenge || {};
+    save.challenge.won = typeof challenge.won === "string" ? challenge.won : "";
+    save.challenge.count = Math.floor(num(challenge.count, 0, 0, 1e6));
+
+    // older saves never kept this list: whatever they own now counts as found
+    if (raw.found && typeof raw.found === "object") {
+      Object.keys(raw.found).forEach(function (id) { if (PS.ITEMS[id]) save.found[id] = 1; });
+    }
+    save.items.forEach(function (item) { save.found[item.id] = 1; });
+    save.book = Math.floor(num(raw.book, 0, 0, PS.BOOK.length));
 
     PS.QUESTS.forEach(function (quest) {
       var claimed = Math.floor(num(raw.quests ? raw.quests[quest.id] : 0, 0, 0, quest.tiers.length));
@@ -264,6 +278,7 @@
   function add(id, rarity) {
     var item = { u: S.uid++, id: id, r: rarity, n: 1 };
     S.items.push(item);
+    S.found[id] = 1;
     return item;
   }
 
@@ -840,13 +855,81 @@
         }
       }
     }
+
+    // today's challenge, won for the first time today: its bonus on top
+    var challenge = null;
+    if (result.won && result.twist) {
+      var info = challengeInfo();
+      if (info.open && !info.done && info.twist.id === result.twist) {
+        S.challenge.won = today();
+        S.challenge.count++;
+        S.gems += PS.CHALLENGE.gems;
+        challenge = { gems: PS.CHALLENGE.gems, items: [] };
+      }
+    }
     commit();
+    if (challenge) challenge.items = openChest(PS.CHALLENGE.chest, 1, true) || [];
 
     return {
       chapter: ch.n, won: Boolean(result.won), first: first, gold: gold, gems: gems, items: items,
       unlocked: unlocked, progress: progress, time: result.time || 0, kills: result.kills || 0,
-      level: result.level || 1, finished: result.won && ch.n === PS.BAL.CHAPTERS && first
+      level: result.level || 1, finished: result.won && ch.n === PS.BAL.CHAPTERS && first,
+      twist: result.twist || null, challenge: challenge
     };
+  }
+
+  /** The days since 1970 of a "2026-10-17" date, so each day has its own twist. */
+  function dayNumber(day) {
+    var parts = day.split("-");
+    return Math.round(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])) / 86400000);
+  }
+
+  /** Today's challenge: { open, chapter, twist, done (won today), count }. */
+  function challengeInfo() {
+    var list = PS.CHALLENGE.twists;
+    var day = today();
+    return {
+      open: S.best >= PS.CHALLENGE.from,
+      chapter: Math.max(1, S.best - PS.CHALLENGE.behind),
+      twist: list[dayNumber(day) % list.length],
+      done: S.challenge.won === day,
+      count: S.challenge.count
+    };
+  }
+
+  /* ----------------------------------------------------- collection book */
+
+  /** { found, total, bySlot: { weapon: { found, total } }, next (the next
+   *  step, or null), ready (steps reached but not claimed), gems (they pay) }. */
+  function bookInfo() {
+    var found = 0;
+    var bySlot = {};
+    PS.SLOTS.forEach(function (slot) { bySlot[slot.key] = { found: 0, total: 0 }; });
+    PS.ITEM_ORDER.forEach(function (id) {
+      var tally = bySlot[PS.ITEMS[id].slot];
+      tally.total++;
+      if (S.found[id]) {
+        tally.found++;
+        found++;
+      }
+    });
+    var ready = 0;
+    var gems = 0;
+    for (var i = S.book; i < PS.BOOK.length && found >= PS.BOOK[i].at; i++) {
+      ready++;
+      gems += PS.BOOK[i].gems;
+    }
+    return { found: found, total: PS.ITEM_ORDER.length, bySlot: bySlot, next: PS.BOOK[S.book] || null, ready: ready, gems: gems };
+  }
+
+  /** Claim every collection step reached. Returns the gems, or 0. */
+  function claimBook() {
+    var info = bookInfo();
+    if (!info.ready) return 0;
+    S.book += info.ready;
+    S.gems += info.gems;
+    commit();
+    return info.gems;
   }
 
   /* Endless swarm pays gold only: 3 times what a normal chapter run pays, in
@@ -1252,7 +1335,7 @@
   function badges() {
     return {
       shop: giftWait() === 0 || dailyInfo().ready,
-      gear: forgeAvailable() || S.items.some(function (item) { return item.n; }),
+      gear: forgeAvailable() || S.items.some(function (item) { return item.n; }) || bookInfo().ready > 0,
       quests: quests().some(function (quest) { return quest.ready; }),
       talents: ascendInfo().can
     };
@@ -1329,6 +1412,9 @@
     claimQuest: claimQuest,
     paySwarm: paySwarm,
     endlessInfo: endlessInfo,
+    challengeInfo: challengeInfo,
+    bookInfo: bookInfo,
+    claimBook: claimBook,
     dailyInfo: dailyInfo,
     claimDaily: claimDaily,
     sellValue: sellValue,

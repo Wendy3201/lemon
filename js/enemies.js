@@ -64,9 +64,107 @@
     e.mass = def.mass;
     e.ai = def.ai || null;
     if (def.split) e.onDeath = splitUp;
+    // a daily challenge's twist on the pests (Giants, Rush Hour)
+    var m = R.pestMul;
+    if (m && kind !== "crate") {
+      if (m.r) e.r *= m.r;
+      if (m.hp) e.hp = e.maxHp = e.hp * m.hp;
+      if (m.speed) e.speed *= m.speed;
+      if (m.xp) e.xp *= m.xp;
+    }
     R.enemies.push(e);
     return e;
   };
+
+  /* Elite pests. From chapter TRAITS_FROM on (and always in the endless
+     swarm) each elite also has one trait, shown as a tag over it:
+     Swift (much faster, less health), Healer (heals the pests around it
+     every second), Summoner (calls in three pests now and then) and
+     Splitting (breaks into two smaller copies when squashed). */
+  var TRAITS = {
+    swift: { name: "Swift", color: "#3F8FE4", speed: 1.6, hp: 0.7 },
+    healer: { name: "Healer", color: "#3DBE8B", every: 1, reach: 150, heal: 0.06 },
+    summoner: { name: "Summoner", color: "#9B6AD9", every: 5, count: 3 },
+    splitting: { name: "Splitting", color: "#4FB3A0", parts: 2, share: 0.3 }
+  };
+  var TRAITS_FROM = 3;
+  B.ELITE_TRAITS = TRAITS;
+
+  /** Turn a fresh pest into an elite. `trait`: a key of TRAITS, false for
+   *  none, or left out to roll one when the chapter allows it. */
+  B.eliteUp = function (e, trait) {
+    var R = B.run;
+    e.elite = true;
+    e.r *= 1.55;
+    e.hp = e.maxHp = e.hp * 4;
+    e.hurt *= 1.5;
+    e.xp *= 10;
+    e.mass *= 3;
+    if (trait === undefined && (R.mode === "swarm" || R.ch.n >= TRAITS_FROM)) {
+      var keys = Object.keys(TRAITS);
+      trait = keys[Math.floor(Math.random() * keys.length)];
+    }
+    if (!trait || !TRAITS[trait]) return e;
+    var def = TRAITS[trait];
+    e.trait = trait;
+    e.traitT = def.every || 0;
+    if (def.speed) e.speed *= def.speed;
+    if (def.hp) e.hp = e.maxHp = e.maxHp * def.hp;
+    if (trait === "splitting") e.onDeath = eliteSplit;
+    return e;
+  };
+
+  function makeElite(kind) {
+    return B.eliteUp(atRing(kind, Math.random() * TAU));
+  }
+
+  function eliteSplit(e) {
+    var def = TRAITS.splitting;
+    for (var i = 0; i < def.parts; i++) {
+      var angle = e.wob + (i / def.parts) * TAU;
+      var part = B.spawn(e.kind, e.x + Math.cos(angle) * e.r * 0.5, e.y + Math.sin(angle) * e.r * 0.5);
+      part.r = e.r * 0.7;
+      part.hp = part.maxHp = e.maxHp * def.share;
+      part.hurt = e.hurt * 0.7;
+      part.xp = Math.ceil(e.xp * 0.15);
+      part.mass = e.mass * 0.5;
+      part.kx = Math.cos(angle) * 220;
+      part.ky = Math.sin(angle) * 220;
+    }
+    B.run.fx.push({ type: "ring", x: e.x, y: e.y, r0: e.r * 0.5, r1: e.r * 2.2, color: def.color, width: 4, t: 0, dur: 0.35 });
+  }
+
+  /** What a trait does each tick, before the elite moves. */
+  function traitThink(e, dt) {
+    var R = B.run;
+    var def = TRAITS[e.trait];
+    if (!def.every) return;
+    e.traitT -= dt;
+    if (e.traitT > 0) return;
+    e.traitT = def.every;
+    if (e.trait === "healer") {
+      var healed = 0;
+      for (var i = 0; i < R.enemies.length; i++) {
+        var o = R.enemies[i];
+        if (o.dead || o.prop || o.boss || o.golden || o.hp >= o.maxHp) continue;
+        var dx = o.x - e.x;
+        var dy = o.y - e.y;
+        if (dx * dx + dy * dy > def.reach * def.reach) continue;
+        o.hp = Math.min(o.maxHp, o.hp + o.maxHp * def.heal);
+        healed++;
+      }
+      if (healed) R.fx.push({ type: "ring", x: e.x, y: e.y, r0: e.r, r1: def.reach, color: def.color, width: 3, t: 0, dur: 0.5 });
+    } else if (e.trait === "summoner") {
+      if (R.enemies.length > 260) return;
+      for (var k = 0; k < def.count; k++) {
+        var a = Math.random() * TAU;
+        var called = B.spawn("grunt", e.x + Math.cos(a) * (e.r + 26), e.y + Math.sin(a) * (e.r + 26));
+        called.kx = Math.cos(a) * 140;
+        called.ky = Math.sin(a) * 140;
+      }
+      R.fx.push({ type: "ring", x: e.x, y: e.y, r0: e.r, r1: e.r + 40, color: def.color, width: 4, t: 0, dur: 0.4 });
+    }
+  }
 
   function splitUp(e) {
     var count = KINDS[e.kind].split;
@@ -129,15 +227,7 @@
       var count = 24 + Math.min(24, R.swarmRings * 2);
       var start = Math.random() * TAU;
       for (var i = 0; i < count; i++) atRing(R.swarmRings % 2 ? "dart" : "grunt", start + (i / count) * TAU);
-      if (R.swarmRings % 2 === 0) {
-        var elite = atRing(Math.random() < 0.5 ? "charger" : "brute", Math.random() * TAU);
-        elite.elite = true;
-        elite.r *= 1.55;
-        elite.hp = elite.maxHp = elite.hp * 4;
-        elite.hurt *= 1.5;
-        elite.xp *= 10;
-        elite.mass *= 3;
-      }
+      if (R.swarmRings % 2 === 0) makeElite(Math.random() < 0.5 ? "charger" : "brute");
       B.toast("A ring of pests closes in!");
     }
   }
@@ -185,14 +275,8 @@
 
     if (R.elites.length && R.t >= R.elites[0]) {
       R.elites.shift();
-      var elite = atRing(R.ch.n >= 5 && Math.random() < 0.5 ? "charger" : "brute", Math.random() * TAU);
-      elite.elite = true;
-      elite.r *= 1.55;
-      elite.hp = elite.maxHp = elite.hp * 4;
-      elite.hurt *= 1.5;
-      elite.xp *= 10;
-      elite.mass *= 3;
-      B.toast("An elite pest is hunting you");
+      var elite = makeElite(R.ch.n >= 5 && Math.random() < 0.5 ? "charger" : "brute");
+      B.toast(elite.trait ? "A " + TRAITS[elite.trait].name.toLowerCase() + " elite is hunting you" : "An elite pest is hunting you");
     }
 
     if (R.t >= R.dur) startBoss();
@@ -297,6 +381,11 @@
       var zig = Math.sin(R.t * 3.2 + e.wob) * 0.7;
       walk(e, -nx - ny * zig, -ny + nx * zig, e.speed * 0.8 * slow * dt);
       return;
+    }
+
+    if (e.trait) {
+      traitThink(e, dt);
+      if (e.dead) return;
     }
 
     if (!e.ai) {
@@ -969,11 +1058,28 @@
     }
 
     if (e.elite) {
+      var trait = e.trait ? TRAITS[e.trait] : null;
+      if (trait && e.trait === "healer") {
+        // how far its healing reaches
+        ctx.fillStyle = trait.color;
+        ctx.globalAlpha = 0.07;
+        circle(ctx, x, y, trait.reach);
+        ctx.globalAlpha = 1;
+      }
       ctx.strokeStyle = "#F2B93B";
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(x, y, r + 4 + Math.sin(t * 5) * 1.2, 0, TAU);
       ctx.stroke();
+      if (trait) {
+        ctx.strokeStyle = trait.color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.arc(x, y, r + 9, t * 1.5, t * 1.5 + TAU);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     }
 
     switch (e.kind) {
@@ -1076,6 +1182,19 @@
       ctx.fillRect(x - r, y - r - 12, r * 2, 4);
       ctx.fillStyle = "#F2B93B";
       ctx.fillRect(x - r, y - r - 12, r * 2 * Math.max(0, e.hp / e.maxHp), 4);
+      if (e.trait) {
+        // its trait, named over the health bar
+        ctx.save();
+        ctx.font = "800 11px 'Baloo 2', Nunito, sans-serif";
+        ctx.textAlign = "center";
+        ctx.lineJoin = "round";
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "rgba(20,18,14,0.75)";
+        ctx.strokeText(TRAITS[e.trait].name, x, y - r - 17);
+        ctx.fillStyle = TRAITS[e.trait].color;
+        ctx.fillText(TRAITS[e.trait].name, x, y - r - 17);
+        ctx.restore();
+      }
     }
   };
 

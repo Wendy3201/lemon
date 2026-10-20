@@ -248,6 +248,34 @@
     );
   }
 
+  /** Today's challenge, between the chapter and the Endless swarm card. */
+  function challengeCard() {
+    var info = st.challengeInfo();
+    if (!info.open) {
+      return (
+        '<div class="panel endless endless--challenge is-locked">' +
+          '<div class="endless__art">' + PS.icon("lock") + "</div>" +
+          '<div class="endless__body"><h3>Daily challenge</h3><p>Clear chapter ' + PS.CHALLENGE.from + " to unlock a new challenge every day.</p></div>" +
+        "</div>"
+      );
+    }
+    var tw = info.twist;
+    var reward = info.done
+      ? '<p class="endless__best">' + PS.icon("check") + "<span>Won today · a new one in " + '<span data-countdown="midnight">' + PS.countdown(untilMidnight()) + "</span></span></p>"
+      : '<p class="endless__best">' + PS.icon("gift") + "<span>Win it for " + price("gems", PS.CHALLENGE.gems) + " and a " + esc(PS.CHESTS[PS.CHALLENGE.chest].name) + "</span></p>";
+    return (
+      '<div class="panel endless endless--challenge' + (info.done ? " is-done" : "") + '">' +
+        '<div class="endless__art">' + PS.icon(tw.icon) + "</div>" +
+        '<div class="endless__body"><p class="kicker">Daily challenge · chapter ' + info.chapter + "</p>" +
+          "<h3>" + esc(tw.name) + "</h3>" +
+          "<p>" + esc(tw.text) + "</p>" +
+          reward +
+        "</div>" +
+        '<button class="btn' + (info.done ? "" : " btn--primary") + '" type="button" data-act="challenge" data-key="challenge">' + (info.done ? "Play again" : "Play") + "</button>" +
+      "</div>"
+    );
+  }
+
   SCREENS.battle = function () {
     var S = st.get();
     var ch = PS.chapter(S.chapter);
@@ -301,6 +329,7 @@
           '<p class="hint">Move with WASD or the arrow keys, or drag on the screen. Your lemon attacks by itself.</p>' +
           '<button class="btn btn--sm home__guide" type="button" data-act="howto" data-key="howto">' + PS.icon("info") + "New here? How to play</button>" +
         "</div>" +
+        challengeCard() +
         endlessCard() +
         '<footer class="foot"><span>Your progress is saved in this browser.</span>' +
           '<button class="foot__secret" type="button" data-act="secret" aria-label="Locked area">?</button></footer>' +
@@ -381,6 +410,7 @@
             '<div><p class="kicker">Power</p><p class="bigpower">' + PS.icon("power") + fmt(stats.power) + "</p></div>" +
             '<div class="gear__buttons">' +
               '<button class="btn btn--sm" type="button" data-act="equip-best" data-key="equip-best">Equip best</button>' +
+              '<button class="btn btn--sm' + (st.bookInfo().ready ? " has-badge" : "") + '" type="button" data-act="book" data-key="book">' + PS.icon("book") + "Collection</button>" +
               '<button class="btn btn--sm" type="button" data-act="forge-quick" data-key="forge-quick">' + PS.icon("bolt") + "Quick forge</button>" +
               '<button class="btn btn--sm btn--primary' + (canForge ? " has-badge" : "") + '" type="button" data-act="forge-open" data-key="forge-open">' + PS.icon("forge") + "Forge</button>" +
             "</div>" +
@@ -1074,6 +1104,7 @@
           '<ul class="howto">' +
             "<li>When your health falls below 30% the edges of the screen glow red.</li>" +
             "<li><b>Lemon slices</b> heal you. Pests drop them now and then; <b>elites</b> (the big ones with a gold ring) always do, along with a magnet that pulls in every gem.</li>" +
+            "<li>From chapter 3 on, every elite has a <b>trait</b>, named over its head: <b>Swift</b> ones are fast but fragile, <b>Healers</b> mend the pests around them (squash those first), <b>Summoners</b> call in more pests, and <b>Splitting</b> ones break in two when squashed.</li>" +
             "<li>Keep moving. Standing still is how the swarm surrounds you.</li>" +
             "<li>Upgrades like <b>Thick Rind</b>, <b>Regrowth</b>, <b>Hard Shell</b> and <b>Second Wind</b> keep you going when the battle gets busy.</li>" +
           "</ul>") +
@@ -1109,6 +1140,7 @@
             "<li>Battles drop gear up to " + rarityName(PS.MAX_DROP_RARITY) + ". Anything rarer comes from the <b>Forge</b>: put in three items of the same slot and rarity, and the one you keep goes up a rarity. <b>Quick forge</b> does every forge it can at once.</li>" +
             "<li>Spend gold to <b>level up</b> each slot. An item's rarity caps how high its slot's level counts.</li>" +
             "<li>Some items are <b>S</b> or <b>SS grade</b>: stronger at every rarity.</li>" +
+            "<li>The <b>Collection</b> button on the Equipment screen keeps every different item you have ever owned. Find more of them for gems: the first reward comes at " + PS.BOOK[0].at + " items.</li>" +
             "<li><b>Power</b> sums up how strong you are. Each chapter shows a recommended Power; below it, the chapter will be tough.</li>" +
           "</ul>") +
         guideSection("shop", "The Shop", "tabShop",
@@ -1124,6 +1156,11 @@
             "<li><b>Talents</b> are bonuses bought with gold that last for good. Max a whole tier to <b>ascend</b> and unlock stronger ones.</li>" +
             "<li><b>Quests</b> are goals that pay gems: clear chapters, squash pests, forge, open chests and more.</li>" +
           "</ul>") +
+        guideSection("challenge", "The daily challenge", "gift",
+          "<p>Clear chapter " + PS.CHALLENGE.from + " to unlock the <b>daily challenge</b> on the Battle screen: a chapter " + PS.CHALLENGE.behind + " short of your furthest, with a twist that changes every day at midnight. Win it for " + PS.CHALLENGE.gems + " gems and a free " + PS.CHESTS[PS.CHALLENGE.chest].name + " (once a day; you can play again for the chapter's normal pay).</p>" +
+          '<ul class="guide__list">' + PS.CHALLENGE.twists.map(function (tw) {
+            return '<li><span class="guide__badge" style="--c:#E58A2A">' + PS.icon(tw.icon) + "</span><span><b>" + esc(tw.name) + "</b> " + esc(tw.text) + "</span></li>";
+          }).join("") + "</ul>") +
         guideSection("endless", "Endless swarm", "clock",
           "<p>Clear chapter " + PS.ENDLESS.from + " to unlock the <b>endless swarm</b>, under the chapter on the Battle screen. There is no boss and no end: the swarm keeps growing and you are paid gold for every second you last. Your best time is kept.</p>") +
       "</div>"
@@ -1966,6 +2003,59 @@
     return out;
   }
 
+  /** The line over the collection grid: what the tapped item is. */
+  function bookCaption(id) {
+    var def = id ? PS.ITEMS[id] : null;
+    if (!def) return "Tap an item to see what it is.";
+    if (st.get().found[id]) {
+      return "<b>" + esc(def.name) + "</b>" + (def.grade !== "A" ? ' <b class="rname g-' + def.grade + '">' + def.grade + "</b>" : "") + " · " + esc(def.blurb);
+    }
+    return "<b>Not found yet.</b> " + (def.grade === "SS" ? "SS-grade gear comes from SS shards and the bosses of every fourth chapter." : "It can turn up in battles and chests.");
+  }
+
+  /** The collection book: every item in the game, one slot at a time. Found
+   *  ones show in colour, the rest as shadows. */
+  function bookModal(modal) {
+    var info = st.bookInfo();
+    var found = st.get().found;
+    var slot = PS.SLOTS.filter(function (s) { return s.key === modal.slot; })[0] || PS.SLOTS[0];
+    var ids = PS.ITEM_ORDER.filter(function (id) { return PS.ITEMS[id].slot === slot.key; });
+    var next = info.next;
+    var from = st.get().book ? PS.BOOK[st.get().book - 1].at : 0;
+    var share = next ? PS.clamp((info.found - from) / (next.at - from), 0, 1) : 1;
+    return (
+      '<div class="book">' +
+        '<button class="modal__close" type="button" data-act="close" aria-label="Close">' + PS.icon("close") + "</button>" +
+        '<h2 id="modal-title">Collection</h2>' +
+        '<p class="hint">Every different piece of gear you have ever owned counts, even after it is forged away or sold.</p>' +
+        '<div class="book__progress">' +
+          '<p class="book__count"><b>' + fmt(info.found) + "</b> of " + fmt(info.total) + " found</p>" +
+          '<div class="book__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(share * 100) + '"><i style="width:' + (share * 100).toFixed(1) + '%"></i></div>' +
+          (info.ready
+            ? '<button class="btn btn--primary btn--sm" type="button" data-act="book-claim" data-key="book-claim">Claim ' + price("gems", info.gems) + "</button>"
+            : next
+              ? '<p class="book__next">Next reward at ' + fmt(next.at) + " found: " + price("gems", next.gems) + "</p>"
+              : '<p class="book__next">' + PS.icon("check") + "Every item found. That is all of them!</p>") +
+        "</div>" +
+        '<div class="chestinfo__tabs book__tabs" role="tablist">' + PS.SLOTS.map(function (s) {
+          var tally = info.bySlot[s.key];
+          var on = s.key === slot.key;
+          return '<button class="chestinfo__tab' + (on ? " is-active" : "") + '" type="button" role="tab" aria-selected="' + on + '" data-act="book-slot" data-slot="' + s.key + '">' +
+            s.plural + "<small>" + tally.found + "/" + tally.total + "</small></button>";
+        }).join("") + "</div>" +
+        '<p class="book__caption" aria-live="polite">' + bookCaption(modal.pick) + "</p>" +
+        '<div class="book__grid">' + ids.map(function (id) {
+          var def = PS.ITEMS[id];
+          var have = Boolean(found[id]);
+          return '<button class="tile r0 tile--mini' + (have ? (def.grade !== "A" ? " gr-" + def.grade : "") : " book__unseen") + (modal.pick === id ? " is-picked" : "") +
+            '" type="button" data-act="book-pick" data-id="' + id + '" title="' + (have ? esc(def.name) : "Not found yet") + '" aria-label="' + (have ? esc(def.name) : "Not found yet") + '">' +
+            '<span class="tile__art">' + PS.itemIcon(id) + "</span>" + (have ? gradeTag(def) : "") + "</button>";
+        }).join("") + "</div>" +
+        '<div class="modal__actions"><button class="btn btn--primary" type="button" data-act="close" data-key="m-ok">Done</button></div>' +
+      "</div>"
+    );
+  }
+
   function hatchModal(modal) {
     var list = modal.results;
     var many = list.length > 6;
@@ -2065,6 +2155,7 @@
     else if (modal.type === "womp") html = wompModal();
     else if (modal.type === "hatch") html = hatchModal(modal);
     else if (modal.type === "chestinfo") html = chestInfoModal(modal);
+    else if (modal.type === "book") html = bookModal(modal);
     if (html === null) {
       closeModal();
       return;
@@ -2075,7 +2166,7 @@
 
   /* ------------------------------------------------------------- battles */
 
-  function startBattle(chapter, mode) {
+  function startBattle(chapter, mode, twist) {
     closeModal();
     var pad = document.querySelector(".codepad"); // the admin key pad must not follow you into a battle
     if (pad) pad.hidden = true;
@@ -2084,8 +2175,9 @@
     el.app.hidden = true;
     el.battle.hidden = false;
     PS.music.play("battle");
-    PS.B.start(chapter, mode);
+    var R = PS.B.start(chapter, mode, twist);
     if (mode === "swarm") PS.B.toast("Endless swarm! Survive as long as you can.", 4);
+    else if (R.twist) PS.B.toast("Daily challenge: " + R.twist.name + ". " + R.twist.text, 5);
   }
 
   function leaveBattle() {
@@ -2135,9 +2227,14 @@
       ? result.first ? "First clear bonus: triple gold, gems and extra gear." : "Nicely done."
       : result.progress >= 1 ? esc(ch.bossName) + " got the better of you." : "You lasted " + PS.clock(result.time) + " of " + PS.clock(ch.duration) + ".";
 
+    var twist = null;
+    PS.CHALLENGE.twists.forEach(function (tw) { if (tw.id === result.twist) twist = tw; });
+    var bonus = result.challenge;
+    var items = bonus ? result.items.concat(bonus.items) : result.items;
+
     el.results.innerHTML =
       '<div class="panel results results--' + (result.won ? "win" : "loss") + '">' +
-        '<p class="kicker">Chapter ' + ch.n + " · " + esc(ch.name) + "</p>" +
+        '<p class="kicker">' + (twist ? "Daily challenge · " + esc(twist.name) + " · chapter " + ch.n : "Chapter " + ch.n + " · " + esc(ch.name)) + "</p>" +
         "<h2>" + title + "</h2>" +
         '<p class="results__sub">' + sub + "</p>" +
         '<dl class="facts facts--tight">' +
@@ -2148,8 +2245,10 @@
           "<div><dt>Best combo</dt><dd>×" + fmt(result.combo || 0) + "</dd></div>" +
         "</dl>" +
         '<p class="loot__money">' + price("gold", result.gold) + (result.gems ? price("gems", result.gems) : "") + "</p>" +
-        (result.items.length
-          ? '<div class="loot__items">' + result.items.map(function (item, index) {
+        (bonus ? '<p class="results__unlock results__challenge">' + PS.icon("gift") + "Challenge won! " + price("gems", bonus.gems) + " and a " + esc(PS.CHESTS[PS.CHALLENGE.chest].name) + "</p>" : "") +
+        (twist && result.won && !bonus ? '<p class="hint">You already won the challenge today, so this win paid like a normal clear.</p>' : "") +
+        (items.length
+          ? '<div class="loot__items">' + items.map(function (item, index) {
               var def = st.def(item);
               return (
                 '<div class="loot__item" style="--i:' + index + '">' + tile(item, { plain: true, cls: "tile--pop" }) +
@@ -2256,6 +2355,10 @@
       var info = st.endlessInfo();
       if (info.open) startBattle(info.chapter, "swarm");
     },
+    challenge: function () {
+      var info = st.challengeInfo();
+      if (info.open) startBattle(info.chapter, undefined, info.twist.id);
+    },
     daily: function () {
       var got = st.claimDaily();
       if (!got) return;
@@ -2269,8 +2372,15 @@
     again: function () {
       var chapter = view.results.chapter;
       var mode = view.results.swarm ? "swarm" : undefined;
+      var twist = view.results.twist;
       PS.B.stop();
-      startBattle(chapter, mode);
+      // a challenge played again after midnight is the new day's challenge
+      if (twist) {
+        var info = st.challengeInfo();
+        chapter = info.chapter;
+        twist = info.twist.id;
+      }
+      startBattle(chapter, mode, twist);
     },
     home: function () { leaveBattle(); },
 
@@ -2425,6 +2535,26 @@
     },
     "chestinfo-r": function (node) {
       view.modal.r = Number(node.getAttribute("data-r"));
+      renderModal();
+    },
+    book: function () { openModal({ type: "book", slot: "weapon", pick: null }); },
+    "book-slot": function (node) {
+      view.modal.slot = node.getAttribute("data-slot");
+      view.modal.pick = null;
+      renderModal();
+    },
+    "book-pick": function (node) {
+      // only the caption changes, so the grid keeps its scroll position
+      view.modal.pick = node.getAttribute("data-id");
+      var was = $(".book__grid .is-picked");
+      if (was) was.classList.remove("is-picked");
+      node.classList.add("is-picked");
+      $(".book__caption").innerHTML = bookCaption(view.modal.pick);
+    },
+    "book-claim": function () {
+      var gems = st.claimBook();
+      if (!gems) return;
+      toast("+" + fmt(gems) + " gems from your collection");
       renderModal();
     },
     "chest-info": function (node) {
@@ -2866,7 +2996,7 @@
   /* what each action sounds like: a name, or null when the action plays its own */
   var SOUND = {
     tab: "tab", fight: "start", again: "start", equip: "equip", "equip-best": "equip", "dev-give": "equip", "dev-set": "equip",
-    upgrade: "upgrade", "upgrade-max": "upgrade", talent: "talent", quest: "coin", deal: "coin", gold: "coin",
+    upgrade: "upgrade", "upgrade-max": "upgrade", talent: "talent", quest: "coin", deal: "coin", gold: "coin", "book-claim": "coin", challenge: "start",
     gift: null, daily: null, chest: null, craft: null, ascend: null, egg: null, "pet-slot": null, sell: null, "forge-go": null, "quick-go": null, sound: null, cycle: null
   };
 
