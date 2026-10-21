@@ -6850,6 +6850,26 @@ body::before {
   color: var(--ink-soft);
 }
 
+.gate__rules {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.gate__rules .ico {
+  margin-top: 2px;
+  color: var(--bad);
+}
+
 .gate__down {
   margin-top: 14px;
   padding: 12px;

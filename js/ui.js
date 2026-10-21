@@ -2391,7 +2391,8 @@
                 '<button class="btn btn--sm" type="button" data-act="gate-retry">Try again</button>' +
                 '<button class="btn btn--sm" type="button" data-act="gate-offline">Play offline</button>' +
               "</div>" +
-            "</div>") +
+            "</div>" +
+            '<p class="gate__rules">' + PS.icon("skull") + "<span>Use your real name. If you’re caught using bad language, you’ll be banned.</span></p>") +
       "</div>"
     );
   }
