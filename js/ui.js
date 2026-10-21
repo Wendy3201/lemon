@@ -3750,6 +3750,101 @@
 
   /* ---------------------------------------------------------------- boot */
 
+  /* --------------------------------------------------- staying up to date */
+  /* A page left open keeps running the version it loaded. Once a minute (and
+     whenever the tab comes back into view) the game asks the server when each
+     of its own files last changed. When one has, a new version is out: the
+     page fetches the new files, then reloads itself as soon as that costs
+     nothing. Never during a battle; while the page is in view, only with no
+     pop-up open and nothing half-typed on the log-in screen. */
+
+  var UPDATE_EVERY = 60000;
+  var KEY_UPDATED = "lemon:updated"; // sessionStorage: when this tab last reloaded for an update
+  var ownFiles = [];
+  var prints = null; // when each file the page is running last changed
+  var updateReady = false;
+  var reloading = false;
+
+  function lastUpdated() {
+    try {
+      return Number(sessionStorage.getItem(KEY_UPDATED)) || 0;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  /** index.html and every script and stylesheet the page loaded from its own site. */
+  function ownFileList() {
+    var list = [location.href.split("#")[0].split("?")[0]];
+    var nodes = document.querySelectorAll("script[src], link[rel=stylesheet][href]");
+    for (var i = 0; i < nodes.length; i++) {
+      var url = (nodes[i].src || nodes[i].href).split("#")[0];
+      if (url.indexOf(location.origin + "/") === 0) list.push(url);
+    }
+    return list;
+  }
+
+  /** started: what the page loaded (from the browser's cache); otherwise what the server has now. */
+  function readPrints(started) {
+    return Promise.all(ownFiles.map(function (url) {
+      var how = started ? { cache: "force-cache" } : { method: "HEAD", cache: "no-store" };
+      return fetch(url, how).then(function (res) {
+        return res.ok ? res.headers.get("last-modified") || res.headers.get("etag") || "" : "";
+      }, function () { return ""; });
+    }));
+  }
+
+  function checkForUpdate() {
+    if (!prints || updateReady) return;
+    readPrints(false).then(function (now) {
+      var changed = now.some(function (print, i) { return print && prints[i] && print !== prints[i]; });
+      // just reloaded for an update: let a minute or two pass rather than risk a loop
+      if (!changed || updateReady || Date.now() - lastUpdated() < 120000) return;
+      updateReady = true;
+      // fetch the new files into the cache first, or the reload could start from old ones
+      Promise.all(ownFiles.map(function (url) {
+        return fetch(url, { cache: "reload" }).catch(function () {});
+      })).then(tryReload);
+    });
+  }
+
+  function safeToReload() {
+    if (!el.battle.hidden) return false;
+    if (document.visibilityState === "hidden") return true;
+    if (view.modal) return false;
+    var boxes = el.gate.hidden ? [] : el.gate.querySelectorAll("input");
+    for (var i = 0; i < boxes.length; i++) if (boxes[i].value) return false;
+    return true;
+  }
+
+  function tryReload() {
+    if (!updateReady || reloading || !safeToReload()) return;
+    reloading = true;
+    try {
+      sessionStorage.setItem(KEY_UPDATED, String(Date.now()));
+    } catch (err) {
+      /* blocked */
+    }
+    var go = function () { location.reload(); };
+    PS.cloud.sync().then(go, go); // the leaderboard gets the latest figures first
+    setTimeout(go, 2000);
+  }
+
+  function startUpdateWatch() {
+    if (!/^https?:$/.test(location.protocol) || !window.fetch) return; // nothing to watch when opened as a file
+    if (Date.now() - lastUpdated() < 60000) toast("Updated to the newest version");
+    ownFiles = ownFileList();
+    readPrints(true).then(function (list) {
+      prints = list;
+      setInterval(checkForUpdate, UPDATE_EVERY);
+      setInterval(tryReload, 3000);
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "visible") checkForUpdate();
+        else tryReload();
+      });
+    });
+  }
+
   PS.ui = {
     init: function () {
       el.app = $("#app");
@@ -3968,6 +4063,7 @@
       });
       el.app.hidden = true; // until someone has logged in (or chosen to play offline)
       boot();
+      startUpdateWatch();
       clearInterval(tickTimer);
       tickTimer = setInterval(tick, 1000);
     }

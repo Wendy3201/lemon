@@ -31,6 +31,12 @@ Then open <http://localhost:8000>.
 **Publishing it.** The folder is a static site, so it can go straight onto
 GitHub Pages, Netlify or any web host. Nothing needs compiling.
 
+**Updates reach open games by themselves.** Once a minute (and whenever the tab
+comes back into view) a game served from a website checks whether any of its
+files changed. If they have, it reloads itself as soon as that is safe: never
+in the middle of a battle, and not while a pop-up is open. Anyone still running
+a copy from before this check existed has to reload once by hand.
+
 ---
 
 ## How to play
