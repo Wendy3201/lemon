@@ -2226,12 +2226,14 @@
     var mod = PS.cloud.isAdmin();
     var ban = mod ? PS.cloud.banOf(row) : null;
     var open = Boolean(mod && view.board.mod && view.board.mod.id === row.id);
+    // everyone sees the owner's title; only admins see who else is an admin
+    var owner = Boolean(row.admin && String(row.name).toLowerCase() === "owner");
+    var title = owner ? ' <em class="is-owner">owner</em>' : mod && row.admin && !you ? ' <em class="is-admin">admin</em>' : "";
     return (
       '<li class="board__row' + (you ? " is-me" : "") + (ban ? " is-banned" : "") + (open ? " is-open" : "") + '">' +
         '<span class="board__rank board__rank--' + Math.min(row.rank, 4) + '">' + row.rank + "</span>" +
         avatar(row.name) +
-        '<span class="board__who"><span class="board__name">' + esc(row.name) + (you ? " <em>you</em>" : "") +
-          (mod && row.admin && !you ? ' <em class="is-admin">admin</em>' : "") + "</span>" +
+        '<span class="board__who"><span class="board__name"><span class="board__nm">' + esc(row.name) + "</span>" + (you ? " <em>you</em>" : "") + title + "</span>" +
           "<small>" + (ban ? '<b class="board__ban">' + (ban.timeout ? "Timed out until " + esc(whenText(ban.until)) : "Banned") + "</b>" : esc(ago(row.updated_at))) + "</small></span>" +
         '<span class="board__value">' + esc(PS.cloud.show(board.key, row[board.key])) + "</span>" +
         (mod ? modButtons(row, who) : "") +

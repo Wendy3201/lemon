@@ -6594,14 +6594,24 @@ body::before {
 }
 
 .board__name {
-  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 4px;
+  min-width: 0;
   font-weight: 800;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* tags drop to a second line before the name is cut short */
+.board__nm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .board__name em {
-  margin-left: 4px;
+  flex: none;
   padding: 1px 6px;
   border-radius: 999px;
   background: var(--rind);
@@ -6611,7 +6621,12 @@ body::before {
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  vertical-align: 2px;
+}
+
+.board__name em.is-owner {
+  background: linear-gradient(180deg, #ffe680, #f2b93b);
+  color: #5a3d00;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 0 0 1px #c98a1b;
 }
 
 .board__who small {
