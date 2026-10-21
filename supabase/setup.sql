@@ -36,8 +36,8 @@ create unique index if not exists players_name_lower on public.players (lower(na
 create index if not exists players_updated_at on public.players (updated_at desc);
 
 -- The admin accounts. To add or remove one later, tick or untick "admin" on its
--- row in the Table Editor (running this script again ticks these two again).
-update public.players set admin = true where lower(name) in ('test', 'owner');
+-- row in the Table Editor (running this script again ticks these ones again).
+update public.players set admin = true where lower(name) in ('test', 'owner', 'test2');
 
 -- a new account gets its row straight away, named from the sign-up form
 create or replace function public.pip_new_player()

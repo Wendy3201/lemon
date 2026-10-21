@@ -392,8 +392,8 @@ logged in on that device. Their progress goes up the next time they log in.
 ### Moderation
 
 An account is an **admin** when its row in the `players` table has **admin**
-ticked (Supabase → Table Editor → players). `setup.sql` ticks `test` and
-`owner`. Admins see buttons under every name on the leaderboard:
+ticked (Supabase → Table Editor → players). `setup.sql` ticks `test`,
+`owner` and `test2`. Admins see buttons under every name on the leaderboard:
 
 - **Ban**: asks for a message, then that player sees *"You have been banned
   by a moderator"* with the message, instead of the game. **Time out** does
