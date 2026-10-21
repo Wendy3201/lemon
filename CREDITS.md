@@ -27,6 +27,12 @@ uses:
 
 Nothing here is copied from, or is a port of, any commercial game.
 
+## Libraries
+
+[supabase-js](https://github.com/supabase/supabase-js) 2.117.2, loaded from the
+jsDelivr CDN with an integrity check, handles accounts and the leaderboard.
+MIT licence, copyright Supabase.
+
 ## Fonts
 
 Loaded from Google Fonts, used under the

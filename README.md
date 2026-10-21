@@ -13,7 +13,8 @@ no accounts, no tracking. It works offline once the folder is on your computer.
 ## Running it
 
 **The quick way.** Double-click `index.html`. Everything works from `file://`,
-including saving.
+including saving and accounts. Logging in needs an internet connection; without
+one, the log-in screen offers **Play offline**.
 
 **With a local web server** (handy for testing on a phone):
 
@@ -275,6 +276,7 @@ lemon/
 │   ├── audio.js      every sound effect, made with the Web Audio API
 │   ├── state.js      the save file and the rules: equip, level up, forge,
 │   │                 chests, deals, quests, battle rewards, Power
+│   ├── cloud.js      accounts (Supabase) and the leaderboard
 │   ├── battle.js     the battle engine: movement, damage, pickups, drawing
 │   ├── weapons.js    how each weapon attacks and looks
 │   ├── enemies.js    pests, bosses, and who turns up when
@@ -282,6 +284,7 @@ lemon/
 │   ├── hud.js        health bar, timer, level-up cards, pause screen
 │   ├── dev.js        the DEV / admin panel inside a battle (cheats, upgrades, spawning, stats)
 │   └── ui.js         the menus: Battle, Equipment, Forge, Shop, Talents, Quests
+├── supabase/setup.sql   the leaderboard table and its rules, run once in Supabase
 ├── assets/icons/lemon.svg
 ├── games/survivor/index.html   the old address; it forwards to index.html
 ├── CREDITS.md        fonts and third-party notes
@@ -333,13 +336,10 @@ Most tweaks are one line in `js/data.js`.
   size, health and speed, how often shrines and elites come), so a new one
   is one line. The day picks the twist, so everyone gets the same one.
 - **Collection rewards:** `PS.BOOK` in `js/data.js`.
-- **Two passwords.** The dev password (`PS.dev.password` in `js/core.js`) is now a **trap**: whoever types it into the `?` button's box loses their whole save, and a "womp womp" message tells them so. It opens nothing. The admin password (`PS.dev.adminPassword`) opens everything. The admin prompt is hidden: click the lemon logo at the top twice, then type the key code up, up, down, down, left, right, left, right, B, A anywhere in the menus, then enter the password. On a phone, the second logo tap brings up a small pad of arrow, B and A buttons to tap instead. (Once the admin is unlocked for the tab, the key code alone reopens the menu.)
+- **Admin access** is hidden on purpose. The admin password and the way in are only kept as scrambled check values (`LOCK` in `js/core.js`, `CODE` in `js/ui.js`), so reading the files does not give them away. To change the password, open the game, run `PS.dev.mix(PS.dev.mix("your new password"))` in the browser console and put what it prints into `LOCK`.
 - **The admin menu in the lobby** has twelve sections down the left. *Overview* (every computed stat), *Gear* (give items, set each slot's level), *Owned* (change an item's rarity, wear it, remove it, clean out the bag), *Pets* (give any pet at any level, fill the team, open the slots), *Money*, *Shop* (open chests without paying, set the pity counters, set the gift timer), *Progress* (chapters and talents), *Quests* (complete or claim any quest, set the counters they read), *Chapters* (every chapter with Play and Clear to here), *Battle* (start any chapter or swarm mode with cheats and a built-up lemon), *Settings* and *Save*. Every change it makes is remembered: the **Undo** button at the top takes back the last one, and the Save section lists the last thirty so you can go back to any of them. The Save section also keeps named **snapshots** of the save in this browser and can download the save as a file or load one.
 - **The DEV / admin panel in a battle** opens from the DEV button or the ` key. As admin it has six tabs: *Cheats* (godmode, one-hit kills, freeze the pests, stop spawning, vacuum, and multipliers for damage, attack speed, move speed, XP and game speed), *Upgrades* (search, filter by tier, take or max any card), *Player* (health, stat boosts, auto-levelling, swap weapon, build presets), *Spawn* (any pest, elites, the boss, a training dummy for reading damage per second, status effects on every pest, pickups), *Run* (skip the clock, set the boss's health, restart on any chapter) and *Stats* (a read-out of the whole run). The switches themselves are listed in `PS.dev` in `js/core.js`, so adding one there adds it to the lobby and the battle panel together.
-- **The password on the `?` button** is the dev password, and it wipes the
-  save (see above). Both passwords are checked in the browser, so anyone who
-  reads the files can see them. The admin password, through the logo and the
-  key code, unlocks developer tools for that tab: a **DEV button in every
+- **The admin password** only works for the admin accounts (see Moderation below); for anyone else the hidden way in does nothing. It unlocks developer tools for that tab: a **DEV button in every
   battle** (godmode, one-hit kills, game speed, take or max any upgrade, level
   up, skip to the boss) and the tabbed admin menu in the lobby.
   The lobby menu can give or remove any item, set gold and
@@ -350,13 +350,71 @@ Most tweaks are one line in `js/data.js`.
 
 ---
 
+## Accounts and the leaderboard
+
+The game opens on a log-in screen. Players **sign up** with a name (3 to 16
+letters, numbers or `_`) and a password, then **log in** with the same two.
+There is no email, so a forgotten password cannot be reset; the owner can
+delete the account in Supabase and the player signs up again.
+
+Once in, the **account button** at the top right opens the player's account
+and the **leaderboard**. It ranks everyone by furthest chapter, Power, longest
+endless swarm, pests squashed, daily challenges won or collection size, and can
+be filtered to players with progress **this week** or **today**, or searched by
+name. Players on the same figure share a place.
+
+A player's figures go up a few seconds after they change, and only ever go up:
+playing on a second device cannot lower a best. They are checked against sane
+limits, but they come from the player's browser, so a determined cheat can
+still post a fake score. The owner can fix any row in Supabase's Table Editor.
+
+**Setting it up** (once):
+
+1. In Supabase, open **SQL Editor → New query**, paste all of
+   [`supabase/setup.sql`](supabase/setup.sql) and press **Run**.
+2. Open **Authentication → Sign In / Providers → Email** and switch
+   **Confirm email** off, then save. (Names are turned into addresses that can
+   never receive mail, so nobody could ever confirm one.)
+
+The project address and its publishable key are at the top of `js/cloud.js`.
+Both are meant to be public; the table's rules are what protect the data.
+Never put the **secret** key anywhere in this folder.
+
+**No connection?** The log-in screen offers **Play offline**, as whoever last
+logged in on that device. Their progress goes up the next time they log in.
+
+### Moderation
+
+An account is an **admin** when its row in the `players` table has **admin**
+ticked (Supabase → Table Editor → players). `setup.sql` ticks `test` and
+`owner`. Admins see buttons under every name on the leaderboard:
+
+- **Ban**: asks for a message, then that player sees *"You have been banned
+  by a moderator"* with the message, instead of the game. **Time out** does
+  the same for 10 minutes, an hour, a day or a week.
+- **Unban** lifts a ban or a timeout.
+- **Give** sends any weapon or piece of gear at any rarity, or gold, or gems,
+  with an optional message. It arrives the next time the player's game checks
+  in (within a minute while they play) and pops up as a gift.
+
+Banned and timed-out players disappear from everyone else's leaderboard and
+cannot post scores. A game checks for bans and gifts every 45 seconds, and a
+ban ends a battle on the spot. All of this is checked by the server, so the
+buttons do nothing for anyone who is not an admin. Admins cannot be banned.
+
 ## How saving works
 
-Everything is stored in this browser's `localStorage`. Nothing is uploaded.
+Saves stay in this browser's `localStorage`; only the leaderboard figures above
+are sent to the server. Each account on a device has its own save. The first
+account to log in on a device takes over the save that was there before
+accounts existed, so nobody loses progress.
 
 | Key | What it holds |
 | --- | --- |
-| `lemon:pips:save` | the whole save: gold, gems, gear, levels, talents, chapters, quests, the daily challenge and the collection |
+| `lemon:pips:save:<account id>` | one account's whole save: gold, gems, gear, levels, talents, chapters, quests, the daily challenge and the collection |
+| `lemon:pips:save` | the save from before accounts (until an account takes it over), or one played offline with no account |
+| `lemon:cloud:last` | who last logged in on this device, for playing offline |
+| `sb-…-auth-token` | the log-in session, kept by Supabase so the game opens straight into the menus next time |
 | `lemon:theme` | `"light"` or `"dark"` |
 
 Every read and write is wrapped in `try/catch`. In a private window, or when a

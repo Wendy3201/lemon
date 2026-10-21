@@ -11,7 +11,8 @@
   "use strict";
 
   var PS = window.PS;
-  var KEY = "lemon:pips:save";
+  var BASE_KEY = "lemon:pips:save";
+  var KEY = BASE_KEY; // each account on this device has its own: BASE_KEY + ":" + account id
   var VERSION = 1;
 
   var S = null; // the save
@@ -223,7 +224,14 @@
   var KEY_WIPE = "lemon:wipe";
   var KEY_NOTICE = "lemon:wipe-notice"; // set until the player has seen the message once
 
-  function load() {
+  /** Load the save of `owner` (an account id), or the one from before accounts.
+   *  The first account to sign in on a device takes over that older save. */
+  function load(owner) {
+    KEY = owner ? BASE_KEY + ":" + owner : BASE_KEY;
+    if (owner && PS.store.get(KEY, null) === null && PS.store.get(BASE_KEY, null) !== null) {
+      PS.store.set(KEY, PS.store.get(BASE_KEY, null));
+      PS.store.remove(BASE_KEY);
+    }
     if (PS.store.get(KEY_WIPE, null) !== WIPE_ID) {
       // only someone who actually had a save is told it was reset
       if (PS.store.get(KEY, null)) PS.store.set(KEY_NOTICE, true);

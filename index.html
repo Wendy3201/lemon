@@ -43,6 +43,8 @@
           <span class="pill" id="top-gems" title="Gems: for chests"></span>
           <button class="btn btn--icon" id="open-settings" type="button" data-act="settings"
             aria-label="Settings"></button>
+          <button class="account" id="open-account" type="button" data-act="account"
+            aria-label="Your account and the leaderboard"></button>
         </div>
       </header>
     </div>
@@ -59,6 +61,9 @@
     </nav>
   </div>
 
+  <!-- ------------------------------------------- log in or sign up -->
+  <section class="gate" id="gate" hidden aria-labelledby="gate-title"></section>
+
   <!-- ----------------------------------------------------------- battle -->
   <section class="battle" id="battle" hidden aria-label="Battle"></section>
 
@@ -70,6 +75,9 @@
   </noscript>
 
   <!-- ---------------------------------------------------------- scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"
+    integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok"
+    crossorigin="anonymous"></script>
   <script src="js/core.js"></script>
   <script src="js/armory.js"></script>
   <script src="js/data.js"></script>
@@ -77,6 +85,7 @@
   <script src="js/audio.js"></script>
   <script src="js/music.js"></script>
   <script src="js/state.js"></script>
+  <script src="js/cloud.js"></script>
   <script src="js/battle.js"></script>
   <script src="js/arena.js"></script>
   <script src="js/events.js"></script>

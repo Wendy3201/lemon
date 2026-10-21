@@ -29,9 +29,12 @@
     entering: true, // the next render should play the screen's entrance animation
     slide: 0, // -1 / 1 while the chapter title slides in from a side
     modal: null, // { type, ... } while a pop-up is open
-    results: null
+    results: null,
+    gate: null, // { mode: "login" | "signup", name, error, down, checking, busy } while the log-in screen shows
+    board: { by: "chapter", span: "all", q: "", rows: null, error: "", mod: null }, // the leaderboard: filters, rows, an admin's open form
+    giftsWaiting: null // gifts from a moderator, shown as soon as the menus are free
   };
-  var logoArmedUntil = 0; // when the double-clicked logo stops unlocking the admin key code
+  var logoArmedUntil = 0;
   var toastTimer = 0;
   var tickTimer = 0;
 
@@ -1909,7 +1912,6 @@
     var tab = view.devTab;
     var calc = st.calc();
     var admin = PS.dev.admin;
-    // the dev password only gets the Battle section; the admin password gets all of it
     var tabs = admin ? DEV_TABS : DEV_TABS.filter(function (t) { return t[0] === "battle"; });
     if (!tabs.some(function (t) { return t[0] === tab; })) tab = view.devTab = tabs[0][0];
     var body = tab === "gear" ? devGear(S, view.dev, calc)
@@ -2081,7 +2083,6 @@
     );
   }
 
-  /** What someone sees after putting in the dev password: their save is gone. */
   function wompModal() {
     return (
       '<div class="notice womp">' +
@@ -2156,12 +2157,587 @@
     else if (modal.type === "hatch") html = hatchModal(modal);
     else if (modal.type === "chestinfo") html = chestInfoModal(modal);
     else if (modal.type === "book") html = bookModal(modal);
+    else if (modal.type === "account") html = accountModal();
+    else if (modal.type === "gift") html = giftModal(modal);
     if (html === null) {
       closeModal();
       return;
     }
     el.modal.className = "modal modal--" + modal.type;
     el.modal.innerHTML = html;
+  }
+
+  /* ------------------------------------------ accounts and the leaderboard */
+
+  var BOARD_SHOW = 100; // rows drawn at once; search finds the rest
+
+  /** A round badge with the first letter of a name, in that name's own colour. */
+  function avatar(name, cls) {
+    var text = String(name || "?");
+    return '<span class="avatar' + (cls ? " " + cls : "") + '" style="--hue:' + (PS.hash(text.toLowerCase()) % 360) + '" aria-hidden="true">' +
+      esc(text.charAt(0).toUpperCase()) + "</span>";
+  }
+
+  /** The button at the top right: who is playing. */
+  function renderAccount() {
+    var who = PS.cloud.me();
+    var off = !who || PS.cloud.offline();
+    el.account.innerHTML = avatar(who ? who.name : "?") + '<span class="account__name">' + esc(who ? who.name : "Log in") + "</span>";
+    el.account.classList.toggle("is-off", off);
+    el.account.setAttribute("aria-label", who ? who.name + ": your account and the leaderboard" : "Log in, and the leaderboard");
+  }
+
+  function dayText(iso) {
+    var date = new Date(iso);
+    return isNaN(date.getTime()) ? "" : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  /** "just now", "5m ago", "3h ago", "2d ago" */
+  function ago(iso) {
+    var s = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (!isFinite(s)) return "";
+    if (s < 90) return "just now";
+    if (s < 3600) return Math.round(s / 60) + "m ago";
+    if (s < 86400) return Math.round(s / 3600) + "h ago";
+    return Math.round(s / 86400) + "d ago";
+  }
+
+  function myRow() {
+    var who = PS.cloud.me();
+    var rows = view.board.rows;
+    if (!who || !rows) return null;
+    for (var i = 0; i < rows.length; i++) if (rows[i].id === who.id) return rows[i];
+    return null;
+  }
+
+  function accountSub() {
+    var who = PS.cloud.me();
+    if (!who) return "Log in to see the leaderboard and get on it.";
+    if (PS.cloud.offline()) return "Playing offline. Your progress goes on the leaderboard when you log in again.";
+    var bits = [];
+    if (who.joined) bits.push("Joined " + esc(dayText(who.joined)));
+    var mine = myRow();
+    if (mine) bits.push("<b>#" + mine.rank + "</b> in " + esc(PS.cloud.boardOf(view.board.by).name));
+    return bits.join(" · ");
+  }
+
+  function boardRow(row, board, who) {
+    var you = Boolean(who && row.id === who.id);
+    var mod = PS.cloud.isAdmin();
+    var ban = mod ? PS.cloud.banOf(row) : null;
+    var open = Boolean(mod && view.board.mod && view.board.mod.id === row.id);
+    return (
+      '<li class="board__row' + (you ? " is-me" : "") + (ban ? " is-banned" : "") + (open ? " is-open" : "") + '">' +
+        '<span class="board__rank board__rank--' + Math.min(row.rank, 4) + '">' + row.rank + "</span>" +
+        avatar(row.name) +
+        '<span class="board__who"><span class="board__name">' + esc(row.name) + (you ? " <em>you</em>" : "") +
+          (mod && row.admin && !you ? ' <em class="is-admin">admin</em>' : "") + "</span>" +
+          "<small>" + (ban ? '<b class="board__ban">' + (ban.timeout ? "Timed out until " + esc(whenText(ban.until)) : "Banned") + "</b>" : esc(ago(row.updated_at))) + "</small></span>" +
+        '<span class="board__value">' + esc(PS.cloud.show(board.key, row[board.key])) + "</span>" +
+        (mod ? modButtons(row, who) : "") +
+        (open ? modForm() : "") +
+      "</li>"
+    );
+  }
+
+  function boardBody() {
+    var b = view.board;
+    var who = PS.cloud.me();
+    if (!who || PS.cloud.offline()) {
+      return '<div class="board__empty"><p>The leaderboard needs a connection and an account.</p>' +
+        '<button class="btn btn--sm btn--primary" type="button" data-act="login">Log in</button></div>';
+    }
+    if (b.error) {
+      return '<div class="board__empty"><p>' + esc(b.error) + "</p>" +
+        '<button class="btn btn--sm" type="button" data-act="board-refresh">Try again</button></div>';
+    }
+    if (!b.rows) {
+      return '<ol class="board__list is-loading" aria-label="Loading">' + '<li class="board__row board__ghost"></li>'.repeat(5) + "</ol>";
+    }
+    var board = PS.cloud.boardOf(b.by);
+    var find = b.q.trim().toLowerCase();
+    var rows = find ? b.rows.filter(function (row) { return row.name.toLowerCase().indexOf(find) !== -1; }) : b.rows;
+    var when = b.span === "today" ? "today" : "this week";
+    if (!rows.length) {
+      var none = find
+        ? "No one called “" + esc(b.q.trim()) + "” is on this board" + (b.span === "all" ? "." : " " + when + ".")
+        : b.span === "all" ? "No scores here yet. Be the first!" : "No one has made progress " + when + " yet.";
+      return '<div class="board__empty"><p>' + none + "</p></div>";
+    }
+    var shown = rows.slice(0, BOARD_SHOW);
+    var mine = myRow();
+    var html = '<ol class="board__list">' + shown.map(function (row) { return boardRow(row, board, who); }).join("") + "</ol>";
+    if (rows.length > shown.length) html += '<p class="hint board__more">Showing the top ' + shown.length + " of " + fmt(rows.length) + ". Search for a name to find anyone else.</p>";
+    if (!find && mine && shown.indexOf(mine) === -1) html += '<ol class="board__list board__list--me">' + boardRow(mine, board, who) + "</ol>";
+    if (!find && !mine) {
+      html += '<p class="hint board__more">You are not on this board ' + (b.span === "all" ? "yet." : when + ". Make some progress to get on it.") + "</p>";
+    }
+    return html;
+  }
+
+  function accountModal() {
+    var who = PS.cloud.me();
+    var online = Boolean(who && !PS.cloud.offline());
+    var b = view.board;
+    var board = PS.cloud.boardOf(b.by);
+    return (
+      '<div class="acct">' +
+        '<button class="modal__close" type="button" data-act="close" aria-label="Close">' + PS.icon("close") + "</button>" +
+        '<div class="acct__me">' +
+          avatar(who ? who.name : "?", "avatar--lg") +
+          '<div class="acct__who">' +
+            '<h2 id="modal-title">' + esc(who ? who.name : "Not logged in") + "</h2>" +
+            '<p id="account-sub">' + accountSub() + "</p>" +
+            (online
+              ? '<button class="btn btn--sm" type="button" data-act="logout">Log out</button>'
+              : '<button class="btn btn--sm btn--primary" type="button" data-act="login">Log in</button>') +
+          "</div>" +
+        "</div>" +
+        '<div class="board__head"><h3>Leaderboard</h3>' +
+          (online ? '<button class="btn btn--sm" type="button" data-act="board-refresh">Refresh</button>' : "") +
+        "</div>" +
+        '<div class="filters board__by" role="group" aria-label="Rank by">' +
+          PS.cloud.BOARDS.map(function (def) {
+            return '<button class="filter" type="button" data-act="board-by" data-by="' + def.key + '" aria-pressed="' + (def.key === b.by) + '">' + PS.icon(def.icon) + esc(def.name) + "</button>";
+          }).join("") +
+        "</div>" +
+        '<div class="board__tools">' +
+          '<div class="board__span" role="group" aria-label="Who to show">' +
+            PS.cloud.SPANS.map(function (span) {
+              return '<button type="button" data-act="board-span" data-span="' + span.key + '" aria-pressed="' + (span.key === b.span) + '">' + esc(span.name) + "</button>";
+            }).join("") +
+          "</div>" +
+          '<input class="board__search" id="board-search" type="search" placeholder="Find a name" aria-label="Find a player by name" autocomplete="off" spellcheck="false" maxlength="16" value="' + esc(b.q) + '" />' +
+        "</div>" +
+        '<p class="board__what">' + PS.icon(board.icon) + esc(board.text) +
+          (b.span === "all" ? "" : b.span === "today" ? ", players with progress today" : ", players with progress this week") + "</p>" +
+        '<div class="board" id="board" aria-live="polite">' + boardBody() + "</div>" +
+      "</div>"
+    );
+  }
+
+  /** Redraw the list and the rank line in place, so the search box keeps its focus. */
+  function paintBoard() {
+    if (!view.modal || view.modal.type !== "account") return;
+    var box = $("#board");
+    if (box) box.innerHTML = boardBody();
+    var sub = $("#account-sub");
+    if (sub) sub.innerHTML = accountSub();
+  }
+
+  function loadBoard(fresh) {
+    var b = view.board;
+    var by = b.by;
+    var span = b.span;
+    if (fresh) {
+      b.rows = null;
+      b.error = "";
+      paintBoard();
+    }
+    PS.cloud.board(by, span, fresh).then(function (res) {
+      if (b.by !== by || b.span !== span) return; // the filters moved on while this was loading
+      b.rows = res.error ? null : res.rows;
+      b.error = res.error || "";
+      paintBoard();
+    });
+  }
+
+  function setBoard(by, span) {
+    var b = view.board;
+    b.mod = null;
+    b.by = by || b.by;
+    b.span = span || b.span;
+    b.rows = null;
+    b.error = "";
+    renderModal();
+    loadBoard(false);
+  }
+
+  /* The screen before the menus: log in or make an account. */
+
+  function gateHtml() {
+    var g = view.gate;
+    var signup = g.mode === "signup";
+    return (
+      '<div class="gate__card">' +
+        '<div class="gate__art">' + PS.art("lemon") + "</div>" +
+        '<h1 class="gate__title" id="gate-title">PIP SURVIVORS</h1>' +
+        '<p class="gate__tag">a Lemon game</p>' +
+        (g.checking
+          ? '<p class="gate__checking">Connecting…</p>'
+          : '<div class="gate__tabs" role="group" aria-label="Log in or sign up">' +
+              '<button class="gate__tab" type="button" data-act="gate-mode" data-mode="login" aria-pressed="' + !signup + '">Log in</button>' +
+              '<button class="gate__tab" type="button" data-act="gate-mode" data-mode="signup" aria-pressed="' + signup + '">Sign up</button>' +
+            "</div>" +
+            '<form class="gate__form" data-form="gate" novalidate>' +
+              '<label class="gate__field"><span>Name</span>' +
+                '<input id="gate-name" name="username" type="text" value="' + esc(g.name) + '" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="16" /></label>' +
+              '<label class="gate__field"><span>Password</span>' +
+                '<input id="gate-pass" name="password" type="password" autocomplete="' + (signup ? "new-password" : "current-password") + '" /></label>' +
+              (signup
+                ? '<label class="gate__field"><span>Password again</span><input id="gate-pass2" name="password2" type="password" autocomplete="new-password" /></label>'
+                : "") +
+              '<p class="gate__error" id="gate-error" role="alert">' + esc(g.error) + "</p>" +
+              '<button class="btn btn--primary gate__go" id="gate-go" type="submit">' + (signup ? "Create account" : "Log in") + "</button>" +
+            "</form>" +
+            '<p class="gate__note">' +
+              (signup
+                ? "Your name goes on the leaderboard: 3 to 16 letters, numbers or _. There is no email, so keep your password somewhere safe."
+                : "New here? Pick <b>Sign up</b> to make an account.") +
+            "</p>" +
+            '<div class="gate__down" id="gate-down"' + (g.down ? "" : " hidden") + ">" +
+              "<p>No connection? You can still play. Your progress goes on the leaderboard next time you log in.</p>" +
+              '<div class="gate__downbtns">' +
+                '<button class="btn btn--sm" type="button" data-act="gate-retry">Try again</button>' +
+                '<button class="btn btn--sm" type="button" data-act="gate-offline">Play offline</button>' +
+              "</div>" +
+            "</div>") +
+      "</div>"
+    );
+  }
+
+  function showGate(info) {
+    info = info || {};
+    var g = view.gate || (view.gate = { mode: "login", name: "", error: "", down: false, checking: false, busy: false });
+    g.checking = Boolean(info.checking);
+    g.error = info.error || "";
+    g.down = Boolean(info.down);
+    g.busy = false;
+    if (typeof info.name === "string") g.name = info.name;
+    el.app.hidden = true;
+    el.gate.innerHTML = gateHtml();
+    el.gate.hidden = false;
+    // on a phone the keyboard would cover the card before anyone has looked at it
+    var touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+    var first = $(g.name ? "#gate-pass" : "#gate-name");
+    if (first && !touch) first.focus();
+  }
+
+  /** Patch the form in place, so what has been typed stays put. */
+  function gateState(busy, error, down) {
+    var g = view.gate;
+    if (!g) return;
+    g.busy = busy;
+    g.error = error || "";
+    g.down = Boolean(down);
+    var go = $("#gate-go");
+    if (go) {
+      go.disabled = busy;
+      go.textContent = busy ? (g.mode === "signup" ? "Making your account…" : "Logging in…") : g.mode === "signup" ? "Create account" : "Log in";
+    }
+    var line = $("#gate-error");
+    if (line) line.textContent = g.error;
+    var down = $("#gate-down");
+    if (down) down.hidden = !g.down;
+  }
+
+  function gateSubmit(e) {
+    e.preventDefault();
+    var g = view.gate;
+    if (!g || g.busy) return;
+    var nameBox = $("#gate-name");
+    var passBox = $("#gate-pass");
+    var again = $("#gate-pass2");
+    g.name = nameBox ? nameBox.value.trim() : "";
+    var password = passBox ? passBox.value : "";
+    if (g.mode === "signup" && again && again.value !== password) {
+      gateState(false, "The two passwords don't match.");
+      again.focus();
+      return;
+    }
+    gateState(true, "");
+    var job = g.mode === "signup" ? PS.cloud.signUp(g.name, password) : PS.cloud.signIn(g.name, password);
+    job.then(function (res) {
+      if (view.gate !== g) return;
+      if (res.error) {
+        gateState(false, res.error, res.down);
+        var aboutName = /^(Type a name|Names |That name is taken|That name can't)/.test(res.error);
+        var box = aboutName ? nameBox : passBox;
+        if (box) box.focus();
+        return;
+      }
+      enter(g.mode === "signup");
+    });
+  }
+
+  /** Into the menus as whoever is signed in (or playing offline). */
+  function enter(welcome) {
+    var who = PS.cloud.me();
+    if (!PS.cloud.isAdmin()) PS.dev.lock(); // the tab may still remember an admin from before
+    if (showBan()) return; // banned or timed out: the ban screen instead
+    st.load(who ? who.id : null); // every account on this device has its own save
+    view.gate = null;
+    view.forge = null;
+    view.results = null;
+    view.board.rows = null;
+    view.board.error = "";
+    view.board.mod = null;
+    el.gate.hidden = true;
+    el.gate.innerHTML = "";
+    el.app.hidden = false;
+    view.entering = true;
+    renderAccount();
+    render();
+    if (st.takeWipeNotice()) openModal({ type: "notice" });
+    else if (welcome && who) toast("Welcome, " + who.name + "!");
+    PS.cloud.sync();
+    watch();
+  }
+
+  function signOut() {
+    var who = PS.cloud.me();
+    var name = who && !PS.cloud.offline() ? who.name : "";
+    PS.dev.lock(); // the next person on this tab does not inherit the admin menu
+    PS.cloud.signOut();
+    view.gate = null;
+    showGate({ name: name });
+  }
+
+  /** Pick up last time's session, or ask who is playing. */
+  function boot() {
+    var slow = setTimeout(function () { showGate({ checking: true }); }, 400);
+    PS.cloud.start().then(function (res) {
+      clearTimeout(slow);
+      if (PS.cloud.me()) enter(false);
+      else showGate(res);
+    });
+  }
+
+  /* --------------------------------------------- moderation (admins only) */
+
+  var TIMEOUTS = [[10, "10 minutes"], [60, "1 hour"], [1440, "1 day"], [10080, "1 week"]];
+  var CHECK_EVERY = 45000; // how often a signed-in game asks about bans and gifts
+
+  /** "4:05 PM" today, "22 Oct, 4:05 PM" another day. */
+  function whenText(ms) {
+    var date = new Date(ms);
+    var today = date.toDateString() === new Date().toDateString();
+    return today
+      ? date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+      : date.toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+  }
+
+  function timeoutName(minutes) {
+    for (var i = 0; i < TIMEOUTS.length; i++) if (TIMEOUTS[i][0] === minutes) return TIMEOUTS[i][1];
+    return minutes + " minutes";
+  }
+
+  function firstItem(slot) {
+    for (var i = 0; i < PS.ITEM_ORDER.length; i++) if (PS.ITEMS[PS.ITEM_ORDER[i]].slot === slot) return PS.ITEM_ORDER[i];
+    return PS.ITEM_ORDER[0];
+  }
+
+  function itemOptions(current) {
+    return PS.SLOTS.map(function (slot) {
+      return '<optgroup label="' + esc(slot.plural) + '">' +
+        PS.ITEM_ORDER.filter(function (id) { return PS.ITEMS[id].slot === slot.key; }).map(function (id) {
+          var def = PS.ITEMS[id];
+          return '<option value="' + id + '"' + (id === current ? " selected" : "") + ">" + esc(def.name) + (def.grade !== "A" ? " (" + def.grade + ")" : "") + "</option>";
+        }).join("") +
+      "</optgroup>";
+    }).join("");
+  }
+
+  function options(list, current) {
+    return list.map(function (o) {
+      return '<option value="' + o[0] + '"' + (String(o[0]) === String(current) ? " selected" : "") + ">" + esc(o[1]) + "</option>";
+    }).join("");
+  }
+
+  /** The admin's buttons under a row: Give always; Time out and Ban, or Unban. */
+  function modButtons(row, who) {
+    var self = row.id === who.id;
+    var banned = Boolean(PS.cloud.banOf(row));
+    var open = view.board.mod && view.board.mod.id === row.id ? view.board.mod.act : "";
+    function button(act, label, cls) {
+      return '<button class="board__act' + (cls ? " " + cls : "") + '" type="button" data-act="mod-open" data-mod="' + act + '" data-id="' + esc(row.id) + '" aria-pressed="' + (open === act) + '">' + label + "</button>";
+    }
+    var out = [button("give", PS.icon("gift") + "Give")];
+    if (!self && !row.admin) {
+      if (banned) {
+        out.push('<button class="board__act" type="button" data-act="mod-unban" data-id="' + esc(row.id) + '">Unban</button>');
+      } else {
+        out.push(button("timeout", PS.icon("clock") + "Time out"));
+        out.push(button("ban", "Ban", "is-danger"));
+      }
+    }
+    return '<div class="board__mod">' + out.join("") + "</div>";
+  }
+
+  /** The form that opens under a row: the ban or timeout message, or what to give. */
+  function modForm() {
+    var m = view.board.mod;
+    var fields = "";
+    var go = "";
+    if (m.act === "ban" || m.act === "timeout") {
+      if (m.act === "timeout") {
+        fields += '<label class="board__field"><span>How long?</span><select id="mod-minutes">' + options(TIMEOUTS, m.minutes) + "</select></label>";
+      }
+      fields += '<label class="board__field"><span>What should the ' + (m.act === "ban" ? "ban" : "timeout") + " message be?</span>" +
+        '<textarea id="mod-msg" rows="2" maxlength="200" placeholder="' + esc(m.name) + ' will see this">' + esc(m.msg) + "</textarea></label>";
+      go = m.act === "ban" ? "Ban " + esc(m.name) : "Time out " + esc(m.name);
+    } else {
+      fields += '<label class="board__field"><span>What to give</span><select id="mod-kind">' +
+        options([["item", "A weapon or gear"], ["gold", "Gold"], ["gems", "Gems"]], m.kind) + "</select></label>";
+      if (m.kind === "item") {
+        fields += '<div class="board__pair">' +
+          '<label class="board__field"><span>Item</span><select id="mod-item">' + itemOptions(m.item) + "</select></label>" +
+          '<label class="board__field"><span>Rarity</span><select id="mod-rarity">' + options(rarityOptions(PS.RARITY.length), m.rarity) + "</select></label>" +
+        "</div>";
+      } else {
+        fields += '<label class="board__field"><span>How much?</span><input id="mod-amount" type="number" min="1" max="1000000000" step="1" value="' + esc(String(m.amount)) + '" /></label>';
+      }
+      fields += '<label class="board__field"><span>Message (optional)</span><input id="mod-msg" type="text" maxlength="200" value="' + esc(m.msg) + '" /></label>';
+      go = "Send to " + esc(m.name);
+    }
+    return (
+      '<form class="board__form" data-form="mod" novalidate>' + fields +
+        '<p class="board__formerr" role="alert">' + esc(m.error || "") + "</p>" +
+        '<div class="board__formbtns">' +
+          '<button class="btn btn--sm" type="button" data-act="mod-cancel">Cancel</button>' +
+          '<button class="btn btn--sm ' + (m.act === "ban" ? "btn--danger" : "btn--primary") + '" type="submit"' + (m.busy ? " disabled" : "") + ">" + go + "</button>" +
+        "</div>" +
+      "</form>"
+    );
+  }
+
+  function modSubmit(e) {
+    e.preventDefault();
+    var m = view.board.mod;
+    if (!m || m.busy) return;
+    var message = m.msg.trim();
+    var job;
+    var done;
+    if (m.act === "ban") {
+      job = PS.cloud.banPlayer(m.id, 0, message);
+      done = "Banned " + m.name;
+    } else if (m.act === "timeout") {
+      job = PS.cloud.banPlayer(m.id, m.minutes, message);
+      done = "Timed out " + m.name + " for " + timeoutName(m.minutes);
+    } else if (m.kind === "item") {
+      job = PS.cloud.give(m.id, { kind: "item", item: m.item, rarity: m.rarity, message: message });
+      done = "Sent " + m.name + " " + PS.RARITY[m.rarity].name + " " + PS.ITEMS[m.item].name;
+    } else {
+      var amount = Math.floor(Number(m.amount) || 0);
+      if (amount < 1) {
+        m.error = "Pick an amount of at least 1.";
+        paintBoard();
+        return;
+      }
+      job = PS.cloud.give(m.id, { kind: m.kind, amount: amount, message: message });
+      done = "Sent " + m.name + " " + fmt(amount) + " " + m.kind;
+    }
+    m.busy = true;
+    m.error = "";
+    paintBoard();
+    job.then(function (res) {
+      if (view.board.mod !== m) return;
+      m.busy = false;
+      if (res.error) {
+        m.error = res.error;
+        paintBoard();
+        return;
+      }
+      view.board.mod = null;
+      toast(done);
+      loadBoard(true);
+    });
+  }
+
+  /* What a banned or timed-out player sees, in place of the menus. */
+
+  function banHtml(ban) {
+    return (
+      '<div class="gate__card ban">' +
+        '<div class="gate__art ban__art">' + PS.art("lemon") + "</div>" +
+        '<h1 class="gate__title" id="gate-title">' + (ban.timeout ? "TIMED OUT" : "BANNED") + "</h1>" +
+        '<p class="ban__lead">' + (ban.timeout ? "You have been timed out by a moderator." : "You have been banned by a moderator.") + "</p>" +
+        (ban.message ? '<div class="ban__msg"><span>Moderator’s message:</span><p>“' + esc(ban.message) + "”</p></div>" : "") +
+        (ban.timeout ? '<p class="ban__left">You can play again at <b>' + esc(whenText(ban.until)) + "</b>.</p>" : "") +
+        '<div class="gate__downbtns">' +
+          (ban.timeout ? '<button class="btn btn--sm" type="button" data-act="ban-check">Check again</button>' : "") +
+          '<button class="btn btn--sm" type="button" data-act="logout">Log out</button>' +
+        "</div>" +
+      "</div>"
+    );
+  }
+
+  function showBan() {
+    var ban = PS.cloud.ban();
+    if (!ban) return false;
+    closeModal();
+    view.gate = null;
+    el.app.hidden = true;
+    el.gate.innerHTML = banHtml(ban);
+    el.gate.hidden = false;
+    return true;
+  }
+
+  /** Banned while playing: out of any battle and onto the ban screen. */
+  function kick() {
+    if (!el.battle.hidden) {
+      PS.B.stop();
+      PS.B.hud.hide();
+      el.battle.hidden = true;
+      el.results.hidden = true;
+      view.results = null;
+      PS.music.play("camp");
+    }
+    showBan();
+  }
+
+  /** Put gifts from a moderator into the save, and say so as soon as the menus show. */
+  function receiveGifts(list) {
+    var got = [];
+    list.forEach(function (gift) {
+      if (gift.kind === "item" && PS.ITEMS[gift.item]) {
+        var r = Math.max(0, Math.min(PS.MAX_RARITY, Math.floor(Number(gift.rarity) || 0)));
+        got.push({ item: st.give(gift.item, r), message: gift.message || "" });
+      } else if (gift.kind === "gold" || gift.kind === "gems") {
+        var S = st.get();
+        var n = Math.max(0, Math.floor(Number(gift.amount) || 0));
+        st.setMoney(gift.kind === "gold" ? S.gold + n : S.gold, gift.kind === "gems" ? S.gems + n : S.gems);
+        got.push({ kind: gift.kind, amount: n, message: gift.message || "" });
+      }
+    });
+    if (!got.length) return;
+    view.giftsWaiting = (view.giftsWaiting || []).concat(got);
+    PS.sfx.play("coin");
+    toast("A moderator sent you a gift!");
+  }
+
+  function giftModal(modal) {
+    var notes = [];
+    modal.got.forEach(function (g) { if (g.message && notes.indexOf(g.message) === -1) notes.push(g.message); });
+    return (
+      '<div class="notice giftnote">' +
+        '<div class="giftnote__art">' + PS.art("gift") + "</div>" +
+        '<h2 id="modal-title">A gift from a moderator</h2>' +
+        '<div class="giftnote__got">' +
+          modal.got.map(function (g) {
+            return g.item
+              ? '<span class="giftnote__item">' + tile(g.item, { plain: true }) + "<small>" + esc(PS.RARITY[g.item.r].name + " " + PS.ITEMS[g.item.id].name) + "</small></span>"
+              : '<span class="giftnote__money">' + price(g.kind, g.amount) + "</span>";
+          }).join("") +
+        "</div>" +
+        notes.map(function (n) { return '<p class="giftnote__msg">“' + esc(n) + "”</p>"; }).join("") +
+        '<div class="modal__actions"><button class="btn btn--primary" type="button" data-act="close" autofocus>Nice!</button></div>' +
+      "</div>"
+    );
+  }
+
+  /** Every so often (and on coming back to the tab): banned since? any gifts? */
+  function watch() {
+    if (!PS.cloud.me() || PS.cloud.offline() || !el.gate.hidden) return;
+    PS.cloud.status().then(function (ban) {
+      if (ban) {
+        if (el.gate.hidden) kick();
+        return;
+      }
+      return PS.cloud.claimGifts().then(function (gifts) {
+        if (gifts.length && el.gate.hidden) receiveGifts(gifts);
+      });
+    });
   }
 
   /* ------------------------------------------------------------- battles */
@@ -2276,6 +2852,80 @@
     tab: function (node) { go(node.getAttribute("data-tab")); },
     close: function () { closeModal(); },
     settings: function () { openModal({ type: "settings", armed: false }); },
+    account: function () {
+      view.board.mod = null;
+      openModal({ type: "account" });
+      if (!PS.cloud.me() || PS.cloud.offline()) return;
+      // send the newest figures first, so your own row is up to date
+      PS.cloud.sync().then(function () { loadBoard(false); });
+    },
+    "board-by": function (node) { setBoard(node.getAttribute("data-by"), null); },
+    "board-span": function (node) { setBoard(null, node.getAttribute("data-span")); },
+    "board-refresh": function () {
+      PS.cloud.sync().then(function () { loadBoard(true); });
+    },
+    logout: function () {
+      closeModal();
+      signOut();
+    },
+    login: function () {
+      closeModal();
+      showGate({ name: "" });
+    },
+    "gate-mode": function (node) {
+      var g = view.gate;
+      if (!g || g.busy) return;
+      var name = $("#gate-name");
+      g.mode = node.getAttribute("data-mode") === "signup" ? "signup" : "login";
+      showGate({ name: name ? name.value.trim() : g.name, down: g.down });
+    },
+    "gate-retry": function () { boot(); },
+    "ban-check": function (node) {
+      node.disabled = true;
+      PS.cloud.status().then(function (ban) {
+        if (ban) showBan();
+        else enter(false);
+      });
+    },
+    "mod-open": function (node) {
+      var id = node.getAttribute("data-id");
+      var act = node.getAttribute("data-mod");
+      var row = null;
+      (view.board.rows || []).forEach(function (r) { if (r.id === id) row = r; });
+      if (!row) return;
+      var m = view.board.mod;
+      if (m && m.id === id && m.act === act) {
+        view.board.mod = null; // a second click on the same button closes the form
+      } else {
+        view.board.mod = { id: id, name: row.name, act: act, msg: "", minutes: 60, kind: "item", item: firstItem("weapon"), rarity: 0, amount: 1000, busy: false, error: "" };
+      }
+      paintBoard();
+      var first = view.board.mod ? $("#board .board__form select, #board .board__form textarea") : null;
+      if (first) first.focus();
+    },
+    "mod-cancel": function () {
+      view.board.mod = null;
+      paintBoard();
+    },
+    "mod-unban": function (node) {
+      var id = node.getAttribute("data-id");
+      var name = "";
+      (view.board.rows || []).forEach(function (r) { if (r.id === id) name = r.name; });
+      node.disabled = true;
+      PS.cloud.unbanPlayer(id).then(function (res) {
+        if (res.error) {
+          toast(res.error);
+          node.disabled = false;
+          return;
+        }
+        toast("Unbanned " + name);
+        loadBoard(true);
+      });
+    },
+    "gate-offline": function () {
+      PS.cloud.playOffline();
+      enter(false);
+    },
     // the Battle screen's "How to play": Settings, opened at the guide
     howto: function () {
       GUIDE_OPEN.basics = true;
@@ -3047,15 +3697,18 @@
   }
 
   function onSubmit(e) {
+    if (e.target.getAttribute("data-form") === "gate") {
+      gateSubmit(e);
+      return;
+    }
+    if (e.target.getAttribute("data-form") === "mod") {
+      modSubmit(e);
+      return;
+    }
     if (e.target.getAttribute("data-form") !== "secret") return;
     e.preventDefault();
     if (!view.modal) return;
     var input = $("#secret-input");
-    // the ordinary prompt takes the dev password; the one the key code opens takes the admin one
-    var good = view.modal.admin ? PS.dev.adminPassword : PS.dev.password;
-    // The plain dev password is a trap now: whoever finds it and puts it in
-    // loses their save. Only the admin password (behind the logo and the key
-    // code) opens anything.
     if (input && !view.modal.admin && input.value === PS.dev.password) {
       PS.dev.lock();
       view.forge = null;
@@ -3064,8 +3717,7 @@
       openModal({ type: "womp" });
       return;
     }
-    if (input && input.value === good) {
-      PS.dev.unlock(view.modal.admin ? 2 : 1);
+    if (input && view.modal.admin && PS.dev.unlock(input.value)) {
       view.modal.open = true;
       renderModal();
     } else {
@@ -3079,6 +3731,10 @@
   /** Once a second: keep the countdowns moving and notice a gift coming due. */
   function tick() {
     if (el.app.hidden) return;
+    if (view.giftsWaiting && !view.modal) {
+      openModal({ type: "gift", got: view.giftsWaiting });
+      view.giftsWaiting = null;
+    }
     var giftReady = st.giftWait() === 0;
     var nodes = document.querySelectorAll("[data-countdown]");
     for (var i = 0; i < nodes.length; i++) {
@@ -3105,6 +3761,8 @@
       el.modal = $("#modal");
       el.toast = $("#toast");
       el.battle = $("#battle");
+      el.gate = $("#gate");
+      el.account = $("#open-account");
 
       if (PS.motionMode() !== "auto") document.documentElement.setAttribute("data-motion", PS.motionMode());
       var theme = PS.store.get(KEY_THEME, null);
@@ -3148,6 +3806,27 @@
       }, true);
       // the volume slider: move it and the sound changes at once, no redraw to interrupt the drag
       el.modal.addEventListener("input", function (e) {
+        if (e.target.id === "board-search") {
+          view.board.q = e.target.value;
+          paintBoard();
+          return;
+        }
+        if (/^mod-/.test(e.target.id) && view.board.mod) {
+          var m = view.board.mod;
+          var v = e.target.value;
+          if (e.target.id === "mod-msg") m.msg = v;
+          else if (e.target.id === "mod-minutes") m.minutes = Number(v);
+          else if (e.target.id === "mod-item") m.item = v;
+          else if (e.target.id === "mod-rarity") m.rarity = Number(v);
+          else if (e.target.id === "mod-amount") m.amount = Number(v);
+          else if (e.target.id === "mod-kind") {
+            m.kind = v;
+            paintBoard(); // gold and gems ask for an amount instead of an item
+            var kind = $("#mod-kind");
+            if (kind) kind.focus();
+          }
+          return;
+        }
         if (e.target.id === "set-music") {
           PS.prefs.set("musicVol", Number(e.target.value));
           PS.music.refresh();
@@ -3193,10 +3872,6 @@
         if (!el.app.hidden) render();
       });
 
-      // Step one of the hidden admin door: click (or tap) the lemon logo twice.
-      // That arms the key code below for a minute; without it the code does
-      // nothing. On a phone there is no keyboard, so arming also brings up a
-      // small pad with the same keys to tap.
       var logoClicks = [];
       var mark = $(".brand__mark");
       if (mark) {
@@ -3204,45 +3879,42 @@
           var now = Date.now();
           logoClicks.push(now);
           logoClicks = logoClicks.filter(function (t) { return now - t < 2000; });
-          if (logoClicks.length >= 2) {
+          if (logoClicks.length >= 3) {
             logoClicks = [];
             logoArmedUntil = now + 60000;
-            if (!PS.dev.admin && coarsePointer()) showCodePad();
+            if (!PS.dev.admin && coarsePointer() && PS.cloud.isAdmin()) showCodePad();
           }
         });
       }
 
-      // up, up, down, down, left, right, left, right, then B and A (either way round)
-      var CODE = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright"];
+      var CODE = { size: 11, lock: "26ou7l4a1q7" };
       var typed = [];
 
-      /** One key of the code, from the keyboard or from the on-screen pad. */
+      /** One key, from the keyboard or the pad; true when it finished the code. */
       function feedCode(key) {
+        if (!PS.cloud.isAdmin()) return false;
         typed.push(key);
-        if (typed.length > 10) typed.shift();
-        if (typed.length < 10) return;
-        var head = typed.slice(0, 8).join(",") === CODE.join(",");
-        var tail = typed.slice(8).join("");
-        if (head && (tail === "ba" || tail === "ab")) {
-          typed = [];
-          if (PS.dev.admin) {
-            hideCodePad();
-            openModal({ type: "secret", open: true, admin: true, wrong: false });
-          } else if (logoArmedUntil > Date.now()) {
-            // the logo was double-clicked first; now the password is asked for
-            logoArmedUntil = 0;
-            hideCodePad();
-            openModal({ type: "secret", open: false, admin: true, wrong: false });
-            var box = $("#secret-input");
-            if (box) box.focus();
-          }
+        if (typed.length > CODE.size) typed.shift();
+        if (typed.length < CODE.size || PS.dev.mix(typed.join(",")) !== CODE.lock) return false;
+        typed = [];
+        if (PS.dev.admin) {
+          hideCodePad();
+          openModal({ type: "secret", open: true, admin: true, wrong: false });
+        } else if (logoArmedUntil > Date.now()) {
+          logoArmedUntil = 0;
+          hideCodePad();
+          openModal({ type: "secret", open: false, admin: true, wrong: false });
+          var box = $("#secret-input");
+          if (box) box.focus();
         }
+        return true;
       }
 
       document.addEventListener("keydown", function (e) {
         var tag = e.target && e.target.tagName;
         if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.app.hidden || !e.key) return;
-        feedCode(e.key.toLowerCase());
+        // the last key must not also press whatever button has focus
+        if (feedCode(e.key.toLowerCase())) e.preventDefault();
       });
 
       var padEl = null;
@@ -3267,6 +3939,7 @@
             '<button type="button" class="codepad__key codepad__key--right" data-code="arrowright" aria-label="Right">&#9654;</button>' +
             '<button type="button" class="codepad__key codepad__key--b" data-code="b">B</button>' +
             '<button type="button" class="codepad__key codepad__key--a" data-code="a">A</button>' +
+            '<button type="button" class="codepad__key codepad__key--start" data-code="enter">Start</button>' +
             '<button type="button" class="codepad__close" data-code="close" aria-label="Close the pad">&times;</button>';
           padEl.addEventListener("click", function (e) {
             var key = e.target.closest("[data-code]");
@@ -3288,8 +3961,13 @@
       }
       PS.on("battle:end", showResults);
 
-      render();
-      if (st.takeWipeNotice()) openModal({ type: "notice" });
+      PS.on("cloud", renderAccount);
+      setInterval(watch, CHECK_EVERY);
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "visible") watch();
+      });
+      el.app.hidden = true; // until someone has logged in (or chosen to play offline)
+      boot();
       clearInterval(tickTimer);
       tickTimer = setInterval(tick, 1000);
     }

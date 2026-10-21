@@ -41,6 +41,13 @@
       } catch (err) {
         return false;
       }
+    },
+    remove: function (key) {
+      try {
+        localStorage.removeItem(key);
+      } catch (err) {
+        /* blocked */
+      }
     }
   };
 
@@ -254,18 +261,27 @@
   };
 
   /* ------------------------------------------------------------ dev access */
-  /* Unlocked once per browser tab by the developer password (the "?" on the
-     construction page or in the footer). While unlocked, battles show a DEV
-     button and the lobby's dev menu opens without asking again. */
+  /* Unlocked once per browser tab. While unlocked, battles show a DEV button
+     and the lobby's dev menu opens without asking again. */
 
-  /* Two levels. The dev password (level 1) opens the battle tools: the Battle
-     section of the lobby dev menu and the DEV panel inside a battle. The admin
-     password (level 2) opens everything, and it can only be asked for after
-     the secret key code (see ui.js) has been typed. */
+  /** A one-way scramble (cyrb53), so the source only holds check values. */
+  function mix(text) {
+    var h1 = 0xdeadbeef ^ 7, h2 = 0x41c6ce57 ^ 7;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+  }
+  // mix(mix(password)); a new one comes from PS.dev.mix(PS.dev.mix("...")) in the console
+  var LOCK = "1ab1n9953iu";
   var KEY_DEV = "lemon:dev";
   var devLevel = 0;
-  try { devLevel = Number(sessionStorage.getItem(KEY_DEV)) || 0; } catch (err) { /* blocked */ }
-  if (devLevel !== 2) devLevel = 0; // only the admin level is kept; the dev password is now a trap (ui.js)
+  // the tab keeps mix(password), which only the real password can produce
+  try { if (mix(sessionStorage.getItem(KEY_DEV) || "") === LOCK) devLevel = 2; } catch (err) { /* blocked */ }
 
   /* The switches a battle can run with. Both the DEV panel inside a battle and
      the lobby's "start the next battle with" card are drawn from these lists, so
@@ -299,10 +315,10 @@
 
   PS.dev = {
     password: "3.1415925",
-    adminPassword: "3.1415926",
-    level: devLevel,
-    unlocked: devLevel >= 1,
-    admin: devLevel >= 2,
+    mix: mix,
+    get level() { return devLevel; },
+    get unlocked() { return devLevel >= 1; },
+    get admin() { return devLevel >= 2; },
     TOGGLES: TOGGLES,
     MULTS: MULTS,
     // switches the battle looks at; they reset whenever a battle starts
@@ -310,20 +326,19 @@
     // what the next battle starts with (set in the lobby dev menu's Battle section)
     startWith: cheatDefaults(),
     startBuild: buildDefaults(),
-    /** level 1 (dev) or 2 (admin); never lowers a level that is already open */
-    unlock: function (level) {
-      level = level === 2 ? 2 : 1;
-      if (level < PS.dev.level) return;
-      PS.dev.level = level;
-      PS.dev.unlocked = true;
-      PS.dev.admin = level >= 2;
-      try { sessionStorage.setItem(KEY_DEV, String(level)); } catch (err) { /* blocked */ }
+    /** Opens everything for this tab if `secret` is the admin password and
+     *  the account playing is one of the admin accounts (cloud.js). */
+    unlock: function (secret) {
+      if (!PS.cloud || !PS.cloud.isAdmin()) return false;
+      var token = mix(String(secret));
+      if (mix(token) !== LOCK) return false;
+      devLevel = 2;
+      try { sessionStorage.setItem(KEY_DEV, token); } catch (err) { /* blocked */ }
       PS.emit("dev");
+      return true;
     },
     lock: function () {
-      PS.dev.level = 0;
-      PS.dev.unlocked = false;
-      PS.dev.admin = false;
+      devLevel = 0;
       // nothing the admin switched on may carry over into ordinary play
       PS.dev.cheats = cheatDefaults();
       PS.dev.startWith = cheatDefaults();
