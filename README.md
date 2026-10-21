@@ -369,6 +369,14 @@ endless swarm, pests squashed, daily challenges won or collection size, and can
 be filtered to players with progress **this week** or **today**, or searched by
 name. Players on the same figure share a place.
 
+**Ranks.** Every board has eight ranks: Unranked, Bronze, Silver, Gold,
+Diamond, Platinum, Citrine and Zenith, each with its own emblem. Each row shows
+the player's rank, the account window shows your rank on every board, and a
+ladder under the filters shows what each rank takes and what is next. The
+targets are the `ranks` lists in `BOARDS` in `js/cloud.js`. Chapter ranks are
+chapters 1, 10, 25, 40, 60, 80 and 100, and Power ranks are the Power those
+same chapters recommend.
+
 A player's figures go up a few seconds after they change, and only ever go up:
 playing on a second device cannot lower a best. They are checked against sane
 limits, but they come from the player's browser, so a determined cheat can

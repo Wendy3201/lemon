@@ -31,7 +31,8 @@
     modal: null, // { type, ... } while a pop-up is open
     results: null,
     gate: null, // { mode: "login" | "signup", name, error, down, checking, busy } while the log-in screen shows
-    board: { by: "chapter", span: "all", q: "", rows: null, error: "", mod: null }, // the leaderboard: filters, rows, an admin's open form
+    // the leaderboard: filters, rows, banned players (for admins), an admin's open form
+    board: { by: "chapter", span: "all", q: "", rows: null, banned: [], showBanned: false, error: "", mod: null },
     giftsWaiting: null // gifts from a moderator, shown as soon as the menus are free
   };
   var logoArmedUntil = 0;
@@ -2167,6 +2168,145 @@
     el.modal.innerHTML = html;
   }
 
+  /* --------------------------------------------------------- rank emblems */
+  /* Each rank's emblem is drawn once, as an SVG symbol with its gradients,
+     and every badge on the page points at it with <use>. */
+
+  function starPoints(cx, cy, outer, inner, points, turn) {
+    var out = [];
+    for (var i = 0; i < points * 2; i++) {
+      var r = i % 2 ? inner : outer;
+      var a = (i * Math.PI) / points + (turn === undefined ? -Math.PI / 2 : turn);
+      out.push((cx + Math.cos(a) * r).toFixed(2) + "," + (cy + Math.sin(a) * r).toFixed(2));
+    }
+    return out.join(" ");
+  }
+
+  function gradient(id, stops) {
+    return '<linearGradient id="' + id + '" x1="0" y1="0" x2="0.35" y2="1">' +
+      stops.map(function (s) { return '<stop offset="' + s[0] + '" stop-color="' + s[1] + '"/>'; }).join("") +
+      "</linearGradient>";
+  }
+
+  function tierDefs() {
+    var shield = "M16 2.5 27 6.5v8.6c0 6.6-4.4 11.6-11 14.4C9.4 26.7 5 21.7 5 15.1V6.5z";
+    var shine = '<path d="M16 4.6 25 7.9v4.3C20 10.8 12 11.4 7 14.4V7.9z" fill="#fff" opacity=".3"/>';
+    var chevron = function (y, color) {
+      return '<path d="M10.8 ' + y + ' 16 ' + (y + 3.6) + 'l5.2-3.6" fill="none" stroke="' + color + '" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>';
+    };
+    var gem = "9,5 23,5 29.5,12.5 16,29 2.5,12.5";
+    var hex = "16,2.5 27.5,9 27.5,23 16,29.5 4.5,23 4.5,9";
+    var oct = "11.6,6 20.4,6 27,12.6 27,21.4 20.4,28 11.6,28 5,21.4 5,12.6";
+    var octIn = "13.2,10.4 18.8,10.4 22.6,14.2 22.6,19.8 18.8,23.6 13.2,23.6 9.4,19.8 9.4,14.2";
+    return (
+      '<svg class="tierdefs" width="0" height="0" aria-hidden="true" focusable="false"><defs>' +
+        gradient("tg-unranked", [[0, "#f3f5f8"], [1, "#b4bcc8"]]) +
+        gradient("tg-bronze", [[0, "#ffd9b3"], [0.45, "#d98b4e"], [1, "#8a4519"]]) +
+        gradient("tg-silver", [[0, "#ffffff"], [0.45, "#c6cfdc"], [1, "#78849a"]]) +
+        gradient("tg-gold", [[0, "#fff6b8"], [0.45, "#f6c437"], [1, "#b57606"]]) +
+        gradient("tg-diamond", [[0, "#effcff"], [0.45, "#72d8f6"], [1, "#1b7fbf"]]) +
+        gradient("tg-platinum", [[0, "#ffffff"], [0.4, "#ddd8f5"], [1, "#857bc2"]]) +
+        gradient("tg-citrine", [[0, "#fffbd2"], [0.4, "#ffd83a"], [1, "#e07f00"]]) +
+        gradient("tg-zray", [[0, "#fff4b0"], [1, "#ff9f1a"]]) +
+        '<radialGradient id="tg-zcore" cx="0.4" cy="0.35" r="0.75">' +
+          '<stop offset="0" stop-color="#ffd2f2"/><stop offset="0.45" stop-color="#b56cff"/><stop offset="1" stop-color="#4c22c4"/>' +
+        "</radialGradient>" +
+
+        '<symbol id="tier-unranked" viewBox="0 0 32 32">' +
+          '<circle cx="16" cy="16" r="11.5" fill="url(#tg-unranked)" stroke="#8d96a8" stroke-width="1.4" stroke-dasharray="3 2.2"/>' +
+          '<path d="M11.5 16h9" stroke="#7a8496" stroke-width="2.4" stroke-linecap="round"/>' +
+        "</symbol>" +
+
+        '<symbol id="tier-bronze" viewBox="0 0 32 32">' +
+          '<path d="' + shield + '" fill="url(#tg-bronze)" stroke="#6b3410" stroke-width="1.4" stroke-linejoin="round"/>' + shine +
+          chevron(14.2, "#fff1e0") +
+        "</symbol>" +
+
+        '<symbol id="tier-silver" viewBox="0 0 32 32">' +
+          '<path d="' + shield + '" fill="url(#tg-silver)" stroke="#4d586a" stroke-width="1.4" stroke-linejoin="round"/>' + shine +
+          chevron(11.6, "#ffffff") + chevron(16.6, "#ffffff") +
+        "</symbol>" +
+
+        '<symbol id="tier-gold" viewBox="0 0 32 32">' +
+          '<path d="' + shield + '" fill="url(#tg-gold)" stroke="#8a5600" stroke-width="1.4" stroke-linejoin="round"/>' + shine +
+          '<polygon points="' + starPoints(16, 15.8, 6.4, 2.8, 5) + '" fill="#fffbe0" stroke="#b57606" stroke-width=".9" stroke-linejoin="round"/>' +
+        "</symbol>" +
+
+        '<symbol id="tier-diamond" viewBox="0 0 32 32">' +
+          '<polygon points="' + gem + '" fill="url(#tg-diamond)" stroke="#0d5c8a" stroke-width="1.3" stroke-linejoin="round"/>' +
+          '<polygon points="9,5 16,5 12,12.5 2.5,12.5" fill="#fff" opacity=".45"/>' +
+          '<path d="M2.5 12.5h27M9 5l3 7.5L16 29M23 5l-3 7.5L16 29M12 12.5 16 5l4 7.5" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width=".9" stroke-linejoin="round"/>' +
+        "</symbol>" +
+
+        '<symbol id="tier-platinum" viewBox="0 0 32 32">' +
+          '<polygon points="' + hex + '" fill="url(#tg-platinum)" stroke="#463f86" stroke-width="1.4" stroke-linejoin="round"/>' +
+          '<polygon points="16,6 24,10.5 24,21.5 16,26 8,21.5 8,10.5" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width=".9"/>' +
+          '<polygon points="' + starPoints(16, 16, 7.4, 2.2, 4) + '" fill="#ffffff" stroke="#6a60b2" stroke-width=".8" stroke-linejoin="round"/>' +
+        "</symbol>" +
+
+        '<symbol id="tier-citrine" viewBox="0 0 32 32">' +
+          '<polygon points="' + oct + '" fill="url(#tg-citrine)" stroke="#8a4f00" stroke-width="1.3" stroke-linejoin="round"/>' +
+          '<polygon points="' + octIn + '" fill="#fff6a6" fill-opacity=".55" stroke="#fff" stroke-opacity=".8" stroke-width=".8"/>' +
+          '<path d="M11.6 6l1.6 4.4M20.4 6l-1.6 4.4M27 12.6l-4.4 1.6M27 21.4l-4.4-1.6M20.4 28l-1.6-4.4M11.6 28l1.6-4.4M5 21.4l4.4-1.6M5 12.6l4.4 1.6" stroke="#fff" stroke-opacity=".6" stroke-width=".8"/>' +
+          '<path d="M16.2 6c.6-2.6 3.2-4 5.8-3.4-.9 2.5-3.3 3.8-5.8 3.4z" fill="#8fae65" stroke="#5f8244" stroke-width=".7"/>' +
+          '<polygon points="' + starPoints(24.5, 9, 2.6, 0.7, 4) + '" fill="#fff"/>' +
+        "</symbol>" +
+
+        '<symbol id="tier-zenith" viewBox="0 0 32 32">' +
+          '<polygon points="' + starPoints(16, 16, 15.2, 10.4, 12) + '" fill="url(#tg-zray)" stroke="#b06a00" stroke-width=".7" stroke-linejoin="round"/>' +
+          '<circle cx="16" cy="16" r="9.2" fill="url(#tg-zcore)" stroke="#fff3b8" stroke-width="1.2"/>' +
+          '<path d="M11 19.6 10.2 13l3.5 2.5L16 10.6l2.3 4.9 3.5-2.5-.8 6.6z" fill="#fff6cf" stroke="#c98a1b" stroke-width=".8" stroke-linejoin="round"/>' +
+          '<path d="M11.2 21.2h9.6" stroke="#fff6cf" stroke-width="1.5" stroke-linecap="round"/>' +
+        "</symbol>" +
+      "</defs></svg>"
+    );
+  }
+
+  /** A rank's emblem, with its name for screen readers and on hover. */
+  function tierBadge(tier, cls) {
+    var t = PS.cloud.TIERS[tier];
+    return '<span class="tier tier--' + t.key + (cls ? " " + cls : "") + '" role="img" aria-label="' + t.name + '" title="' + t.name + '">' +
+      '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><use href="#tier-' + t.key + '"/></svg></span>';
+  }
+
+  /** Your figure on a board: the best of what this device has and what the server holds. */
+  function myFigure(key) {
+    var mine = myRow();
+    return Math.max(PS.cloud.figures()[key] || 0, mine ? mine[key] || 0 : 0);
+  }
+
+  /** Your rank on every board, at the top of the account window; a tap shows that board. */
+  function myRanks() {
+    return PS.cloud.BOARDS.map(function (def) {
+      var tier = PS.cloud.tierOf(def.key, myFigure(def.key));
+      return (
+        '<button class="ranks__cell' + (def.key === view.board.by ? " is-on" : "") + '" type="button" data-act="board-by" data-by="' + def.key + '" title="' + esc(def.text) + '">' +
+          tierBadge(tier, "tier--lg") +
+          "<b>" + PS.cloud.TIERS[tier].name + "</b>" +
+          "<small>" + esc(def.name) + "</small>" +
+        "</button>"
+      );
+    }).join("");
+  }
+
+  /** The ladder for the board on show: every rank and what it takes, yours lit up. */
+  function ladder() {
+    var def = PS.cloud.boardOf(view.board.by);
+    var value = myFigure(def.key);
+    var tier = PS.cloud.tierOf(def.key, value);
+    var steps = PS.cloud.TIERS.slice(1).map(function (t, i) {
+      return (
+        '<li class="ladder__step' + (i + 1 <= tier ? " is-got" : "") + (i + 1 === tier ? " is-now" : "") + '">' +
+          tierBadge(i + 1) + "<b>" + t.name + "</b><small>" + esc(PS.cloud.short(def.key, def.ranks[i])) + "</small>" +
+        "</li>"
+      );
+    }).join("");
+    var next = tier < def.ranks.length
+      ? "Next rank: <b>" + PS.cloud.TIERS[tier + 1].name + "</b> at " + esc(PS.cloud.show(def.key, def.ranks[tier]))
+      : "You have the top rank here. Nothing above Zenith!";
+    return '<ol class="ladder">' + steps + '</ol><p class="ladder__next">' + next + "</p>";
+  }
+
   /* ------------------------------------------ accounts and the leaderboard */
 
   var BOARD_SHOW = 100; // rows drawn at once; search finds the rest
@@ -2231,14 +2371,30 @@
     var title = owner ? ' <em class="is-owner">owner</em>' : mod && row.admin && !you ? ' <em class="is-admin">admin</em>' : "";
     return (
       '<li class="board__row' + (you ? " is-me" : "") + (ban ? " is-banned" : "") + (open ? " is-open" : "") + '">' +
-        '<span class="board__rank board__rank--' + Math.min(row.rank, 4) + '">' + row.rank + "</span>" +
+        '<span class="board__rank board__rank--' + Math.min(row.rank || 4, 4) + '">' + (row.rank || "\u2013") + "</span>" +
         avatar(row.name) +
         '<span class="board__who"><span class="board__name"><span class="board__nm">' + esc(row.name) + "</span>" + (you ? " <em>you</em>" : "") + title + "</span>" +
           "<small>" + (ban ? '<b class="board__ban">' + (ban.timeout ? "Timed out until " + esc(whenText(ban.until)) : "Banned") + "</b>" : esc(ago(row.updated_at))) + "</small></span>" +
-        '<span class="board__value">' + esc(PS.cloud.show(board.key, row[board.key])) + "</span>" +
+        '<span class="board__value">' + tierBadge(PS.cloud.tierOf(board.key, row[board.key])) + "<span>" + esc(PS.cloud.show(board.key, row[board.key])) + "</span></span>" +
         (mod ? modButtons(row, who) : "") +
         (open ? modForm() : "") +
       "</li>"
+    );
+  }
+
+  /** For admins: banned and timed-out players, in their own list under the board. */
+  function bannedPart(board, who, find) {
+    var b = view.board;
+    if (!PS.cloud.isAdmin() || !b.banned || !b.banned.length) return "";
+    var list = find ? b.banned.filter(function (row) { return row.name.toLowerCase().indexOf(find) !== -1; }) : b.banned;
+    return (
+      '<div class="board__bannedbox">' +
+        '<button class="board__bannedbtn" type="button" data-act="board-banned" aria-expanded="' + b.showBanned + '">' +
+          (b.showBanned ? "Hide" : "Show") + " banned and timed out (" + b.banned.length + ")</button>" +
+        (!b.showBanned ? ""
+          : list.length ? '<ol class="board__list board__list--banned">' + list.map(function (row) { return boardRow(row, board, who); }).join("") + "</ol>"
+          : '<p class="hint board__more">No one by that name.</p>') +
+      "</div>"
     );
   }
 
@@ -2264,7 +2420,7 @@
       var none = find
         ? "No one called “" + esc(b.q.trim()) + "” is on this board" + (b.span === "all" ? "." : " " + when + ".")
         : b.span === "all" ? "No scores here yet. Be the first!" : "No one has made progress " + when + " yet.";
-      return '<div class="board__empty"><p>' + none + "</p></div>";
+      return '<div class="board__empty"><p>' + none + "</p></div>" + bannedPart(board, who, find);
     }
     var shown = rows.slice(0, BOARD_SHOW);
     var mine = myRow();
@@ -2274,7 +2430,7 @@
     if (!find && !mine) {
       html += '<p class="hint board__more">You are not on this board ' + (b.span === "all" ? "yet." : when + ". Make some progress to get on it.") + "</p>";
     }
-    return html;
+    return html + bannedPart(board, who, find);
   }
 
   function accountModal() {
@@ -2295,6 +2451,7 @@
               : '<button class="btn btn--sm btn--primary" type="button" data-act="login">Log in</button>') +
           "</div>" +
         "</div>" +
+        '<div class="ranks" id="my-ranks" role="group" aria-label="Your ranks">' + myRanks() + "</div>" +
         '<div class="board__head"><h3>Leaderboard</h3>' +
           (online ? '<button class="btn btn--sm" type="button" data-act="board-refresh">Refresh</button>' : "") +
         "</div>" +
@@ -2313,6 +2470,7 @@
         "</div>" +
         '<p class="board__what">' + PS.icon(board.icon) + esc(board.text) +
           (b.span === "all" ? "" : b.span === "today" ? ", players with progress today" : ", players with progress this week") + "</p>" +
+        '<div class="ladderbox" id="board-ladder">' + ladder() + "</div>" +
         '<div class="board" id="board" aria-live="polite">' + boardBody() + "</div>" +
       "</div>"
     );
@@ -2325,6 +2483,11 @@
     if (box) box.innerHTML = boardBody();
     var sub = $("#account-sub");
     if (sub) sub.innerHTML = accountSub();
+    // the server's figures may have arrived, and they can lift your ranks
+    var ranks = $("#my-ranks");
+    if (ranks) ranks.innerHTML = myRanks();
+    var steps = $("#board-ladder");
+    if (steps) steps.innerHTML = ladder();
   }
 
   function loadBoard(fresh) {
@@ -2339,9 +2502,17 @@
     PS.cloud.board(by, span, fresh).then(function (res) {
       if (b.by !== by || b.span !== span) return; // the filters moved on while this was loading
       b.rows = res.error ? null : res.rows;
+      b.banned = res.banned || [];
       b.error = res.error || "";
       paintBoard();
     });
+  }
+
+  /** A row on the board or in the banned list. */
+  function boardFind(id) {
+    var all = (view.board.rows || []).concat(view.board.banned || []);
+    for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
+    return null;
   }
 
   function setBoard(by, span) {
@@ -2350,6 +2521,7 @@
     b.by = by || b.by;
     b.span = span || b.span;
     b.rows = null;
+    b.banned = [];
     b.error = "";
     renderModal();
     loadBoard(false);
@@ -2473,6 +2645,7 @@
     view.forge = null;
     view.results = null;
     view.board.rows = null;
+    view.board.banned = [];
     view.board.error = "";
     view.board.mod = null;
     el.gate.hidden = true;
@@ -2893,8 +3066,7 @@
     "mod-open": function (node) {
       var id = node.getAttribute("data-id");
       var act = node.getAttribute("data-mod");
-      var row = null;
-      (view.board.rows || []).forEach(function (r) { if (r.id === id) row = r; });
+      var row = boardFind(id);
       if (!row) return;
       var m = view.board.mod;
       if (m && m.id === id && m.act === act) {
@@ -2906,14 +3078,17 @@
       var first = view.board.mod ? $("#board .board__form select, #board .board__form textarea") : null;
       if (first) first.focus();
     },
+    "board-banned": function () {
+      view.board.showBanned = !view.board.showBanned;
+      paintBoard();
+    },
     "mod-cancel": function () {
       view.board.mod = null;
       paintBoard();
     },
     "mod-unban": function (node) {
       var id = node.getAttribute("data-id");
-      var name = "";
-      (view.board.rows || []).forEach(function (r) { if (r.id === id) name = r.name; });
+      var name = (boardFind(id) || { name: "" }).name;
       node.disabled = true;
       PS.cloud.unbanPlayer(id).then(function (res) {
         if (res.error) {
@@ -4060,6 +4235,7 @@
       PS.on("battle:end", showResults);
 
       PS.on("cloud", renderAccount);
+      document.body.insertAdjacentHTML("beforeend", tierDefs());
       setInterval(watch, CHECK_EVERY);
       document.addEventListener("visibilitychange", function () {
         if (document.visibilityState === "visible") watch();

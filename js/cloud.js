@@ -27,15 +27,35 @@
   var DOWN = "Can't reach the server. Check your connection and try again.";
   var KEY_BAN = "lemon:cloud:ban"; // the last ban seen on this device, so playing offline cannot dodge it
 
+  /* The ranks, lowest first. Each board says what its figure must reach for
+     Bronze up to Zenith; anything below Bronze is Unranked. */
+  var TIERS = [
+    { key: "unranked", name: "Unranked" },
+    { key: "bronze", name: "Bronze" },
+    { key: "silver", name: "Silver" },
+    { key: "gold", name: "Gold" },
+    { key: "diamond", name: "Diamond" },
+    { key: "platinum", name: "Platinum" },
+    { key: "citrine", name: "Citrine" },
+    { key: "zenith", name: "Zenith" }
+  ];
+  // Chapter ranks, and Power ranks at the Power those chapters recommend, so the two agree
+  var RANK_CHAPTERS = [1, 10, 25, 40, 60, 80, 100];
+
   /* What the leaderboard can rank by. `then` breaks ties; `max` matches the
      limits in setup.sql, so a figure the server would refuse is never sent. */
   var BOARDS = [
-    { key: "chapter", name: "Chapter", icon: "tabBattle", text: "Furthest chapter cleared", then: "power", max: 1000 },
-    { key: "power", name: "Power", icon: "power", text: "Highest Power reached", then: "chapter", max: 1e12 },
-    { key: "endless", name: "Endless", icon: "clock", text: "Longest endless swarm survived", then: "power", max: 604800 },
-    { key: "kills", name: "Pests", icon: "skull", text: "Pests squashed in all", then: "power", max: 1e12 },
-    { key: "challenges", name: "Challenges", icon: "gift", text: "Daily challenges won", then: "power", max: 1e6 },
-    { key: "collection", name: "Collection", icon: "book", text: "Items found for the collection", then: "power", max: 1e6 }
+    { key: "chapter", name: "Chapter", icon: "tabBattle", text: "Furthest chapter cleared", then: "power", max: 1000, ranks: RANK_CHAPTERS },
+    { key: "power", name: "Power", icon: "power", text: "Highest Power reached", then: "chapter", max: 1e12,
+      ranks: RANK_CHAPTERS.map(function (n) { return PS.chapter(n).rec; }) },
+    { key: "endless", name: "Endless", icon: "clock", text: "Longest endless swarm survived", then: "power", max: 604800,
+      ranks: [60, 180, 300, 480, 720, 960, 1200] },
+    { key: "kills", name: "Pests", icon: "skull", text: "Pests squashed in all", then: "power", max: 1e12,
+      ranks: [100, 1000, 5000, 15000, 40000, 100000, 250000] },
+    { key: "challenges", name: "Challenges", icon: "gift", text: "Daily challenges won", then: "power", max: 1e6,
+      ranks: [1, 3, 7, 14, 30, 60, 100] },
+    { key: "collection", name: "Collection", icon: "book", text: "Items found for the collection", then: "power", max: 1e6,
+      ranks: [10, 50, 100, 200, 300, 450, PS.ITEM_ORDER.length] }
   ];
   var SPANS = [
     { key: "all", name: "All time" },
@@ -73,6 +93,19 @@
     if (key === "endless") return PS.clock(value);
     if (key === "collection") return PS.fmt(value) + " / " + PS.fmt(PS.ITEM_ORDER.length);
     return PS.fmt(value);
+  }
+
+  /** 0 (Unranked) to 7 (Zenith): the rank a figure earns on a board. */
+  function tierOf(key, value) {
+    var ranks = boardOf(key).ranks;
+    var tier = 0;
+    for (var i = 0; i < ranks.length; i++) if (value >= ranks[i]) tier = i + 1;
+    return tier;
+  }
+
+  /** A figure written short, for the rank ladder: "25", "2.59M", "5:00". */
+  function short(key, value) {
+    return key === "endless" ? PS.clock(value) : PS.fmt(value);
   }
 
   function nameProblem(name) {
@@ -252,8 +285,12 @@
     SPANS: SPANS,
     MIN_PASSWORD: MIN_PASSWORD,
     LIMIT: LIMIT,
+    TIERS: TIERS,
     boardOf: boardOf,
     show: show,
+    short: short,
+    tierOf: tierOf,
+    figures: figures,
     nameProblem: nameProblem,
     ready: function () {
       return Boolean(client);
@@ -388,7 +425,7 @@
       var board = boardOf(key);
       var id = board.key + ":" + span;
       var hit = cache[id];
-      if (hit && !fresh && Date.now() - hit.at < CACHE_FOR) return Promise.resolve({ rows: hit.rows });
+      if (hit && !fresh && Date.now() - hit.at < CACHE_FOR) return Promise.resolve({ rows: hit.rows, banned: hit.banned });
       if (!client || !me || offline) return Promise.resolve({ rows: [], error: DOWN, down: true });
       var query = client.from("players").select(FIELDS).gt(board.key, 0);
       var since = spanStart(span);
@@ -404,9 +441,12 @@
             out.rows = [];
             return out;
           }
-          var rows = ranked(res.data || [], board.key);
-          cache[id] = { at: Date.now(), rows: rows };
-          return { rows: rows };
+          // banned and timed-out players (only admins get them back) are kept off the ranking
+          var all = res.data || [];
+          var rows = ranked(all.filter(function (row) { return !banOf(row); }), board.key);
+          var banned = all.filter(function (row) { return Boolean(banOf(row)); });
+          cache[id] = { at: Date.now(), rows: rows, banned: banned };
+          return { rows: rows, banned: banned };
         }, function (err) {
           var out = failed(err);
           out.rows = [];
