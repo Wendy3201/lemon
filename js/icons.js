@@ -238,6 +238,28 @@
     return line("M9 5Q24 34 39 5", "#6F654F", 2.2) + pendant;
   }
 
+  var SPADE = "M12 2C9 6.5 3.5 9.5 3.5 14a4.3 4.3 0 0 0 7.2 3.2L9.5 22h5l-1.2-4.8A4.3 4.3 0 0 0 20.5 14C20.5 9.5 15 6.5 12 2z";
+
+  function playingCard(x, turn, pip) {
+    return group("rotate(" + turn + " " + (x + 10.5) + " 30)",
+      box(x, 9.5, 21, 29, 3.2, C.white, 'stroke="#C9BFA4" stroke-width="1.4"') + pip);
+  }
+
+  /* eight wedges, black and white in turn, under a pointer */
+  function wheelArt() {
+    var out = dot(24, 26, 20.5, C.goldDark) + dot(24, 26, 19, C.gold);
+    for (var i = 0; i < 8; i++) {
+      var a0 = ((i * 45 - 90) * Math.PI) / 180;
+      var a1 = (((i + 1) * 45 - 90) * Math.PI) / 180;
+      out += fill(
+        "M24 26L" + (24 + 17 * Math.cos(a0)).toFixed(2) + " " + (26 + 17 * Math.sin(a0)).toFixed(2) +
+        "A17 17 0 0 1 " + (24 + 17 * Math.cos(a1)).toFixed(2) + " " + (26 + 17 * Math.sin(a1)).toFixed(2) + "z",
+        i % 2 ? C.white : C.ink);
+    }
+    return out + dot(24, 26, 4, C.gold) + dot(24, 26, 1.7, C.goldDark) +
+      poly("18.5,2.5 29.5,2.5 24,11", C.red, 'stroke="' + C.white + '" stroke-width="1.3" stroke-linejoin="round"');
+  }
+
   var VEST = "M14 8 20 12H28L34 8 41 15 36 21V41H12V21L7 15Z";
   var PLATE = "M11 10Q24 3 37 10L39 29Q24 46 9 29Z";
   var DOME = "M8 31Q8 11 24 11Q40 11 40 31Z";
@@ -472,6 +494,13 @@
       oval(24, 37, 15, 5.5, C.goldDark) + oval(24, 35, 15, 5.5, C.gold) + oval(24, 30, 15, 5.5, C.goldDark) + oval(24, 28, 15, 5.5, C.gold) +
       oval(24, 23, 15, 5.5, C.goldDark) + oval(24, 21, 15, 5.5, C.gold) + oval(24, 21, 9.5, 3, "none", 'stroke="' + C.goldLight + '" stroke-width="1.6"') +
       poly(star(38, 11, 4.5, 1.6, 4), C.white),
+
+    /* the casino in the Shop */
+    cards:
+      playingCard(6, -14, group("translate(8.1 15.1) scale(0.7)", fill(HEART, C.red))) +
+      playingCard(20, 11, group("translate(22.1 15.6) scale(0.7)", fill(SPADE, C.ink))),
+
+    wheel: wheelArt(),
 
     /* the hero and the bosses, for the menus */
     lemon:

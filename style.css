@@ -7394,3 +7394,619 @@ body::before {
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------- casino */
+/* Blackjack and Black & White, in pop-ups from the Shop. The felt and the
+   cards keep their colours in both themes, like a real table. */
+
+.casino__rules {
+  margin: 6px 34px 14px 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.casino__result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border: 2px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--surface-2);
+  font-weight: 800;
+  text-align: center;
+  animation: rise 0.25s ease both;
+}
+
+.casino__result--good {
+  border-color: var(--good);
+  background: color-mix(in srgb, var(--good) 16%, var(--surface));
+}
+
+.casino__result--bad {
+  border-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 12%, var(--surface));
+}
+
+/* --- blackjack */
+
+.felt {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 22px;
+  background: radial-gradient(120% 90% at 50% 0%, #3f8a55, #24583a);
+  color: #f4fbef;
+  box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.3), 0 0 0 4px #8b5e34;
+}
+
+.felt__who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.felt__who b {
+  padding: 1px 10px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.28);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.felt__bet {
+  margin-left: auto;
+  font-size: 13px;
+}
+
+.felt__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 76px;
+}
+
+.pcard {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 76px;
+  border-radius: 9px;
+  background: #fffcf2;
+  color: #29261f;
+  box-shadow: 0 3px 8px -2px rgba(0, 0, 0, 0.45);
+  font-family: var(--font-display);
+}
+
+.pcard b {
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  font-size: 17px;
+  line-height: 1.1;
+}
+
+.pcard i {
+  margin-top: 8px;
+  font-size: 30px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.pcard--red {
+  color: #d23b3b;
+}
+
+.pcard--back {
+  border: 3px solid #fffcf2;
+  background: repeating-linear-gradient(45deg, #c8423f 0 5px, #9e2d2b 5px 10px);
+}
+
+.pcard.is-new {
+  animation: deal 0.35s var(--soft-ease) both;
+}
+
+@keyframes deal {
+  from {
+    opacity: 0;
+    transform: translate(34px, -26px) rotate(10deg);
+  }
+}
+
+/* --- black & white */
+
+.spin {
+  position: relative;
+  width: min(230px, 64vw);
+  aspect-ratio: 1;
+  margin: 8px auto 14px;
+}
+
+.spin__wheel {
+  position: absolute;
+  inset: 0;
+  border: 8px solid var(--rind);
+  border-radius: 50%;
+  background: repeating-conic-gradient(#24211b 0deg 22.5deg, #fffcf2 22.5deg 45deg);
+  box-shadow: 0 0 0 2px var(--line-strong), var(--shadow);
+}
+
+.spin__wheel.is-spinning {
+  transition: transform 4.2s cubic-bezier(0.12, 0.65, 0.08, 1);
+}
+
+.spin__hub {
+  position: absolute;
+  inset: 40%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--lemon-bright), var(--rind));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.spin__pointer {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  z-index: 1;
+  border-top: 26px solid var(--bad);
+  border-right: 13px solid transparent;
+  border-left: 13px solid transparent;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+}
+
+.spin__history {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.spin__dot {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 50%;
+}
+
+.spin__dot:first-child {
+  width: 16px;
+  height: 16px;
+  border-color: var(--accent-deep);
+}
+
+.spin__dot--black {
+  background: #24211b;
+}
+
+.spin__dot--white {
+  background: #fffcf2;
+}
+
+.spin__picks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.spin__pick {
+  padding: 12px;
+  border: 3px solid var(--line-strong);
+  border-radius: 16px;
+  font: 800 18px/1 var(--font-display);
+  cursor: pointer;
+  transition: transform 0.2s var(--soft-ease), border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.spin__pick--black {
+  background: #24211b;
+  color: #fffcf2;
+}
+
+.spin__pick--white {
+  background: #fffcf2;
+  color: #24211b;
+}
+
+.spin__pick.is-on {
+  border-color: var(--lemon);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lemon) 45%, transparent);
+  transform: translateY(-2px);
+}
+
+.spin__pick:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.spin__pick:focus-visible {
+  outline: 3px solid var(--accent-deep);
+  outline-offset: 2px;
+}
+
+/* --- the bet */
+
+.bet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.bet__field {
+  display: inline-flex;
+  flex: 1 1 130px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--bg-soft);
+}
+
+.bet__field:focus-within {
+  border-color: var(--accent-deep);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lemon) 40%, transparent);
+}
+
+.bet__field input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: 700 17px/1.4 var(--font-mono);
+  outline: none;
+}
+
+.bet__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bet__have {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pcard.is-new,
+  .casino__result {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------ playing together */
+
+.home__together {
+  margin-top: 10px;
+}
+
+/* the "Play with a friend" window */
+.mp {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  overflow-y: auto;
+  background: rgba(20, 18, 14, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.mp[hidden] {
+  display: none;
+}
+
+.mp__box {
+  position: relative;
+  width: min(100%, 640px);
+  color: var(--ink);
+}
+
+.mp__box h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1.15;
+  margin-right: 40px;
+}
+
+.mp__lead {
+  margin: 6px 0 14px;
+}
+
+.mp__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.mp__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-2);
+}
+
+.mp__card h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 19px;
+}
+
+.mp__card h3 .ico {
+  width: 20px;
+  height: 20px;
+}
+
+.mp__card p {
+  color: var(--ink-soft);
+  font-size: 14.5px;
+}
+
+.mp__card .btn {
+  margin-top: auto;
+}
+
+.mp__seg {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: 99px;
+  background: var(--surface);
+}
+
+.mp__seg button {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 99px;
+  background: none;
+  font: inherit;
+  font-weight: 800;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.mp__seg button[aria-pressed="true"] {
+  background: linear-gradient(180deg, var(--lemon-bright), var(--lemon));
+  color: var(--charcoal);
+}
+
+.mp__join {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.mp__joinrow {
+  display: flex;
+  gap: 8px;
+}
+
+.mp__joinrow input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 2px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--bg-soft);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 20px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.mp__joinrow input:focus {
+  outline: none;
+  border-color: var(--rind);
+}
+
+.mp__code {
+  margin: 14px 0 6px;
+  padding: 14px;
+  border: 2px dashed var(--rind);
+  border-radius: 16px;
+  background: var(--lemon-pale);
+  color: var(--charcoal);
+  font-family: var(--font-mono);
+  font-size: clamp(30px, 8vw, 44px);
+  font-weight: 500;
+  letter-spacing: 0.32em;
+  text-align: center;
+}
+
+:root[data-theme="dark"] .mp__code {
+  background: #3d3520;
+  color: var(--lemon-bright);
+}
+
+.mp__copy {
+  display: flex;
+  margin: 0 auto;
+}
+
+.mp__how {
+  margin: 12px 0;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.mp__who {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  font-weight: 700;
+}
+
+.mp__who.is-in {
+  border: 1px solid var(--rind);
+}
+
+.mp__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--good);
+  box-shadow: 0 0 0 4px rgba(93, 154, 63, 0.2);
+}
+
+.mp__spin {
+  width: 16px;
+  height: 16px;
+  border: 3px solid var(--line-strong);
+  border-top-color: var(--rind);
+  border-radius: 50%;
+  animation: mp-spin 0.9s linear infinite;
+}
+
+@keyframes mp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.mp__link {
+  min-height: 20px;
+  margin-top: 8px;
+  color: var(--ink-faint);
+  font-size: 13px;
+  text-align: center;
+}
+
+.mp__error {
+  margin-top: 12px;
+  color: var(--bad);
+  font-weight: 700;
+}
+
+.mp__busy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--ink-soft);
+}
+
+/* in battle: the other lemon's health, a duel's score, and a word while someone waits */
+.hud__mate {
+  position: absolute;
+  top: 116px;
+  right: clamp(10px, 2vw, 18px);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "name note" "bar bar";
+  gap: 3px 8px;
+  width: min(42%, 220px);
+  padding: 6px 10px 8px;
+  border-radius: 12px;
+  background: rgba(20, 18, 14, 0.6);
+  border: 1px solid rgba(127, 196, 255, 0.45);
+  color: #fffcf2;
+}
+
+.hud__mate b {
+  grid-area: name;
+  font-family: var(--font-display);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud__mate small {
+  grid-area: note;
+  justify-self: end;
+  font-size: 12px;
+  color: rgba(255, 252, 242, 0.75);
+}
+
+.hud__mate-hp {
+  grid-area: bar;
+  height: 8px;
+  border-radius: 99px;
+  background: rgba(255, 252, 242, 0.15);
+  overflow: hidden;
+}
+
+.hud__mate-hp i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(180deg, #8fd16a, #4f9a35);
+  transition: width 0.15s linear;
+}
+
+.hud__mate.is-down {
+  border-color: #e5484d;
+}
+
+.hud__mate.is-down small {
+  color: #ff9a8a;
+  font-weight: 800;
+}
+
+.hud__score {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 16px;
+  border-radius: 99px;
+  background: rgba(20, 18, 14, 0.72);
+  border: 1px solid var(--rind);
+  color: var(--lemon-bright);
+  font-family: var(--font-display);
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+.hud__wait {
+  position: absolute;
+  left: 50%;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  padding: 8px 18px;
+  border-radius: 99px;
+  background: rgba(20, 18, 14, 0.82);
+  border: 1px solid rgba(127, 196, 255, 0.5);
+  color: #dff1ff;
+  font-weight: 800;
+  text-align: center;
+}
+
+/* the power-up list moves down out of the partner panel's way */
+.hud.has-mate .hud__buffs {
+  top: 176px;
+}

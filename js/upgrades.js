@@ -439,7 +439,7 @@
 
     level = up.mines || 0;
     if (level) {
-      var mines = R.mines || (R.mines = []);
+      var mines = p.mines || (p.mines = []); // each lemon its own
       T.mine = (T.mine === undefined ? 0.8 : T.mine) - dt;
       if (T.mine <= 0 && mines.length < 4 + level) {
         T.mine = Math.max(1, 2.4 - 0.25 * level);
@@ -612,9 +612,9 @@
       ctx.globalAlpha = 1;
     }
     // seed mines lying in wait, blinking once they are armed
-    if (R.mines) {
-      for (var m = 0; m < R.mines.length; m++) {
-        var mine = R.mines[m];
+    if (p.mines) {
+      for (var m = 0; m < p.mines.length; m++) {
+        var mine = p.mines[m];
         ctx.fillStyle = "#8C6A44";
         ctx.beginPath();
         ctx.ellipse(mine.x, mine.y, 7, 5, 0.4, 0, TAU);

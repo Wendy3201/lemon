@@ -41,7 +41,9 @@
   };
 
   function blank(kind, x, y) {
+    var R = B.run;
     return {
+      id: R ? (R.uid = (R.uid || 0) + 1) : 0,
       kind: kind, x: x, y: y, r: 10, fill: "#fff", hp: 1, maxHp: 1, speed: 0, hurt: 0, xp: 0, mass: 1, ai: null,
       flash: 0, kx: 0, ky: 0, stun: 0, chillT: 0, chillAmt: 0, burnT: 0, burnDps: 0, shockT: 0, shockAmp: 0, freezeCd: 0,
       mode: 0, clock: PS.rand(0.6, 2.4), clock2: 0, clock3: 0, ax: 0, ay: 0, side: Math.random() < 0.5 ? -1 : 1,
@@ -146,7 +148,7 @@
       var healed = 0;
       for (var i = 0; i < R.enemies.length; i++) {
         var o = R.enemies[i];
-        if (o.dead || o.prop || o.boss || o.golden || o.hp >= o.maxHp) continue;
+        if (o.dead || o.prop || o.proxyOf || o.boss || o.golden || o.hp >= o.maxHp) continue;
         var dx = o.x - e.x;
         var dy = o.y - e.y;
         if (dx * dx + dy * dy > def.reach * def.reach) continue;
@@ -178,7 +180,29 @@
 
   function atRing(kind, angle) {
     var R = B.run;
-    return B.spawn(kind, R.p.x + Math.cos(angle) * B.view.ring, R.p.y + Math.sin(angle) * B.view.ring);
+    var c = ringCentre(R);
+    return B.spawn(kind, c.x + Math.cos(angle) * B.view.ring, c.y + Math.sin(angle) * B.view.ring);
+  }
+
+  /** Where new pests close in from: the lemon, or (playing together) one of the lemons still standing. */
+  function ringCentre(R) {
+    if (!R.players) return R.p;
+    var up = R.players.filter(function (q) { return !q.down && !q.gone; });
+    return up.length ? up[Math.floor(Math.random() * up.length)] : R.p;
+  }
+
+  /* A duel: a handful of weak pests wander the ring, for a little XP. */
+  function duelDirector(dt) {
+    var R = B.run;
+    if (R.duel.hold > 0) return;
+    if (R.spawnIn > 0) return;
+    R.spawnIn = 1.1;
+    var pests = 0;
+    for (var i = 0; i < R.enemies.length; i++) if (!R.enemies[i].dead && !R.enemies[i].proxyOf) pests++;
+    if (pests >= 12) return;
+    var a = Math.random() * TAU;
+    var d = PS.rand(120, B.DUEL.r - 30);
+    B.spawn(Math.random() < 0.7 ? "grunt" : "dart", Math.cos(a) * d, Math.sin(a) * d);
   }
 
   function enemyShot(x, y, angle, speed, r, dmg, color) {
@@ -238,6 +262,7 @@
     // attack felling the boss): nothing more may spawn after that
     if (R.phase !== "swarm" && R.phase !== "boss") return;
     R.spawnIn -= dt;
+    if (R.duel) return duelDirector(dt);
     if (PS.dev.cheats.noSpawn) {
       // the admin's "stop spawning": only the boss still turns up on time
       R.spawnIn = Math.max(R.spawnIn, 0.5);
@@ -256,18 +281,19 @@
 
     // the swarm thickens the whole way through the chapter
     var u = Math.min(1, R.t / R.dur);
+    var more = R.mpMul ? R.mpMul.pests : 1; // playing together: a thicker swarm
     if (R.spawnIn <= 0) {
-      if (R.enemies.length < 80 + 60 * u + R.ch.n * 2) {
+      if (R.enemies.length < (80 + 60 * u + R.ch.n * 2) * more) {
         var pack = 1 + Math.floor(2.4 * u);
         var angle = Math.random() * TAU;
         while (pack--) atRing(pickKind(u), angle + PS.rand(-0.5, 0.5));
       }
-      R.spawnIn = PS.lerp(0.8, 0.28, Math.pow(u, 0.8));
+      R.spawnIn = PS.lerp(0.8, 0.28, Math.pow(u, 0.8)) / more;
     }
 
     if (R.hordes.length && R.t >= R.hordes[0]) {
       R.hordes.shift();
-      var count = 12 + Math.min(12, R.ch.n);
+      var count = Math.round((12 + Math.min(12, R.ch.n)) * (R.mpMul ? R.mpMul.horde : 1));
       var start = Math.random() * TAU;
       for (var i = 0; i < count; i++) atRing(u < 0.4 ? "grunt" : "dart", start + (i / count) * TAU);
       B.toast("A swarm closes in!");
@@ -307,7 +333,8 @@
     R.bosses = from.map(function (src, index) {
       var kind = BOSSES[src.boss];
       var a = angle + index * Math.PI;
-      var e = blank(src.boss, R.p.x + Math.cos(a) * B.view.ring, R.p.y + Math.sin(a) * B.view.ring);
+      var c = ringCentre(R);
+      var e = blank(src.boss, c.x + Math.cos(a) * B.view.ring, c.y + Math.sin(a) * B.view.ring);
       e.boss = true;
       e.name = src.bossName;
       e.tier = src.bossTier;
@@ -315,7 +342,7 @@
       e.look = src.look;
       e.fill = e.look ? e.look.body : kind.fill;
       // toughness always comes from the chapter being played
-      e.hp = e.maxHp = 2250 * R.ch.bossScale * Math.pow(R.dur / 180, 1.3) * kind.hp * share;
+      e.hp = e.maxHp = 2250 * R.ch.bossScale * Math.pow(R.dur / 180, 1.3) * kind.hp * share * (R.mpMul ? R.mpMul.boss : 1);
       e.speed = kind.speed;
       e.hurt = 44 * R.ch.dmgScale;
       e.baseHurt = e.hurt; // some bosses stop hurting on touch while in the air or underground
@@ -449,7 +476,7 @@
         e.dead = true;
         R.fx.push({ type: "blast", x: e.x, y: e.y, r: 68, color: "#E5484D", t: 0, dur: 0.3 });
         R.shake = Math.max(R.shake, 5);
-        if (d < 68 + R.p.r) B.hurt(36 * scale);
+        B.hurtIn(e.x, e.y, 72, 36 * scale);
       }
     }
   };
@@ -701,10 +728,7 @@
         if (e.clock <= 0) {
           e.lift = 0;
           e.hurt = e.baseHurt;
-          var p = R.p;
-          var dx = p.x - e.x;
-          var dy = p.y - e.y;
-          if (dx * dx + dy * dy < (82 + p.r - 4) * (82 + p.r - 4)) B.hurt(32 * scale);
+          B.hurtIn(e.x, e.y, 82, 32 * scale);
           R.fx.push({ type: "blast", x: e.x, y: e.y, r: 82, color: "#C79A5B", t: 0, dur: 0.35 });
           R.fx.push({ type: "ring", x: e.x, y: e.y, r0: 40, r1: 160, color: "#F2D49B", width: 6, t: 0, dur: 0.45 });
           R.shake = Math.max(R.shake, 9);
@@ -835,9 +859,7 @@
         // bursts up
         e.under = false;
         e.hurt = e.baseHurt;
-        var hx = p.x - e.x;
-        var hy = p.y - e.y;
-        if (hx * hx + hy * hy < (70 + p.r - 4) * (70 + p.r - 4)) B.hurt(32 * scale);
+        B.hurtIn(e.x, e.y, 70, 32 * scale);
         R.fx.push({ type: "blast", x: e.x, y: e.y, r: 70, color: "#9C7448", t: 0, dur: 0.35 });
         B.sparks(e.x, e.y, "#7A5A38", 16, 200);
         R.shake = Math.max(R.shake, 7);
@@ -982,11 +1004,8 @@
     B.addZone({
       type: "warn", x: x, y: y, r: 54, life: time,
       onEnd: function (zone) {
-        var p = R.p;
-        var dx = p.x - zone.x;
-        var dy = p.y - zone.y;
         R.fx.push({ type: "blast", x: zone.x, y: zone.y, r: zone.r, color: "#8A77B8", t: 0, dur: 0.3 });
-        if (dx * dx + dy * dy < (zone.r + p.r - 4) * (zone.r + p.r - 4)) B.hurt(32 * scale);
+        B.hurtIn(zone.x, zone.y, zone.r, 32 * scale);
         B.addZone({ type: "puddle", x: zone.x, y: zone.y, r: 44, life: 5, dps: 22 * scale, slow: 0.35, color: "#8A77B8" });
       }
     });

@@ -19,18 +19,24 @@
 
   function team(R) {
     if (!R.pets) {
-      R.pets = PS.state.petTeam().map(function (owned, i) {
-        return {
-          sp: owned.sp, r: owned.r, lv: owned.lv, slot: i, x: R.p.x + SPOTS[i][0], y: R.p.y + SPOTS[i][1],
-          cd: 1.2 + i * 0.4, bob: Math.random() * TAU, face: 1
-        };
+      // playing together, each lemon brings its own pets
+      var owners = R.players || [R.p];
+      R.pets = [];
+      owners.forEach(function (owner, n) {
+        var list = n === 0 ? PS.state.petTeam() : owner.petTeam || [];
+        list.forEach(function (owned, i) {
+          R.pets.push({
+            sp: owned.sp, r: owned.r, lv: owned.lv, slot: i, x: owner.x + SPOTS[i][0], y: owner.y + SPOTS[i][1],
+            cd: 1.2 + i * 0.4, bob: Math.random() * TAU, face: 1, owner: owner
+          });
+        });
       });
     }
     return R.pets;
   }
 
   function tend(R, pet, dt) {
-    var p = R.p;
+    var p = pet.owner || R.p;
     pet.bob += dt * 4;
     // hovers by the lemon's shoulder, easing along after it
     var wantX = p.x + SPOTS[pet.slot][0];
@@ -41,8 +47,9 @@
     pet.face = SPOTS[pet.slot][0] <= 0 ? 1 : -1;
 
     pet.cd -= dt;
-    if (pet.cd > 0) return;
-    var e = B.nearest(pet.x, pet.y, 320);
+    if (pet.cd > 0 || p.down || p.gone) return;
+    // (as its own lemon, so in a duel it never goes for its own lemon)
+    var e = B.ownAs(p, function () { return B.nearest(pet.x, pet.y, 320); });
     if (!e) {
       pet.cd = 0.3;
       return;
@@ -50,11 +57,13 @@
     pet.cd = Math.max(0.9, 2.3 - 0.045 * pet.lv);
     var mult = (0.25 + 0.015 * pet.lv) * PS.PET_RARITY[pet.r].mult;
     var angle = Math.atan2(e.y - pet.y, e.x - pet.x);
-    // credited to this pet by name in the damage meter
-    B.as("pet:" + pet.sp + ":" + pet.r, function () {
-      B.shoot({
-        x: pet.x, y: pet.y, angle: angle, speed: 360, range: 360, r: 3.6, dmg: B.dmg() * mult,
-        homing: 4, sprite: "pip", color: PS.PET[pet.sp].color, bounce: 0
+    // credited to this pet by name in the damage meter, and shot as its own lemon
+    B.ownAs(p, function () {
+      B.as("pet:" + pet.sp + ":" + pet.r, function () {
+        B.shoot({
+          x: pet.x, y: pet.y, angle: angle, speed: 360, range: 360, r: 3.6, dmg: B.dmg() * mult,
+          homing: 4, sprite: "pip", color: PS.PET[pet.sp].color, bounce: 0
+        });
       });
     });
   }

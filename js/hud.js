@@ -31,6 +31,10 @@
         '<span class="hud__pill hud__coins"></span>' +
       '</div>' +
       '<div class="hud__meter" aria-label="Damage by source" hidden></div>' +
+      // playing together: the other lemon's health, a duel's score, and a word while someone waits
+      '<div class="hud__mate" hidden><b></b><div class="hud__mate-hp"><i></i></div><small></small></div>' +
+      '<div class="hud__score" hidden></div>' +
+      '<div class="hud__wait" role="status" hidden></div>' +
       '<div class="hud__boss" hidden><span></span><div><i></i></div></div>' +
       '<div class="hud__toast" role="status" aria-live="polite"></div>' +
       '<div class="hud__combo" hidden aria-hidden="true"><b></b><span>combo</span></div>' +
@@ -251,6 +255,12 @@
       el.pauseBuild = root.querySelector(".pausebox__build");
       el.quit = root.querySelector('[data-hud="quit"]');
       el.dash = root.querySelector(".hud__dash");
+      el.mate = root.querySelector(".hud__mate");
+      el.mateName = el.mate.querySelector("b");
+      el.mateHp = el.mate.querySelector(".hud__mate-hp i");
+      el.mateNote = el.mate.querySelector("small");
+      el.score = root.querySelector(".hud__score");
+      el.wait = root.querySelector(".hud__wait");
       el.kills.innerHTML = PS.icon("skull") + "<b></b>";
       el.coins.innerHTML = PS.icon("coin") + "<b></b>";
       el.killsText = el.kills.querySelector("b");
@@ -263,7 +273,7 @@
       meterOpen = PS.store.get("lemon:meter", window.innerWidth >= 900) === true;
       applyMeter();
       var devButtons = el.hud.parentNode.querySelectorAll('[data-hud="dev"]');
-      for (var i = 0; i < devButtons.length; i++) devButtons[i].hidden = !PS.dev.unlocked;
+      for (var i = 0; i < devButtons.length; i++) devButtons[i].hidden = !PS.dev.unlocked || Boolean(R.mp);
       el.hud.hidden = false;
       el.choose.hidden = true;
       el.pause.hidden = true;
@@ -288,7 +298,9 @@
       setText("hpText", el.hpText, PS.fmt(Math.min(maxShown, Math.ceil(Math.max(0, p.hp)))) + " / " + PS.fmt(maxShown));
       setWidth("xp", el.xp, p.xp / p.need);
       setText("lvl", el.lvl, "Lv " + p.level);
-      setText("time", el.time, R.mode === "swarm" ? PS.clock(R.t) : R.phase === "swarm" ? PS.clock(Math.ceil(R.dur - R.t)) : "BOSS");
+      setText("time", el.time, R.duel ? "Round " + R.duel.round + " · " + PS.clock(Math.ceil(Math.max(0, B.DUEL.round - R.duel.roundT)))
+        : R.mode === "swarm" ? PS.clock(R.t) : R.phase === "swarm" ? PS.clock(Math.ceil(R.dur - R.t)) : "BOSS");
+      B.hud.together(R);
       setText("kills", el.killsText, PS.fmt(R.kills));
       setText("coins", el.coinsText, PS.fmt(R.coins));
 
@@ -362,6 +374,39 @@
         shown.toast = toast;
         if (toast) el.toast.textContent = toast;
         el.toast.classList.toggle("is-on", Boolean(toast));
+      }
+    },
+
+    /** Playing together: the other lemon's health bar, a duel's score, and what everyone is waiting for. */
+    together: function (R) {
+      var mate = R.mp ? R.partner : null;
+      if (shown.mateOn !== Boolean(mate)) {
+        shown.mateOn = Boolean(mate);
+        el.mate.hidden = !mate;
+        el.hud.classList.toggle("has-mate", Boolean(mate));
+        el.score.hidden = !(mate && R.duel);
+      }
+      if (mate) {
+        setText("mateName", el.mateName, mate.name);
+        setWidth("mateHp", el.mateHp, mate.gone || mate.down ? 0 : Math.max(0, mate.hp) / mate.maxHp);
+        setText("mateNote", el.mateNote, mate.gone ? "left" : mate.down ? (R.duel ? "" : "down! go help") : "Lv " + mate.level);
+        if (shown.mateDown !== Boolean(mate.down || mate.gone)) {
+          shown.mateDown = Boolean(mate.down || mate.gone);
+          el.mate.classList.toggle("is-down", shown.mateDown);
+        }
+        if (R.duel) {
+          // wins[0] is always this game's own lemon
+          setText("score", el.score, "You " + R.duel.wins[0] + " – " + R.duel.wins[1] + " " + mate.name);
+        }
+      }
+      var wait = "";
+      if (R.p.down && !R.duel) wait = "You're down! Your friend can help you up by standing next to you";
+      else if (R.mirror) wait = R.waitText || "";
+      else if (R.ally && R.ally.choices) wait = R.ally.name + " is picking an upgrade...";
+      if (shown.wait !== wait) {
+        shown.wait = wait;
+        el.wait.textContent = wait;
+        el.wait.hidden = !wait;
       }
     },
 

@@ -49,7 +49,7 @@
       book: 0, // how many collection steps have been claimed
       stats: {
         kills: 0, runs: 0, wins: 0, forges: 0, chests: 0, upgrades: 0, talents: 0,
-        bestLevel: 0, bestPower: 0, maxRarity: 0, grade: 0, time: 0, earned: 0, eggs: 0, bestCombo: 0
+        bestLevel: 0, bestPower: 0, maxRarity: 0, grade: 0, time: 0, earned: 0, eggs: 0, bestCombo: 0, duels: 0, duelsPlayed: 0
       }
     };
     PS.SLOTS.forEach(function (slot) {
@@ -816,7 +816,9 @@
   function finishRun(result) {
     var ch = PS.chapter(result.chapter);
     var stats = calc();
-    var first = result.won && S.best < ch.n;
+    // noProgress: a win alongside a friend in a chapter this player has not
+    // reached yet pays, but does not open chapters
+    var first = result.won && S.best < ch.n && !result.noProgress;
     var progress = result.won ? 1 : PS.clamp(result.time / ch.duration, 0, 1);
 
     var base = result.won ? ch.gold * (first ? 3 : 1) : ch.gold * 0.6 * progress;
@@ -884,6 +886,20 @@
       level: result.level || 1, finished: result.won && ch.n === PS.BAL.CHAPTERS && first,
       twist: result.twist || null, challenge: challenge
     };
+  }
+
+  /** A duel with a friend is over: a win pays a chapter's gold and some gems,
+   *  a loss a little gold. Wins count for the leaderboard. */
+  function finishDuel(won) {
+    var gold = Math.round(PS.BAL.gold(frontier()) * (won ? 1 : 0.3));
+    var gems = won ? 5 : 0;
+    S.gold += gold;
+    S.gems += gems;
+    S.stats.earned += gold;
+    S.stats.duelsPlayed++;
+    if (won) S.stats.duels++;
+    commit();
+    return { duel: true, won: Boolean(won), gold: gold, gems: gems, duels: S.stats.duels };
   }
 
   /** The days since 1970 of a "2026-10-17" date, so each day has its own twist. */
@@ -1212,6 +1228,27 @@
     return pack.gold;
   }
 
+  /* -------------------------------------------------------------- casino */
+  /* A bet leaves the gold the moment it is placed, so reloading the page
+     mid-hand cannot take it back. */
+
+  /** Take a bet out of the gold. Returns the save it was taken from (to pay
+   *  any winnings into the same one), or null when there is not enough. */
+  function stake(amount) {
+    amount = Math.floor(amount);
+    if (!(amount >= 1) || amount > S.gold) return null;
+    S.gold -= amount;
+    commit();
+    return S;
+  }
+
+  function payout(save, amount) {
+    amount = Math.floor(amount);
+    if (save !== S || !(amount > 0)) return; // logged out, or a save loaded, since the bet
+    S.gold += amount;
+    commit();
+  }
+
   /* -------------------------------------------------------------- quests */
 
   function questInfo(quest) {
@@ -1394,6 +1431,7 @@
     chapterOpen: chapterOpen,
     selectChapter: selectChapter,
     finishRun: finishRun,
+    finishDuel: finishDuel,
     frontier: frontier,
     // shop
     chestCost: chestCost,
@@ -1415,6 +1453,8 @@
     buyDeal: buyDeal,
     goldPack: goldPack,
     buyGold: buyGold,
+    stake: stake,
+    payout: payout,
     // quests
     quests: quests,
     claimQuest: claimQuest,

@@ -5,9 +5,10 @@
 -- it only adds what is missing and refreshes the rules.
 --
 -- One row per player. Everyone signed in can read the rows of players who are
--- not banned; a player can only change the figures on their own row, and a
--- figure never goes down when a player sends it (so playing on a second device
--- cannot wipe a best). Admins can ban, time out, unban and send gifts, but only
+-- not banned; a player can only change the figures on their own row. Chapter,
+-- Power and Collection show the save as it is now, so they go down when a
+-- player resets; Endless, Pests, Challenges and Duels never go down when a
+-- player sends them. Admins can ban, time out, unban and send gifts, but only
 -- through the functions at the bottom, which check that the caller is an admin.
 -- The Table Editor and this SQL editor can still change anything.
 
@@ -29,6 +30,8 @@ alter table public.players add column if not exists admin boolean not null defau
 alter table public.players add column if not exists banned_until timestamptz;
 alter table public.players add column if not exists ban_message text;
 alter table public.players add column if not exists banned_by uuid references auth.users (id) on delete set null;
+-- arena duels won against friends (playing together)
+alter table public.players add column if not exists duels integer not null default 0 check (duels between 0 and 1000000);
 alter table public.players drop constraint if exists players_ban_message_length;
 alter table public.players add constraint players_ban_message_length check (char_length(ban_message) <= 200);
 
@@ -68,8 +71,10 @@ select u.id, coalesce(u.raw_user_meta_data ->> 'name', 'player_' || left(replace
 from auth.users u
 on conflict do nothing;
 
--- Figures sent by a player only ever go up. updated_at says when a figure last
--- went up, which is what the leaderboard's "This week" and "Today" look at.
+-- Endless, Pests, Challenges and Duels sent by a player only ever go up. Chapter,
+-- Power and Collection are what the player's save has right now, so they go
+-- down too (after a reset, say). updated_at says when a figure last changed,
+-- which is what the leaderboard's "This week" and "Today" look at.
 create or replace function public.pip_keep_best()
 returns trigger
 language plpgsql
@@ -77,15 +82,13 @@ set search_path = ''
 as $$
 begin
   if coalesce(auth.role(), '') = 'authenticated' then
-    new.chapter := greatest(new.chapter, old.chapter);
-    new.power := greatest(new.power, old.power);
     new.endless := greatest(new.endless, old.endless);
     new.kills := greatest(new.kills, old.kills);
     new.challenges := greatest(new.challenges, old.challenges);
-    new.collection := greatest(new.collection, old.collection);
+    new.duels := greatest(new.duels, old.duels);
   end if;
-  if row(new.chapter, new.power, new.endless, new.kills, new.challenges, new.collection)
-     is distinct from row(old.chapter, old.power, old.endless, old.kills, old.challenges, old.collection) then
+  if row(new.chapter, new.power, new.endless, new.kills, new.challenges, new.collection, new.duels)
+     is distinct from row(old.chapter, old.power, old.endless, old.kills, old.challenges, old.collection, old.duels) then
     new.updated_at := now();
   end if;
   return new;
@@ -132,7 +135,7 @@ create policy "Players can update their own figures"
 grant usage on schema public to authenticated;
 revoke all on public.players from anon, authenticated;
 grant select on public.players to authenticated;
-grant update (chapter, power, endless, kills, challenges, collection) on public.players to authenticated;
+grant update (chapter, power, endless, kills, challenges, collection, duels) on public.players to authenticated;
 
 -- gifts an admin sends, waiting until the player's game picks them up
 create table if not exists public.gifts (

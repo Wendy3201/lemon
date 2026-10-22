@@ -289,6 +289,8 @@ lemon/
 │   ├── upgrades.js   the level-up cards and the abilities they add
 │   ├── hud.js        health bar, timer, level-up cards, pause screen
 │   ├── dev.js        the DEV / admin panel inside a battle (cheats, upgrades, spawning, stats)
+│   ├── net.js        rooms on the server and the direct link between two games
+│   ├── multi.js      the "Play with a friend" window, and starting a battle for two
 │   └── ui.js         the menus: Battle, Equipment, Forge, Shop, Talents, Quests
 ├── supabase/setup.sql   the leaderboard table and its rules, run once in Supabase
 ├── assets/icons/lemon.svg
@@ -365,7 +367,8 @@ delete the account in Supabase and the player signs up again.
 
 Once in, the **account button** at the top right opens the player's account
 and the **leaderboard**. It ranks everyone by furthest chapter, Power, longest
-endless swarm, pests squashed, daily challenges won or collection size, and can
+endless swarm, pests squashed, daily challenges won, collection size or arena
+duels won, and can
 be filtered to players with progress **this week** or **today**, or searched by
 name. Players on the same figure share a place.
 
@@ -415,6 +418,39 @@ Banned and timed-out players disappear from everyone else's leaderboard and
 cannot post scores. A game checks for bans and gifts every 45 seconds, and a
 ban ends a battle on the spot. All of this is checked by the server, so the
 buttons do nothing for anyone who is not an admin. Admins cannot be banned.
+
+## Playing with a friend
+
+**Play with a friend** (under Battle) opens rooms for two. One player makes a
+room and gets a six-letter code; the other presses the same button and types
+the code in. Both need the game open and the internet.
+
+- **Co-op**: both lemons in the room maker's chosen chapter. There are about
+  60% more pests and the boss has 1.8 times the health. A lemon that drops goes
+  down instead of losing; the other stands next to it for three seconds to help
+  it up. The battle is lost only when both are down. Each player keeps their
+  own gold and gear. A chapter past the guest's own progress pays like the
+  guest's furthest chapter and opens nothing new for them.
+- **Arena duel**: lemon against lemon in a walled ring, best of three rounds of
+  up to 90 seconds (out of time, the one with more health left takes the round).
+  **Equal** gives both lemons the same health and damage, so only weapons,
+  perks and upgrades matter; **Full power** uses the real figures with hits
+  between lemons cut down. A few weak pests wander in for XP. A win pays a
+  chapter's gold and 5 gems and counts on the **Duels** leaderboard.
+
+How it works: the room is a Supabase Realtime channel, used only to find each
+other and swap a few handshake messages. The battle itself then goes directly
+between the two browsers (WebRTC), so it does not use the project's monthly
+Realtime allowance. Where the two cannot reach each other directly (some
+school, office or phone networks), it falls back to going through the room,
+which does use the allowance (about 10 messages a second per battle). The room
+maker's game runs the battle and sends the other game what to show about
+fifteen times a second; the other game moves its own lemon at once so it feels
+quick. Keep the room maker's game window open and in front: a browser slows
+down a tab in the background, and the battle with it.
+
+The Duels board needs the newer `supabase/setup.sql` (run it again); until
+then everything else keeps working and the Duels board says so.
 
 ## How saving works
 

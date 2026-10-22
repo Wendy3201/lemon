@@ -116,12 +116,22 @@
 
   function updateShrine(R, dt) {
     var s = R.shrine;
-    var p = R.p;
     s.t += dt;
     s.life -= dt;
-    var dx = p.x - s.x;
-    var dy = p.y - s.y;
-    var inside = dx * dx + dy * dy < s.r * s.r;
+    // playing together, whichever lemon stands in the circle wakes it (and chooses)
+    var list = R.players || [R.p];
+    var inside = false;
+    var waker = null;
+    for (var i = 0; i < list.length; i++) {
+      var q = list[i];
+      if (q.down || q.gone) continue;
+      var dx = q.x - s.x;
+      var dy = q.y - s.y;
+      if (dx * dx + dy * dy < s.r * s.r) {
+        inside = true;
+        waker = waker || q;
+      }
+    }
     s.inside = inside;
     var wake = shrineCharge(R);
     s.charge = inside ? s.charge + dt / wake : Math.max(0, s.charge - dt / (wake * 2));
@@ -133,7 +143,12 @@
       R.fx.push({ type: "blast", x: s.x, y: s.y, r: s.r, color: "#C8F7E6", t: 0, dur: 0.4 });
       B.sparks(s.x, s.y, "#7FE3C4", 20, 180);
       PS.sfx.play("levelup");
-      B.offer(B.rollBlessings(), "shrine");
+      if (R.players && waker) {
+        var blessings = B.ownAs(waker, function () { return B.rollBlessings(); });
+        B.offerTo(waker, blessings, "shrine");
+      } else {
+        B.offer(B.rollBlessings(), "shrine");
+      }
     } else if (s.life <= 0) {
       R.shrine = null;
       R.shrineIn = shrineGap(R) * 0.6;
@@ -144,6 +159,7 @@
   B.events = function (dt) {
     var R = B.run;
     if (R.phase !== "swarm" && R.phase !== "boss") return;
+    if (R.duel) return; // a duel's ring has none of these
     if (R.shrine) updateShrine(R, dt);
     // the admin's "Stop spawning" keeps the field clear of these too
     if (PS.dev.cheats.noSpawn) return;

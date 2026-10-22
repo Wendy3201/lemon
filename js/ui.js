@@ -33,7 +33,9 @@
     gate: null, // { mode: "login" | "signup", name, error, down, checking, busy } while the log-in screen shows
     // the leaderboard: filters, rows, banned players (for admins), an admin's open form
     board: { by: "chapter", span: "all", q: "", rows: null, banned: [], showBanned: false, error: "", mod: null },
-    giftsWaiting: null // gifts from a moderator, shown as soon as the menus are free
+    giftsWaiting: null, // gifts from a moderator, shown as soon as the menus are free
+    // the Shop's casino: the bet in the box (null until one is typed), the blackjack hand, the wheel
+    casino: { bet: null, bj: null, bw: { pick: "black", angle: 0, spinning: null, last: null, history: [] } }
   };
   var logoArmedUntil = 0;
   var toastTimer = 0;
@@ -330,6 +332,7 @@
           "</dl>" +
 
           '<button class="btn btn--primary btn--xl" type="button" data-act="fight" data-key="fight">' + PS.icon("tabBattle") + "Battle</button>" +
+          '<button class="btn home__together" type="button" data-act="together" data-key="together">' + PS.icon("atk") + "Play with a friend</button>" +
           '<p class="hint">Move with WASD or the arrow keys, or drag on the screen. Your lemon attacks by itself.</p>' +
           '<button class="btn btn--sm home__guide" type="button" data-act="howto" data-key="howto">' + PS.icon("info") + "New here? How to play</button>" +
         "</div>" +
@@ -717,9 +720,363 @@
           '<div class="gift__body"><h3>Sack of gold</h3><p>' + fmt(pack.gold) + " gold, about two battles' worth.</p></div>" +
           '<button class="btn btn--primary" type="button" data-act="gold" data-key="gold"' + (S.gems >= pack.gems ? "" : " disabled") + ">" + price("gems", pack.gems) + "</button>" +
         "</div>" +
+
+        '<h2 class="section">Casino</h2>' +
+        '<div class="chests">' +
+          casinoCard("blackjack", "cards", "Blackjack", "Beat the dealer to 21 without going over. Blackjack pays 3 to 2.") +
+          casinoCard("spinner", "wheel", "Black &amp; White", "Pick black or white and spin. A 50-50 shot at doubling your bet.") +
+        "</div>" +
+        '<p class="hint">Played for gold. Your bet leaves your gold when the cards are dealt or the wheel spins, and any winnings come straight back.</p>' +
       "</section>"
     );
   };
+
+  /* -------------------------------------------------------------- casino */
+
+  var SUITS = [["♠", "spades", false], ["♥", "hearts", true], ["♦", "diamonds", true], ["♣", "clubs", false]];
+  var RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+  var RANK_NAMES = ["Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King"];
+  var WHEEL = { wedges: 16, turns: 6, ms: 4200 };
+  var BET_CHIPS = [[0.1, "10%"], [0.25, "25%"], [0.5, "50%"], [1, "All in"]];
+
+  function casinoCard(game, art, title, text) {
+    return (
+      '<div class="panel gift">' +
+        '<div class="gift__art">' + PS.art(art) + "</div>" +
+        '<div class="gift__body"><h3>' + title + "</h3><p>" + text + "</p></div>" +
+        '<button class="btn btn--primary" type="button" data-act="casino" data-game="' + game + '" data-key="casino-' + game + '">Play</button>' +
+      "</div>"
+    );
+  }
+
+  /** The bet in the box: a tenth of your gold until you type or pick one. */
+  function betNow() {
+    var c = view.casino;
+    if (c.bet === null) c.bet = Math.max(1, Math.floor(st.get().gold / 10));
+    return c.bet;
+  }
+
+  /** True when the bet can be placed; otherwise says why. */
+  function betOk(bet) {
+    var gold = st.get().gold;
+    if (!(bet >= 1)) toast("Bet at least 1 gold");
+    else if (bet > gold) toast("You only have " + fmt(gold) + " gold");
+    else return true;
+    PS.sfx.play("deny");
+    return false;
+  }
+
+  function betBox(locked) {
+    var gold = st.get().gold;
+    var off = locked || gold < 1 ? " disabled" : "";
+    return (
+      '<div class="bet">' +
+        '<label class="bet__field">' + PS.icon("coin") + '<span class="visually-hidden">Bet</span>' +
+          '<input id="cas-bet" type="number" inputmode="numeric" min="1" max="' + gold + '" step="1" value="' + betNow() + '"' + off + " /></label>" +
+        '<div class="bet__chips" role="group" aria-label="Bet part of your gold">' + BET_CHIPS.map(function (chip) {
+          return '<button class="btn btn--sm" type="button" data-act="bet" data-share="' + chip[0] + '" data-key="bet-' + chip[0] + '"' + off + ">" + chip[1] + "</button>";
+        }).join("") + "</div>" +
+      "</div>" +
+      '<p class="bet__have">' + (gold < 1 ? "You have no gold to bet. Win some in a battle first." : "You have " + price("gold", gold)) + "</p>"
+    );
+  }
+
+  /** Redraw a casino pop-up if it is the one open, keeping the focus on its
+   *  buttons. Winnings are paid first, which redraws everything through
+   *  "change" (a second redraw would cut short the newest card sliding in). */
+  function paintCasino(type, owner, winnings) {
+    var open = view.modal && view.modal.type === type;
+    var focused = document.activeElement && document.activeElement.getAttribute ? document.activeElement.getAttribute("data-key") : null;
+    if (winnings && owner === st.get()) st.payout(owner, winnings);
+    else if (open) renderModal();
+    if (!open) return;
+    var again = focused ? el.modal.querySelector('[data-key="' + focused + '"]') : null;
+    if (!again || again.disabled) again = el.modal.querySelector(".casino .btn--primary:not(:disabled)");
+    if (again) again.focus();
+  }
+
+  /* --- blackjack */
+
+  function newDeck() {
+    var deck = [];
+    for (var s = 0; s < 4; s++) for (var r = 0; r < 13; r++) deck.push({ r: r, s: s });
+    for (var i = deck.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = deck[i];
+      deck[i] = deck[j];
+      deck[j] = t;
+    }
+    return deck;
+  }
+
+  /** A hand's best total, and whether an ace in it still counts as 11. */
+  function handValue(cards) {
+    var total = 0;
+    var aces = 0;
+    cards.forEach(function (c) {
+      total += c.r === 0 ? 11 : Math.min(10, c.r + 1);
+      if (c.r === 0) aces++;
+    });
+    while (total > 21 && aces) {
+      total -= 10;
+      aces--;
+    }
+    return { total: total, soft: aces > 0 };
+  }
+
+  function isBlackjack(cards) {
+    return cards.length === 2 && handValue(cards).total === 21;
+  }
+
+  function handLabel(cards) {
+    if (isBlackjack(cards)) return "Blackjack";
+    var v = handValue(cards);
+    if (v.total > 21) return v.total + " · bust";
+    return (v.soft ? "Soft " : "") + v.total;
+  }
+
+  /** One hand of cards. Cards past `seen` were just dealt and slide in. */
+  function cardRow(cards, seen, holeDown) {
+    return cards.map(function (card, i) {
+      var fresh = i >= seen ? " is-new" : "";
+      if (holeDown && i === 1) return '<span class="pcard pcard--back' + fresh + '" role="img" aria-label="Face-down card"></span>';
+      var suit = SUITS[card.s];
+      return (
+        '<span class="pcard' + (suit[2] ? " pcard--red" : "") + fresh + '" role="img" aria-label="' + RANK_NAMES[card.r] + " of " + suit[1] + '">' +
+          "<b>" + RANKS[card.r] + "</b><i>" + suit[0] + "</i>" +
+        "</span>"
+      );
+    }).join("");
+  }
+
+  var BJ_RESULTS = {
+    blackjack: ["good", "Blackjack!"],
+    win: ["good", "You beat the dealer!"],
+    dealerbust: ["good", "The dealer busts!"],
+    push: ["even", "Push."],
+    bust: ["bad", "Bust!"],
+    dealerbj: ["bad", "The dealer has blackjack."],
+    lose: ["bad", "The dealer wins."]
+  };
+
+  function blackjackModal() {
+    var bj = view.casino.bj;
+    if (bj && bj.owner !== st.get()) bj = view.casino.bj = null; // someone else has logged in since
+    var gold = st.get().gold;
+    var live = bj && bj.phase !== "done";
+    var holeDown = bj && bj.phase === "play";
+    var table = "";
+    if (bj) {
+      var dealerShown = holeDown ? [bj.dealer[0]] : bj.dealer;
+      var seenD = holeDown || bj.holeUp ? bj.seenD : Math.min(bj.seenD, 1); // the hole card turning over counts as new
+      table =
+        '<div class="felt">' +
+          '<div class="felt__hand"><p class="felt__who">Dealer <b>' + handLabel(dealerShown) + "</b></p>" +
+            '<div class="felt__cards">' + cardRow(bj.dealer, seenD, holeDown) + "</div></div>" +
+          '<div class="felt__hand"><p class="felt__who">You <b>' + handLabel(bj.player) + "</b>" +
+            '<span class="felt__bet">' + price("gold", bj.bet) + (bj.doubled ? " doubled" : "") + "</span></p>" +
+            '<div class="felt__cards">' + cardRow(bj.player, bj.seenP, false) + "</div></div>" +
+        "</div>";
+      bj.seenP = bj.player.length;
+      bj.seenD = bj.dealer.length;
+      if (!holeDown) bj.holeUp = true;
+    }
+    var result = "";
+    if (bj && bj.phase === "done") {
+      var r = BJ_RESULTS[bj.result];
+      var net = bj.back - bj.bet;
+      result =
+        '<p class="casino__result casino__result--' + r[0] + '" role="status">' + r[1] + " " +
+          (net > 0 ? "You win " + price("gold", net) : net < 0 ? "You lose " + price("gold", -net) : "Your bet comes back.") + "</p>";
+    }
+    var controls;
+    if (live) {
+      var canDouble = bj.phase === "play" && bj.player.length === 2 && gold >= bj.bet;
+      controls =
+        '<div class="modal__actions casino__play">' +
+          '<button class="btn" type="button" data-act="bj-double" data-key="bj-double"' + (canDouble ? "" : " disabled") + ">Double " + price("gold", bj.bet) + "</button>" +
+          '<button class="btn" type="button" data-act="bj-stand" data-key="bj-stand"' + (bj.phase === "play" ? "" : " disabled") + ">Stand</button>" +
+          '<button class="btn btn--primary" type="button" data-act="bj-hit" data-key="bj-hit"' + (bj.phase === "play" ? " autofocus" : " disabled") + ">Hit</button>" +
+        "</div>" +
+        (bj.phase === "dealer" ? '<p class="hint">The dealer draws to 17…</p>' : "");
+    } else {
+      controls =
+        betBox(false) +
+        '<div class="modal__actions"><button class="btn btn--primary" type="button" data-act="bj-deal" data-key="bj-deal"' + (gold < 1 ? " disabled" : "") + ">" +
+          (bj ? "Deal again" : "Deal") + "</button></div>";
+    }
+    return (
+      '<div class="casino">' +
+        '<button class="modal__close" type="button" data-act="close" aria-label="Close">' + PS.icon("close") + "</button>" +
+        '<h2 id="modal-title">Blackjack</h2>' +
+        '<p class="casino__rules">Get closer to 21 than the dealer without going over. Picture cards count 10, an ace 1 or 11. The dealer draws to 17. Blackjack pays 3 to 2.</p>' +
+        table + result + controls +
+      "</div>"
+    );
+  }
+
+  function bjDeal() {
+    var bet = betNow();
+    if (!betOk(bet)) return;
+    var owner = st.stake(bet);
+    if (!owner) return;
+    var deck = newDeck();
+    var bj = view.casino.bj = { deck: deck, player: [], dealer: [], bet: bet, owner: owner, phase: "play", seenP: 0, seenD: 0, holeUp: false };
+    bj.player.push(deck.pop());
+    bj.dealer.push(deck.pop());
+    bj.player.push(deck.pop());
+    bj.dealer.push(deck.pop());
+    PS.sfx.play("click");
+    if (isBlackjack(bj.player) || isBlackjack(bj.dealer)) bjSettle();
+    else paintCasino("blackjack");
+  }
+
+  function bjHit() {
+    var bj = view.casino.bj;
+    if (!bj || bj.phase !== "play") return;
+    bj.player.push(bj.deck.pop());
+    var total = handValue(bj.player).total;
+    if (total > 21) bjSettle();
+    else if (total === 21) bjDealer();
+    else paintCasino("blackjack");
+  }
+
+  function bjDouble() {
+    var bj = view.casino.bj;
+    if (!bj || bj.phase !== "play" || bj.player.length !== 2) return;
+    if (st.get().gold < bj.bet) return;
+    st.stake(bj.bet);
+    bj.bet *= 2;
+    bj.doubled = true;
+    bj.player.push(bj.deck.pop());
+    if (handValue(bj.player).total > 21) bjSettle();
+    else bjDealer();
+  }
+
+  /** Turn the hole card over, then draw a card at a time until 17 or more. */
+  function bjDealer() {
+    var bj = view.casino.bj;
+    bj.phase = "dealer";
+    paintCasino("blackjack");
+    var wait = PS.reducedMotion() ? 250 : 650;
+    (function step() {
+      setTimeout(function () {
+        if (view.casino.bj !== bj) return;
+        if (handValue(bj.dealer).total >= 17) {
+          bjSettle();
+          return;
+        }
+        bj.dealer.push(bj.deck.pop());
+        PS.sfx.play("click");
+        paintCasino("blackjack");
+        step();
+      }, wait);
+    })();
+  }
+
+  function bjSettle() {
+    var bj = view.casino.bj;
+    var p = handValue(bj.player).total;
+    var d = handValue(bj.dealer).total;
+    var pBJ = isBlackjack(bj.player);
+    var dBJ = isBlackjack(bj.dealer);
+    var result;
+    var back = 0;
+    if (p > 21) result = "bust";
+    else if (pBJ && dBJ) { result = "push"; back = bj.bet; }
+    else if (pBJ) { result = "blackjack"; back = bj.bet + Math.floor(bj.bet * 1.5); }
+    else if (dBJ) result = "dealerbj";
+    else if (d > 21) { result = "dealerbust"; back = bj.bet * 2; }
+    else if (p > d) { result = "win"; back = bj.bet * 2; }
+    else if (p === d) { result = "push"; back = bj.bet; }
+    else result = "lose";
+    bj.phase = "done";
+    bj.result = result;
+    bj.back = back;
+    PS.sfx.play(result === "blackjack" ? "win" : back > bj.bet ? "coin" : back ? "click" : "deny");
+    paintCasino("blackjack", bj.owner, back);
+  }
+
+  /* --- black & white */
+
+  function spinnerModal() {
+    var bw = view.casino.bw;
+    var gold = st.get().gold;
+    var spinning = Boolean(bw.spinning);
+    var pick = spinning ? bw.spinning.pick : bw.pick;
+    var last = bw.last;
+    var result = last
+      ? '<p class="casino__result casino__result--' + (last.won ? "good" : "bad") + '" role="status">' +
+          "It landed on " + last.land + ". " + (last.won ? "You win " + price("gold", last.bet) : "You lose " + price("gold", last.bet)) + "</p>"
+      : spinning
+        ? '<p class="casino__result" role="status">Spinning for ' + price("gold", bw.spinning.bet) + " on " + bw.spinning.pick + "…</p>"
+        : "";
+    var history = bw.history.length
+      ? '<div class="spin__history" aria-label="Last spins">' + bw.history.map(function (c) {
+          return '<i class="spin__dot spin__dot--' + c + '" title="' + c + '"></i>';
+        }).join("") + "</div>"
+      : "";
+    return (
+      '<div class="casino">' +
+        '<button class="modal__close" type="button" data-act="close" aria-label="Close">' + PS.icon("close") + "</button>" +
+        '<h2 id="modal-title">Black &amp; White</h2>' +
+        '<p class="casino__rules">Half the wheel is black and half is white. Pick a colour and spin: if it stops on yours, your bet comes back doubled.</p>' +
+        '<div class="spin">' +
+          '<span class="spin__pointer" aria-hidden="true"></span>' +
+          '<div class="spin__wheel" style="transform:rotate(' + bw.angle + 'deg)" aria-hidden="true"><span class="spin__hub"></span></div>' +
+        "</div>" +
+        history + result +
+        '<div class="spin__picks" role="group" aria-label="Your colour">' +
+          ["black", "white"].map(function (c) {
+            return '<button class="spin__pick spin__pick--' + c + (pick === c ? " is-on" : "") + '" type="button" data-act="bw-pick" data-pick="' + c + '" data-key="bw-' + c + '" aria-pressed="' + (pick === c) + '"' + (spinning ? " disabled" : "") + ">" +
+              (c === "black" ? "Black" : "White") + "</button>";
+          }).join("") +
+        "</div>" +
+        betBox(spinning) +
+        '<div class="modal__actions"><button class="btn btn--primary" type="button" data-act="bw-spin" data-key="bw-spin"' + (spinning || gold < 1 ? " disabled" : "") + ">Spin</button></div>" +
+      "</div>"
+    );
+  }
+
+  function bwSpin() {
+    var bw = view.casino.bw;
+    if (bw.spinning) return;
+    var bet = betNow();
+    if (!betOk(bet)) return;
+    var owner = st.stake(bet);
+    if (!owner) return;
+    var land = Math.random() < 0.5 ? "black" : "white";
+    // wedge 0 (black) starts under the pointer; every other one is white
+    var wedge = Math.floor(Math.random() * (WHEEL.wedges / 2)) * 2 + (land === "white" ? 1 : 0);
+    var size = 360 / WHEEL.wedges;
+    var at = (wedge + 0.15 + Math.random() * 0.7) * size; // never right on a line
+    var target = bw.angle - (bw.angle % 360) + 360 * WHEEL.turns + ((360 - at) % 360);
+    var spin = bw.spinning = { bet: bet, pick: bw.pick, land: land, owner: owner };
+    bw.last = null;
+    paintCasino("spinner");
+    bw.angle = target;
+    var quick = PS.reducedMotion();
+    var wheel = $(".spin__wheel");
+    if (wheel) {
+      void wheel.offsetWidth; // start from where it was drawn
+      if (!quick) wheel.classList.add("is-spinning");
+      wheel.style.transform = "rotate(" + target + "deg)";
+    }
+    PS.sfx.play("click");
+    setTimeout(function () { bwLand(spin); }, quick ? 400 : WHEEL.ms);
+  }
+
+  function bwLand(spin) {
+    var bw = view.casino.bw;
+    if (bw.spinning !== spin) return;
+    bw.spinning = null;
+    var won = spin.land === spin.pick;
+    bw.last = { land: spin.land, bet: spin.bet, won: won };
+    bw.history.unshift(spin.land);
+    if (bw.history.length > 12) bw.history.length = 12;
+    PS.sfx.play(won ? "coin" : "deny");
+    paintCasino("spinner", spin.owner, won ? spin.bet * 2 : 0);
+  }
 
   /* ------------------------------------------------------------- talents */
 
@@ -2160,6 +2517,8 @@
     else if (modal.type === "book") html = bookModal(modal);
     else if (modal.type === "account") html = accountModal();
     else if (modal.type === "gift") html = giftModal(modal);
+    else if (modal.type === "blackjack") html = blackjackModal();
+    else if (modal.type === "spinner") html = spinnerModal();
     if (html === null) {
       closeModal();
       return;
@@ -2269,10 +2628,15 @@
       '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><use href="#tier-' + t.key + '"/></svg></span>';
   }
 
-  /** Your figure on a board: the best of what this device has and what the server holds. */
+  /** Your figure on a board. Chapter, Power and Collection are this save as it
+   *  is now; the others are the best of this device and what the server holds,
+   *  since those never go down. */
   function myFigure(key) {
+    var here = PS.cloud.figures()[key] || 0;
+    if (PS.cloud.isCurrent(key)) return here;
     var mine = myRow();
-    return Math.max(PS.cloud.figures()[key] || 0, mine ? mine[key] || 0 : 0);
+    var held = PS.cloud.held();
+    return Math.max(here, mine ? mine[key] || 0 : 0, held ? held[key] || 0 : 0);
   }
 
   /** Your rank on every board, at the top of the account window; a tap shows that board. */
@@ -2932,8 +3296,29 @@
     else if (R.twist) PS.B.toast("Daily challenge: " + R.twist.name + ". " + R.twist.text, 5);
   }
 
+  /** A battle with a friend. mp.guest: this game shows the host's battle;
+   *  otherwise this game runs it, with the friend's lemon in it. */
+  function startTogether(mp) {
+    closeModal();
+    var pad = document.querySelector(".codepad");
+    if (pad) pad.hidden = true;
+    view.results = null;
+    el.results.hidden = true;
+    el.app.hidden = true;
+    el.battle.hidden = false;
+    PS.music.play("battle");
+    if (mp.guest) {
+      PS.B.startGuest(mp);
+      PS.B.toast(mp.kind === "duel" ? "Duel! Best of three rounds." : "Playing with " + (mp.host && mp.host.name ? mp.host.name : "your friend") + "!", 4);
+      return;
+    }
+    PS.B.start(mp.chapter, undefined, undefined, mp);
+    PS.B.toast(mp.kind === "duel" ? "Duel! Best of three rounds." : "Playing with " + (mp.ally && mp.ally.name ? mp.ally.name : "your friend") + "!", 4);
+  }
+
   function leaveBattle() {
     PS.music.play("camp");
+    if (PS.multi && PS.multi.active()) PS.multi.leave();
     PS.B.stop();
     PS.B.hud.hide();
     el.battle.hidden = true;
@@ -2969,9 +3354,31 @@
     if (button) button.focus();
   }
 
+  function showDuelResults(result) {
+    var wins = result.wins || [0, 0];
+    var foe = esc(result.foe || "your friend");
+    el.results.innerHTML =
+      '<div class="panel results results--' + (result.won ? "win" : "loss") + '">' +
+        '<p class="kicker">Arena duel · against ' + foe + "</p>" +
+        "<h2>" + (result.won ? "You win the duel!" : foe + " wins the duel") + "</h2>" +
+        '<p class="results__sub">' + (result.forfeit
+          ? (result.won ? foe + " left before the end, so the duel is yours." : "You left the duel early.")
+          : "Rounds: you " + wins[0] + " – " + wins[1] + " " + foe + ".") + "</p>" +
+        '<p class="loot__money">' + price("gold", result.gold) + (result.gems ? price("gems", result.gems) : "") + "</p>" +
+        (result.won ? '<p class="results__unlock">' + PS.icon("check") + "Duels won: " + fmt(result.duels || 0) + "</p>" : "") +
+        '<div class="modal__actions">' +
+          '<button class="btn btn--primary" type="button" data-act="home" data-key="home">Back to camp</button>' +
+        "</div>" +
+      "</div>";
+    el.results.hidden = false;
+    var button = $('[data-key="home"]', el.results);
+    if (button) button.focus();
+  }
+
   function showResults(result) {
     view.results = result;
     PS.music.play("camp");
+    if (result.duel) return showDuelResults(result);
     if (result.swarm) return showSwarmResults(result);
     var ch = PS.chapter(result.chapter);
     var title = result.won ? (result.finished ? "The grove is saved!" : "Chapter cleared!") : result.progress >= 1 ? "So close…" : "Overrun!";
@@ -3012,8 +3419,11 @@
           : '<p class="hint">No gear this time. Get at least halfway through a chapter to find some.</p>') +
         (result.unlocked ? '<p class="results__unlock">' + PS.icon("check") + "Chapter " + result.unlocked + " is open.</p>" : "") +
         (result.finished ? '<p class="results__unlock">That was the last chapter. Surpass and ??? gear is still out there for the forge.</p>' : "") +
+        (result.together ? '<p class="hint">Played together with ' + esc(result.partner || "a friend") + "." +
+          (result.left ? " They left before the end." : "") +
+          (result.assist ? " That chapter is past your own progress, so it paid like your furthest chapter and opened nothing new." : "") + "</p>" : "") +
         '<div class="modal__actions">' +
-          '<button class="btn" type="button" data-act="again" data-key="again">' + (result.won ? "Play it again" : "Try again") + "</button>" +
+          (result.together ? "" : '<button class="btn" type="button" data-act="again" data-key="again">' + (result.won ? "Play it again" : "Try again") + "</button>") +
           '<button class="btn btn--primary" type="button" data-act="home" data-key="home">' + (result.won ? "Continue" : "Back to camp") + "</button>" +
         "</div>" +
       "</div>";
@@ -3178,7 +3588,28 @@
       view.entering = true;
       render();
     },
+    casino: function (node) {
+      openModal({ type: node.getAttribute("data-game") === "spinner" ? "spinner" : "blackjack" });
+    },
+    bet: function (node) {
+      view.casino.bet = Math.max(1, Math.floor(st.get().gold * Number(node.getAttribute("data-share"))));
+      renderModal();
+    },
+    "bj-deal": bjDeal,
+    "bj-hit": bjHit,
+    "bj-stand": function () {
+      var bj = view.casino.bj;
+      if (bj && bj.phase === "play") bjDealer();
+    },
+    "bj-double": bjDouble,
+    "bw-pick": function (node) {
+      if (view.casino.bw.spinning) return;
+      view.casino.bw.pick = node.getAttribute("data-pick") === "white" ? "white" : "black";
+      renderModal();
+    },
+    "bw-spin": bwSpin,
     fight: function () { startBattle(st.get().chapter); },
+    together: function () { if (PS.multi) PS.multi.open(); },
     endless: function () {
       var info = st.endlessInfo();
       if (info.open) startBattle(info.chapter, "swarm");
@@ -3825,7 +4256,9 @@
   var SOUND = {
     tab: "tab", fight: "start", again: "start", equip: "equip", "equip-best": "equip", "dev-give": "equip", "dev-set": "equip",
     upgrade: "upgrade", "upgrade-max": "upgrade", talent: "talent", quest: "coin", deal: "coin", gold: "coin", "book-claim": "coin", challenge: "start",
-    gift: null, daily: null, chest: null, craft: null, ascend: null, egg: null, "pet-slot": null, sell: null, "forge-go": null, "quick-go": null, sound: null, cycle: null
+    gift: null, daily: null, chest: null, craft: null, ascend: null, egg: null, "pet-slot": null, sell: null, "forge-go": null, "quick-go": null, sound: null, cycle: null,
+    // the casino plays its own: a card dealt, the wheel let go, a win or a loss
+    "bj-deal": null, "bj-hit": null, "bj-double": null, "bw-spin": null
   };
 
   function upgraded(slot, text) {
@@ -3988,6 +4421,7 @@
 
   function safeToReload() {
     if (!el.battle.hidden) return false;
+    if ((view.casino.bj && view.casino.bj.phase !== "done") || view.casino.bw.spinning) return false; // a bet is riding on it
     if (document.visibilityState === "hidden") return true;
     if (view.modal) return false;
     var boxes = el.gate.hidden ? [] : el.gate.querySelectorAll("input");
@@ -4024,6 +4458,7 @@
   }
 
   PS.ui = {
+    startTogether: function (mp) { startTogether(mp); },
     init: function () {
       el.app = $("#app");
       el.screen = $("#screen");
@@ -4079,6 +4514,10 @@
       }, true);
       // the volume slider: move it and the sound changes at once, no redraw to interrupt the drag
       el.modal.addEventListener("input", function (e) {
+        if (e.target.id === "cas-bet") {
+          view.casino.bet = Math.floor(Number(e.target.value)) || 0;
+          return;
+        }
         if (e.target.id === "board-search") {
           view.board.q = e.target.value;
           paintBoard();

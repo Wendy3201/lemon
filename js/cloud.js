@@ -23,7 +23,29 @@
   var SEND_AFTER = 3000; // how long the save has to sit still before the figures go up
   var CACHE_FOR = 30000;
   var LIMIT = 500;
-  var FIELDS = "id, name, chapter, power, endless, kills, challenges, collection, created_at, updated_at, admin, banned_until, ban_message";
+  /* The Duels column came later: until the owner runs the newer setup.sql the
+     server has no such column, and everything else carries on without it. */
+  var duelsOk = true;
+
+  function figureList() {
+    return "chapter, power, endless, kills, challenges, collection" + (duelsOk ? ", duels" : "");
+  }
+
+  function fieldList() {
+    return "id, name, " + figureList() + ", created_at, updated_at, admin, banned_until, ban_message";
+  }
+
+  /** Is this the server saying it has no Duels column yet? Then stop asking for it. */
+  function noDuels(error) {
+    if (!duelsOk || !error) return false;
+    var code = error.code || "";
+    var text = String(error.message || "");
+    if ((code === "42703" || code === "PGRST204") && text.indexOf("duels") !== -1) {
+      duelsOk = false;
+      return true;
+    }
+    return false;
+  }
   var DOWN = "Can't reach the server. Check your connection and try again.";
   var KEY_BAN = "lemon:cloud:ban"; // the last ban seen on this device, so playing offline cannot dodge it
 
@@ -45,8 +67,8 @@
   /* What the leaderboard can rank by. `then` breaks ties; `max` matches the
      limits in setup.sql, so a figure the server would refuse is never sent. */
   var BOARDS = [
-    { key: "chapter", name: "Chapter", icon: "tabBattle", text: "Furthest chapter cleared", then: "power", max: 1000, ranks: RANK_CHAPTERS },
-    { key: "power", name: "Power", icon: "power", text: "Highest Power reached", then: "chapter", max: 1e12,
+    { key: "chapter", name: "Chapter", icon: "tabBattle", text: "Furthest chapter cleared on your save now", then: "power", max: 1000, ranks: RANK_CHAPTERS },
+    { key: "power", name: "Power", icon: "power", text: "Power right now, with what you are wearing", then: "chapter", max: 1e12,
       ranks: RANK_CHAPTERS.map(function (n) { return PS.chapter(n).rec; }) },
     { key: "endless", name: "Endless", icon: "clock", text: "Longest endless swarm survived", then: "power", max: 604800,
       ranks: [60, 180, 300, 480, 720, 960, 1200] },
@@ -54,8 +76,10 @@
       ranks: [100, 1000, 5000, 15000, 40000, 100000, 250000] },
     { key: "challenges", name: "Challenges", icon: "gift", text: "Daily challenges won", then: "power", max: 1e6,
       ranks: [1, 3, 7, 14, 30, 60, 100] },
-    { key: "collection", name: "Collection", icon: "book", text: "Items found for the collection", then: "power", max: 1e6,
-      ranks: [10, 50, 100, 200, 300, 450, PS.ITEM_ORDER.length] }
+    { key: "collection", name: "Collection", icon: "book", text: "Items in your collection now", then: "power", max: 1e6,
+      ranks: [10, 50, 100, 200, 300, 450, PS.ITEM_ORDER.length] },
+    { key: "duels", name: "Duels", icon: "atk", text: "Arena duels won against friends", then: "power", max: 1e6,
+      ranks: [1, 3, 7, 15, 30, 60, 100] }
   ];
   var SPANS = [
     { key: "all", name: "All time" },
@@ -79,6 +103,7 @@
   var sent = ""; // the figures last sent, as text, so the same ones are not sent twice
   var timer = 0;
   var cache = {}; // "board:span" -> { at, rows }
+  var stored = null; // this player's figures as the server holds them, once known
 
   function noop() {}
 
@@ -180,16 +205,24 @@
     offline = false;
     sent = "";
     cache = {};
+    stored = row ? keepFigures(row) : null;
     PS.store.set(KEY_LAST, { id: me.id, name: me.name, joined: me.joined, admin: me.admin });
     me.ban = banOf(row);
     remember(me.ban);
     PS.emit("cloud");
+    clearTimeout(timer);
+    timer = setTimeout(push, SEND_AFTER); // the board gets this save's figures, even before anything changes
     return me;
   }
 
   /** The player's row: the name as they typed it, when they joined, admin, and any ban. */
   function fetchRow(user) {
-    return client.from("players").select("name, created_at, admin, banned_until, ban_message").eq("id", user.id).maybeSingle().then(
+    var ask = function () {
+      return client.from("players").select("name, created_at, admin, banned_until, ban_message, " + figureList()).eq("id", user.id).maybeSingle();
+    };
+    return ask().then(function (res) {
+      return res.error && noDuels(res.error) ? ask() : res;
+    }).then(
       function (res) { return adopt(user, res.data); },
       function () { return adopt(user, null); }
     );
@@ -202,16 +235,27 @@
     var S = st.get();
     var raw = {
       chapter: S.best,
-      power: Math.max(S.stats.bestPower, st.calc().power),
+      power: st.calc().power, // current Power, so it can go down as well as up
       endless: S.endless.best,
       kills: S.stats.kills,
       challenges: S.challenge.count,
-      collection: st.bookInfo().found
+      collection: st.bookInfo().found,
+      duels: S.stats.duels || 0
     };
     var out = {};
     BOARDS.forEach(function (board) {
       out[board.key] = Math.max(0, Math.min(board.max, Math.floor(Number(raw[board.key]) || 0)));
     });
+    return out;
+  }
+
+  // the figures that show the save as it is now, and so can go down; the
+  // others are the best the server has seen
+  var CURRENT = ["chapter", "power", "collection"];
+
+  function keepFigures(row) {
+    var out = {};
+    BOARDS.forEach(function (board) { out[board.key] = Number(row[board.key]) || 0; });
     return out;
   }
 
@@ -222,13 +266,21 @@
     timer = 0;
     if (!client || !me || offline || PS.cloud.ban()) return Promise.resolve();
     var now = figures();
+    if (!duelsOk) delete now.duels;
     var text = JSON.stringify(now);
     if (text === sent) return Promise.resolve();
     var id = me.id;
-    return client.from("players").update(now).eq("id", id).then(function (res) {
+    return client.from("players").update(now).eq("id", id).select(figureList()).then(function (res) {
+      // an older server without the Duels column: send again without it
+      if (res.error && noDuels(res.error)) return push();
       if (res.error || !me || me.id !== id) return;
-      sent = text;
       cache = {};
+      if (res.data && res.data[0]) stored = keepFigures(res.data[0]);
+      // If the server kept something else (an older copy of setup.sql only lets
+      // figures go up), it does not count as sent, so the next push tries again.
+      var kept = res.data && res.data[0];
+      var same = !kept || CURRENT.every(function (key) { return Number(kept[key]) === now[key]; });
+      sent = same ? text : "";
     }, noop);
   }
 
@@ -291,9 +343,21 @@
     short: short,
     tierOf: tierOf,
     figures: figures,
+    /** This player's figures as the server last said it holds them, or null. */
+    held: function () {
+      return me ? stored : null;
+    },
+    /** Whether a board shows the save as it is now (and so can go down). */
+    isCurrent: function (key) {
+      return CURRENT.indexOf(key) !== -1;
+    },
     nameProblem: nameProblem,
     ready: function () {
       return Boolean(client);
+    },
+    /** The Supabase client, for net.js (rooms for playing together). */
+    client: function () {
+      return client;
     },
     me: function () {
       return me;
@@ -427,31 +491,40 @@
       var hit = cache[id];
       if (hit && !fresh && Date.now() - hit.at < CACHE_FOR) return Promise.resolve({ rows: hit.rows, banned: hit.banned });
       if (!client || !me || offline) return Promise.resolve({ rows: [], error: DOWN, down: true });
-      var query = client.from("players").select(FIELDS).gt(board.key, 0);
       var since = spanStart(span);
-      if (since) query = query.gte("updated_at", since);
-      return query
-        .order(board.key, { ascending: false })
-        .order(board.then, { ascending: false })
-        .order("name", { ascending: true })
-        .limit(LIMIT)
-        .then(function (res) {
-          if (res.error) {
-            var out = failed(res.error);
-            out.rows = [];
-            return out;
-          }
-          // banned and timed-out players (only admins get them back) are kept off the ranking
-          var all = res.data || [];
-          var rows = ranked(all.filter(function (row) { return !banOf(row); }), board.key);
-          var banned = all.filter(function (row) { return Boolean(banOf(row)); });
-          cache[id] = { at: Date.now(), rows: rows, banned: banned };
-          return { rows: rows, banned: banned };
-        }, function (err) {
-          var out = failed(err);
+      // your own figures go up first, so your row is the save you have now
+      if (board.key === "duels" && !duelsOk) {
+        return Promise.resolve({ rows: [], error: "The server needs an update for duels. (Game owner: run supabase/setup.sql again.)" });
+      }
+      var ask = function () {
+        var query = client.from("players").select(fieldList()).gt(board.key, 0);
+        if (since) query = query.gte("updated_at", since);
+        return query
+          .order(board.key, { ascending: false })
+          .order(board.then, { ascending: false })
+          .order("name", { ascending: true })
+          .limit(LIMIT);
+      };
+      return push().then(ask).then(function (res) {
+        // no Duels column yet: the other boards ask again without it
+        return res.error && noDuels(res.error) && board.key !== "duels" ? ask() : res;
+      }).then(function (res) {
+        if (res.error) {
+          var out = failed(res.error);
           out.rows = [];
           return out;
-        });
+        }
+        // banned and timed-out players (only admins get them back) are kept off the ranking
+        var all = res.data || [];
+        var rows = ranked(all.filter(function (row) { return !banOf(row); }), board.key);
+        var banned = all.filter(function (row) { return Boolean(banOf(row)); });
+        cache[id] = { at: Date.now(), rows: rows, banned: banned };
+        return { rows: rows, banned: banned };
+      }, function (err) {
+        var out = failed(err);
+        out.rows = [];
+        return out;
+      });
     }
   };
 })();
