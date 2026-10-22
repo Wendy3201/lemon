@@ -18,6 +18,7 @@
   var box = null;
   var view = { screen: "home", kind: "coop", duelMode: "equal", code: "", error: "", busy: false, partner: null, hostInfo: null, link: "room" };
   var session = null; // { role: "host"|"guest", kind, chapter, duelMode, inBattle }
+  var hiddenAt = 0;
 
   function myName() {
     var who = PS.cloud && PS.cloud.me ? PS.cloud.me() : null;
@@ -231,6 +232,10 @@
       PS.B.mpSetLink(link);
       if (!box.hidden) render();
     });
+    PS.net.on("ping", function (ms) {
+      view.ping = ms;
+      PS.B.mpSetPing(ms);
+    });
     PS.net.on("left", function () {
       if (session && session.inBattle) {
         PS.B.mpPartnerLeft();
@@ -261,7 +266,18 @@
       if (!session || session.role !== "host" || session.inBattle) return;
       beginAsHost(m && m.loadout);
     });
-    PS.net.on("in", function (m) { PS.B.mpInput(m); });
+    PS.net.on("in", function (m) {
+      PS.B.mpInput(m);
+      // a browser all but stops a tab that is not in front; while the host's
+      // game is hidden, the friend's steering keeps the battle ticking over
+      if (document.hidden && session && session.inBattle && PS.B.run && !PS.B.run.mirror) {
+        var now = performance.now();
+        if (!hiddenAt || now - hiddenAt > 30) {
+          hiddenAt = now;
+          PS.B.frame(now);
+        }
+      }
+    });
     PS.net.on("dash", function () { PS.B.mpDash(); });
     PS.net.on("pick", function (m) { PS.B.mpPick(m); });
     PS.net.on("reroll", function () { PS.B.mpReroll(); });
@@ -279,7 +295,8 @@
       box.hidden = true;
       PS.B.mpHooks.send = PS.net.send;
       PS.ui.startTogether({
-        guest: true, kind: m.kind, chapter: m.chapter, duelMode: m.duelMode, host: m.host, myName: myName()
+        guest: true, kind: m.kind, chapter: m.chapter, duelMode: m.duelMode, host: m.host, myName: myName(),
+        link: view.link
       });
     });
     PS.net.on("s", function (m) { PS.B.mirrorSnapshot(m); });

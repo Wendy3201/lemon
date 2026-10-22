@@ -288,7 +288,20 @@
   /* ------------------------------------------------------ messages */
 
   function deliver(type, data) {
-    if (type === "ping") return;
+    if (type === "ping") {
+      // answered at once, so the other side can time the round trip
+      if (data && data.at) send("pong", { at: data.at }, true);
+      return;
+    }
+    if (type === "pong") {
+      if (room && data && data.at) {
+        var rtt = Date.now() - data.at;
+        // smoothed, so one slow message does not make it jump
+        room.ping = room.ping ? Math.round(room.ping * 0.6 + rtt * 0.4) : rtt;
+        emit("ping", room.ping);
+      }
+      return;
+    }
     if (type === "bye") return partnerGone();
     emit(type, data);
   }
@@ -335,18 +348,11 @@
   setInterval(function () {
     var r = room;
     if (!r || !r.partner || r.gone) return;
-    // a quiet word now and then, so a game that has gone can be noticed
-    if (r.link === "direct" && r.sure && r.sure.readyState === "open") {
-      try {
-        r.sure.send(JSON.stringify({ t: "ping" }));
-      } catch (err) {
-        /* ignored */
-      }
-    } else {
-      signal("ping", { to: r.partner });
-    }
+    // a quiet word now and then: it times the round trip (the ping), and a
+    // game that has gone can be noticed
+    send("ping", { at: Date.now() }, true);
     if (Date.now() - r.heardAt > QUIET) partnerGone();
-  }, 3000);
+  }, 2000);
 
   window.addEventListener("beforeunload", function () {
     if (room && room.partner) signal("bye", { to: room.partner });
@@ -445,10 +451,10 @@
       delete handlers[type];
     },
 
-    /** What is going on: { code, role, link, partner } or null. */
+    /** What is going on: { code, role, link, partner, ping } or null. */
     state: function () {
       if (!room) return null;
-      return { code: room.code, role: room.role, link: room.link, partner: room.partnerInfo, gone: Boolean(room.gone) };
+      return { code: room.code, role: room.role, link: room.link, partner: room.partnerInfo, gone: Boolean(room.gone), ping: room.ping || 0 };
     }
   };
 })();

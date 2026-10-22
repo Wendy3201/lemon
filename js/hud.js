@@ -389,7 +389,14 @@
       if (mate) {
         setText("mateName", el.mateName, mate.name);
         setWidth("mateHp", el.mateHp, mate.gone || mate.down ? 0 : Math.max(0, mate.hp) / mate.maxHp);
-        setText("mateNote", el.mateNote, mate.gone ? "left" : mate.down ? (R.duel ? "" : "down! go help") : "Lv " + mate.level);
+        var ms = R.mp.ping || 0;
+        var lag = ms ? ms + " ms" + (R.mp.link === "direct" ? "" : " · server") : R.mp.link === "direct" ? "" : "via server";
+        setText("mateNote", el.mateNote, mate.gone ? "left" : mate.down ? (R.duel ? "" : "down! go help") : "Lv " + mate.level + (lag ? " · " + lag : ""));
+        var slow = ms > 250 ? 2 : ms > 120 ? 1 : 0;
+        if (shown.mateSlow !== slow) {
+          shown.mateSlow = slow;
+          el.mate.setAttribute("data-lag", slow);
+        }
         if (shown.mateDown !== Boolean(mate.down || mate.gone)) {
           shown.mateDown = Boolean(mate.down || mate.gone);
           el.mate.classList.toggle("is-down", shown.mateDown);

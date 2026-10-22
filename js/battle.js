@@ -1822,7 +1822,7 @@
     a.remote = true;
     a.input = { x: 0, y: 0 };
     a.pending = a.fx.startUp || 0;
-    R.mp = { kind: mp.kind, host: true, partnerName: a.name, rate: mp.relay ? 160 : 66, sentAt: 0 };
+    R.mp = { kind: mp.kind, host: true, partnerName: a.name, rate: mp.relay ? 160 : 33, sentAt: 0, link: mp.relay ? "room" : "direct", ping: 0 };
     host.x = -40;
     a.x = 40;
     R.players = [host, a];
@@ -2161,7 +2161,15 @@
   };
   /** How the two games are linked: directly, or through the server (sends less often). */
   B.mpSetLink = function (link) {
-    if (R && R.mp) R.mp.rate = link === "direct" ? 66 : 160;
+    if (!R || !R.mp) return;
+    // directly: thirty updates a second; through the server it allows only about ten
+    R.mp.link = link;
+    R.mp.rate = link === "direct" ? 33 : 160;
+    R.mp.inGap = link === "direct" ? 0.033 : 0.1;
+  };
+  /** The round trip between the two games, in milliseconds (shown in the HUD). */
+  B.mpSetPing = function (ms) {
+    if (R && R.mp) R.mp.ping = ms;
   };
 
   /** The other player has gone (closed the game, or lost the connection). */
@@ -2228,7 +2236,10 @@
       kills: 0, combo: 0, comboT: 0, bestCombo: 0, coins: 0, dealt: 0,
       boss: null, bosses: null, reachedBoss: false, paused: false, choices: null, choiceKind: null,
       shake: 0, procs: 0, toast: "", toastT: 0, twist: null, hurtMul: 1, pestMul: null, pets: [], shrine: null,
-      mp: { kind: info.kind, host: false, partnerName: pa.name, seq: 0, sendT: 0, hist: [], lastSnap: performance.now(), byId: {}, petsBy: {}, lastToast: "" },
+      mp: {
+        kind: info.kind, host: false, partnerName: pa.name, seq: 0, sendT: 0, hist: [], lastSnap: performance.now(), byId: {}, petsBy: {}, lastToast: "",
+        link: info.link || "room", inGap: info.link === "direct" ? 0.033 : 0.1, ping: 0
+      },
       duel: info.kind === "duel" ? { mode: info.duelMode === "full" ? "full" : "equal", round: 1, wins: [0, 0], roundT: 0, hold: 0 } : null,
       waitText: "", uid: 0
     };
@@ -2277,9 +2288,9 @@
     me.flash = Math.max(0, me.flash - dt);
     me.swing = Math.max(0, me.swing - dt);
     me.spin += dt * 3.2;
-    // where this lemon is steering, about twenty times a second
+    // where this lemon is steering: thirty times a second directly, ten through the server
     M.sendT += dt;
-    if (M.sendT >= 0.05) {
+    if (M.sendT >= (M.inGap || 0.05)) {
       M.sendT = 0;
       M.seq++;
       mpSend("in", { q: M.seq, x: move ? r2(move.x * move.mag) : 0, y: move ? r2(move.y * move.mag) : 0 }, false);
@@ -2287,7 +2298,8 @@
       if (M.hist.length > 80) M.hist.shift();
     }
 
-    var k = 1 - Math.exp(-14 * dt);
+    // quick to catch up, so what is shown lags as little as possible
+    var k = 1 - Math.exp(-22 * dt);
     var i;
     for (i = 0; i < R.enemies.length; i++) {
       var e = R.enemies[i];

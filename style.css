@@ -8010,3 +8010,12 @@ body::before {
 .hud.has-mate .hud__buffs {
   top: 176px;
 }
+
+.hud__mate[data-lag="1"] small {
+  color: #ffd166;
+}
+
+.hud__mate[data-lag="2"] small {
+  color: #ff8a80;
+  font-weight: 800;
+}
