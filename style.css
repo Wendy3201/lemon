@@ -8558,3 +8558,44 @@ button.inv__cell:focus-visible {
   background: var(--bad);
   color: #fff;
 }
+
+/* the Give form: a picture of the item about to be sent, at the left */
+.board__giveitem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.board__giveitem .board__pair {
+  flex: 1;
+  min-width: 0;
+}
+
+.board__preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 92px;
+  flex: none;
+  text-align: center;
+}
+
+.board__preview .tile {
+  width: 64px;
+  height: 64px;
+}
+
+.board__preview small {
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.board__preview b {
+  padding: 0 5px;
+  border-radius: 6px;
+  background: var(--charcoal);
+  color: var(--lemon-bright);
+  font-size: 10.5px;
+}

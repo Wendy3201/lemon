@@ -49,6 +49,7 @@
       found: {}, // every item id ever owned, for the collection book
       book: 0, // how many collection steps have been claimed
       traded: [], // ids of the trades already put into this save, so none is done twice
+      boost: null, // admin menu: { power, label, stats: { atk: 5000, ... } } set by hand, over what gear gives
       stats: {
         kills: 0, runs: 0, wins: 0, forges: 0, chests: 0, upgrades: 0, talents: 0,
         bestLevel: 0, bestPower: 0, maxRarity: 0, grade: 0, time: 0, earned: 0, eggs: 0, bestCombo: 0, duels: 0, duelsPlayed: 0,
@@ -182,6 +183,7 @@
     }
     save.items.forEach(function (item) { save.found[item.id] = 1; });
     save.book = Math.floor(num(raw.book, 0, 0, PS.BOOK.length));
+    save.boost = cleanBoost(raw.boost);
     save.traded = (Array.isArray(raw.traded) ? raw.traded : []).filter(function (id) {
       return typeof id === "number" && isFinite(id);
     }).slice(-TRADES_KEPT);
@@ -195,6 +197,32 @@
       save.stats[key] = num(raw.stats ? raw.stats[key] : 0, 0);
     });
     return save;
+  }
+
+  /* The stats the admin menu can set by hand. Percentages are kept as fractions (0.25 = 25%). */
+  var BOOST_STATS = ["atk", "hp", "crit", "critDmg", "haste", "speed", "armor", "regen", "magnet", "gold", "xp", "luck", "area", "bossDmg"];
+
+  /** A boost as stored: only real numbers, a short label, or null when nothing is set. */
+  function cleanBoost(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    var out = { power: null, label: "", stats: {} };
+    var any = false;
+    if (typeof raw.power === "number" && isFinite(raw.power) && raw.power >= 0) {
+      out.power = Math.min(Math.floor(raw.power), 1e15);
+      any = true;
+    }
+    if (typeof raw.label === "string" && raw.label.trim()) {
+      out.label = raw.label.trim().slice(0, 20);
+      any = true;
+    }
+    BOOST_STATS.forEach(function (key) {
+      var v = raw.stats ? raw.stats[key] : undefined;
+      if (typeof v === "number" && isFinite(v) && v >= 0) {
+        out.stats[key] = Math.min(v, 1e15);
+        any = true;
+      }
+    });
+    return any ? out : null;
   }
 
   function persist() {
@@ -440,10 +468,20 @@
       weapon: weapon
     };
 
+    // the admin menu's stats set by hand win over what the gear gives
+    var boost = S.boost;
+    if (boost) {
+      for (var key in boost.stats) out[key] = boost.stats[key];
+      out.crit = Math.min(out.crit, 1);
+      out.armor = Math.min(out.armor, 0.95); // never quite untouchable: that is what godmode is for
+      out.critDmg = Math.max(out.critDmg, 1);
+    }
+
     var dps = out.atk * (1 + out.haste) * (1 + out.crit * (out.critDmg - 1)) * (1 + 0.6 * out.area) * (1 + 0.5 * out.bossDmg);
     var ehp = (out.hp / (1 - out.armor)) * (1 + out.regen * 25) * (1 + 0.6 * out.speed);
     var extra = 1 + bonus + 0.15 * out.xp + 0.1 * out.luck + 0.05 * out.magnet;
     out.power = Math.round((dps * 20 + ehp * 2) * extra);
+    if (boost && boost.power !== null) out.power = boost.power;
     return out;
   }
 
@@ -1604,6 +1642,15 @@
     applyTrade: applyTrade,
     traded: function (id) { return S.traded.indexOf(id) !== -1; },
     applyTake: applyTake,
+    // admin menu: Power and stats set by hand, and text shown in place of Power
+    BOOST_STATS: BOOST_STATS,
+    boost: function () { return S.boost; },
+    setBoost: function (raw) {
+      S.boost = cleanBoost(raw);
+      commit();
+    },
+    /** Text to show instead of the Power number, or "". */
+    powerText: function () { return S.boost && S.boost.label ? S.boost.label : ""; },
     // dev menu
     give: function (id, rarity) {
       var item = add(id, rarity);

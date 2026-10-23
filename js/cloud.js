@@ -31,17 +31,25 @@
     return "chapter, power, endless, kills, challenges, collection" + (duelsOk ? ", duels" : "");
   }
 
+  // likewise the "shown" column (what an admin made the board show instead of a figure)
+  var shownOk = true;
+
   function fieldList() {
-    return "id, name, " + figureList() + ", created_at, updated_at, admin, banned_until, ban_message";
+    return "id, name, " + figureList() + ", created_at, updated_at, admin, banned_until, ban_message" + (shownOk ? ", shown" : "");
   }
 
-  /** Is this the server saying it has no Duels column yet? Then stop asking for it. */
+  /** Is this the server saying it has no Duels (or "shown") column yet? Then stop asking for it. */
   function noDuels(error) {
-    if (!duelsOk || !error) return false;
+    if (!error) return false;
     var code = error.code || "";
     var text = String(error.message || "");
-    if ((code === "42703" || code === "PGRST204") && text.indexOf("duels") !== -1) {
+    if (code !== "42703" && code !== "PGRST204") return false;
+    if (duelsOk && text.indexOf("duels") !== -1) {
       duelsOk = false;
+      return true;
+    }
+    if (shownOk && text.indexOf("shown") !== -1) {
+      shownOk = false;
       return true;
     }
     return false;
@@ -660,6 +668,15 @@
         return res.error ? failed(res.error) : { rows: Array.isArray(res.data) ? res.data : [] };
       }, failed);
     },
+    /** Make the leaderboard show any number or text for one of a player's figures ('' undoes it). */
+    setShown: function (target, figure, text) {
+      return moderate("pip_set_shown", { target: target, figure: figure, shown_as: String(text || "") });
+    },
+    /** What the board shows for a figure: the admin's text if there is one, else the figure. */
+    shownAs: function (row, key) {
+      var t = row && row.shown && typeof row.shown === "object" ? row.shown[key] : null;
+      return typeof t === "string" && t ? t.slice(0, 24) : show(key, row ? row[key] : 0);
+    },
     cancelTake: function (id) {
       return moderate("pip_take_cancel", { take_id: id });
     },
@@ -756,7 +773,7 @@
       };
       return push().then(ask).then(function (res) {
         // no Duels column yet: the other boards ask again without it
-        return res.error && noDuels(res.error) && board.key !== "duels" ? ask() : res;
+        return res.error && noDuels(res.error) && (board.key !== "duels" || duelsOk) ? ask() : res;
       }).then(function (res) {
         if (res.error) {
           var out = failed(res.error);

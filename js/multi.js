@@ -92,7 +92,8 @@
         '<p class="mp__how">Tell your friend this code. They press <b>Play with a friend</b> and type it in.</p>' +
         '<div class="mp__who' + (partner ? " is-in" : "") + '">' +
           (partner
-            ? '<span class="mp__dot"></span><b>' + esc(partner.name || "Your friend") + "</b> joined" + (partner.power ? ' <span class="power">' + PS.icon("power") + PS.fmt(partner.power) + "</span>" : "")
+            ? '<span class="mp__dot"></span><b>' + esc(partner.name || "Your friend") + "</b> joined" +
+              (partner.power || partner.powerText ? ' <span class="power">' + PS.icon("power") + (partner.powerText ? esc(String(partner.powerText).slice(0, 20)) : PS.fmt(partner.power)) + "</span>" : "")
             : '<span class="mp__spin"></span>Waiting for a friend to join...') +
         "</div>" +
         '<p class="mp__link">' + esc(partner ? linkText() || "Linking up..." : "") + "</p>" +
@@ -361,7 +362,7 @@
     view.error = "";
     render();
     listen();
-    PS.net.join(code, { name: myName(), power: PS.state.calc().power }).then(function (hostInfo) {
+    PS.net.join(code, { name: myName(), power: PS.state.calc().power, powerText: PS.state.powerText() }).then(function (hostInfo) {
       session = { role: "guest", kind: hostInfo.kind, chapter: hostInfo.chapter, duelMode: hostInfo.duelMode, inBattle: false };
       view.screen = "joined";
       view.hostInfo = hostInfo;

@@ -139,9 +139,21 @@
     }
   }
 
+  /** Power as this player's screens show it: the admin menu's text if one is set. */
+  function powerShown(n) {
+    var text = st.powerText();
+    return text ? esc(text) : fmt(n);
+  }
+
   function renderTop() {
     var S = st.get();
-    countTo("power", el.power, "power", st.calc().power);
+    var text = st.powerText();
+    if (text) {
+      counters.power = null; // the number counts again from scratch once the text goes
+      el.power.innerHTML = PS.icon("power") + "<b>" + esc(text) + "</b>";
+    } else {
+      countTo("power", el.power, "power", st.calc().power);
+    }
     countTo("gold", el.gold, "coin", S.gold);
     countTo("gems", el.gems, "gem", S.gems);
   }
@@ -315,7 +327,7 @@
             '<span class="stage__spark" aria-hidden="true">' + PS.icon("boom") + "</span>" +
             '<div class="stage__side">' +
               '<div class="stage__hero">' + PS.art("lemon") + (weapon ? '<span class="stage__weapon">' + PS.itemIcon(weapon.id) + "</span>" : "") + "</div>" +
-              '<span class="stage__label">You' + '<b class="power">' + PS.icon("power") + fmt(stats.power) + "</b></span>" +
+              '<span class="stage__label">You' + '<b class="power">' + PS.icon("power") + powerShown(stats.power) + "</b></span>" +
             "</div>" +
             '<span class="stage__vs" aria-hidden="true">VS</span>' +
             '<div class="stage__side">' +
@@ -419,7 +431,7 @@
         '<div class="panel gear__hero">' +
           '<div class="gear__me">' +
             '<div class="gear__lemon">' + PS.art("lemon") + "</div>" +
-            '<div><p class="kicker">Power</p><p class="bigpower">' + PS.icon("power") + fmt(stats.power) + "</p></div>" +
+            '<div><p class="kicker">Power</p><p class="bigpower">' + PS.icon("power") + powerShown(stats.power) + "</p></div>" +
             '<div class="gear__buttons">' +
               '<button class="btn btn--sm" type="button" data-act="equip-best" data-key="equip-best">Equip best</button>' +
               '<button class="btn btn--sm' + (st.bookInfo().ready ? " has-badge" : "") + '" type="button" data-act="book" data-key="book">' + PS.icon("book") + "Collection</button>" +
@@ -1659,6 +1671,7 @@
     "dev-pet-give": "Gave a pet", "dev-pet-all": "Gave every pet", "dev-pet-team": "Moved a pet", "dev-pet-up": "Levelled a pet",
     "dev-pet-max": "Maxed a pet", "dev-pet-remove": "Removed a pet", "dev-pets-max": "Maxed every pet",
     "dev-pets-fill": "Filled the pet team", "dev-pet-slots": "Set the pet slots",
+    "dev-boost": "Set my power and stats", "dev-boost-clear": "Put my stats back to normal",
     "dev-add": "Added gold or gems", "dev-money": "Set gold and gems", "dev-shards": "Added SS shards", "dev-shards-set": "Set SS shards",
     "dev-eggs": "Hatched free eggs", "dev-shop": "Restocked the shop", "dev-gift-wait": "Set the gift timer",
     "dev-chest": "Opened free chests", "dev-pity": "Set the pity counters",
@@ -1740,6 +1753,39 @@
     return PS.RARITY.slice(0, count).map(function (r, i) { return [i, r.name]; });
   }
 
+  /* The admin menu's "set my power and stats": [key, label, shown as a percentage] */
+  var BOOST_FIELDS = [
+    ["atk", "Attack", false], ["hp", "Health", false], ["crit", "Crit chance %", true], ["critDmg", "Crit damage ×", false],
+    ["haste", "Attack speed +%", true], ["speed", "Move speed +%", true], ["armor", "Damage blocked % (max 95)", true],
+    ["regen", "Regen % a second", true], ["magnet", "Pickup reach +%", true], ["gold", "Gold +%", true], ["xp", "XP +%", true],
+    ["luck", "Luck", false], ["area", "Attack size +%", true], ["bossDmg", "Boss damage +%", true]
+  ];
+
+  function devBoost(calc) {
+    var b = st.boost() || { power: null, label: "", stats: {} };
+    function box(id, label, value, type) {
+      return "<label>" + label + '<input id="' + id + '" type="' + (type || "number") + '" min="0" step="any"' + (type === "text" ? ' maxlength="20"' : "") +
+        ' value="' + esc(value === null || value === undefined ? "" : String(value)) + '" placeholder="normal" /></label>';
+    }
+    var boxes = BOOST_FIELDS.map(function (f) {
+      var v = b.stats[f[0]];
+      return box("dev-b-" + f[0], f[1], v === undefined ? "" : f[2] ? Math.round(v * 10000) / 100 : v);
+    }).join("");
+    return devCard("My power and stats",
+      '<p class="hint">Set any of these by hand (empty = what your gear gives). They work in battles too, and your Power goes on the leaderboard. ' +
+        "\"Power shows as\" puts any text in place of the number on your own screens: the top bar, Battle and Equipment. " +
+        "To change what the leaderboard shows for anyone (you too), use Show as... under their name.</p>" +
+      '<div class="dev__give dev__give--grid">' +
+        box("dev-b-power", "Power", b.power) +
+        box("dev-b-label", "Power shows as", b.label, "text") +
+        boxes +
+      "</div>" +
+      devRow(devButton("dev-boost", "Use these", "", "btn--primary") + devButton("dev-boost-clear", "Back to normal")),
+      [["Power now", fmt(calc.power) + (st.powerText() ? " (shows as “" + esc(st.powerText()) + "”)" : "")],
+        ["Set by hand", Object.keys(b.stats).length + (b.power !== null ? 1 : 0) + (b.label ? 1 : 0)]]
+    );
+  }
+
   function devOverview(S, calc) {
     var minutes = Math.round(S.stats.time / 60);
     var open = st.unlockedTalents();
@@ -1747,6 +1793,7 @@
     var ready = st.quests().filter(function (q) { return q.ready; }).length;
     var bytes = JSON.stringify(S).length;
     return (
+      devBoost(calc) +
       devCard("Save", "", [
         ["Power", fmt(calc.power)],
         ["Gold", fmt(S.gold)],
@@ -2771,7 +2818,7 @@
         '<span class="board__who"><span class="board__name"><span class="board__nm">' + esc(row.name) + "</span>" + (you ? " <em>you</em>" : "") + title + "</span>" +
           "<small>" + (ban ? '<b class="board__ban">' + (ban.timeout ? "Timed out until " + esc(whenText(ban.until)) : "Banned") + "</b>"
             : (mod && view.board.presence ? presenceHtml(row.id) : esc(ago(row.updated_at)))) + "</small></span>" +
-        '<span class="board__value">' + tierBadge(PS.cloud.tierOf(board.key, row[board.key])) + "<span>" + esc(PS.cloud.show(board.key, row[board.key])) + "</span></span>" +
+        '<span class="board__value">' + tierBadge(PS.cloud.tierOf(board.key, row[board.key])) + "<span>" + esc(PS.cloud.shownAs(row, board.key)) + "</span></span>" +
         (mod ? modButtons(row, who) : "") +
         (open ? modForm() : "") +
       "</li>"
@@ -3125,7 +3172,7 @@
     function button(act, label, cls) {
       return '<button class="board__act' + (cls ? " " + cls : "") + '" type="button" data-act="mod-open" data-mod="' + act + '" data-id="' + esc(row.id) + '" aria-pressed="' + (open === act) + '">' + label + "</button>";
     }
-    var out = [button("give", PS.icon("gift") + "Give"), button("inv", PS.icon("tabGear") + "Inventory")];
+    var out = [button("give", PS.icon("gift") + "Give"), button("inv", PS.icon("tabGear") + "Inventory"), button("shown", "Show as...")];
     if (!self && !row.admin) {
       if (banned) {
         out.push('<button class="board__act" type="button" data-act="mod-unban" data-id="' + esc(row.id) + '">Unban</button>');
@@ -3387,6 +3434,7 @@
   function modForm() {
     var m = view.board.mod;
     if (isInv(m)) return invPanel(m);
+    if (m.act === "shown") return shownForm(m);
     var fields = "";
     var go = "";
     if (m.act === "ban" || m.act === "timeout") {
@@ -3400,10 +3448,11 @@
       fields += '<label class="board__field"><span>What to give</span><select id="mod-kind">' +
         options([["item", "A weapon or gear"], ["gold", "Gold"], ["gems", "Gems"]], m.kind) + "</select></label>";
       if (m.kind === "item") {
-        fields += '<div class="board__pair">' +
+        fields += '<div class="board__giveitem"><span class="board__preview" id="mod-preview">' + givePreview(m) + "</span>" +
+          '<div class="board__pair">' +
           '<label class="board__field"><span>Item</span><select id="mod-item">' + itemOptions(m.item) + "</select></label>" +
           '<label class="board__field"><span>Rarity</span><select id="mod-rarity">' + options(rarityOptions(PS.RARITY.length), m.rarity) + "</select></label>" +
-        "</div>";
+        "</div></div>";
       } else {
         fields += '<label class="board__field"><span>How much?</span><input id="mod-amount" type="number" min="1" max="1000000000" step="1" value="' + esc(String(m.amount)) + '" /></label>';
       }
@@ -3421,6 +3470,40 @@
     );
   }
 
+  /** What the board shows for a player's figure: any number or text, for everyone to see. */
+  function shownForm(m) {
+    var row = boardFind(m.id) || {};
+    var set = row.shown && typeof row.shown === "object" ? row.shown : {};
+    var now = PS.cloud.BOARDS.filter(function (def) { return typeof set[def.key] === "string"; }).map(function (def) {
+      return esc(def.name) + ": “" + esc(set[def.key]) + "”";
+    });
+    return (
+      '<form class="board__form" data-form="mod" novalidate>' +
+        '<div class="board__pair">' +
+          '<label class="board__field"><span>Figure</span><select id="mod-figure">' +
+            options(PS.cloud.BOARDS.map(function (def) { return [def.key, def.name]; }), m.figure) + "</select></label>" +
+          '<label class="board__field"><span>Show it as (any number or text)</span><input id="mod-shown" type="text" maxlength="24" value="' + esc(m.text) + '" placeholder="' + esc(PS.cloud.show(m.figure, row[m.figure] || 0)) + '" /></label>' +
+        "</div>" +
+        '<p class="hint">Everyone sees this on the leaderboard in place of the real figure; the real one still decides the order. Leave it empty to show the real one again.' +
+          (now.length ? " Showing now: " + now.join(", ") + "." : "") + "</p>" +
+        '<p class="board__formerr" role="alert">' + esc(m.error || "") + "</p>" +
+        '<div class="board__formbtns">' +
+          '<button class="btn btn--sm" type="button" data-act="mod-cancel">Cancel</button>' +
+          '<button class="btn btn--sm btn--primary" type="submit"' + (m.busy ? " disabled" : "") + ">Save</button>" +
+        "</div>" +
+      "</form>"
+    );
+  }
+
+  /** The item about to be given, as it will look: its picture on the rarity's colour, with its S or SS mark. */
+  function givePreview(m) {
+    var def = PS.ITEMS[m.item];
+    if (!def) return "";
+    var r = Math.max(0, Math.min(PS.RARITY.length - 1, Number(m.rarity) || 0));
+    return tile({ id: m.item, r: r }, { plain: true }) +
+      "<small>" + esc(PS.RARITY[r].name + " " + def.name) + (def.grade !== "A" ? " <b class=\"g-" + def.grade + "\">" + def.grade + "</b>" : "") + "</small>";
+  }
+
   function modSubmit(e) {
     e.preventDefault();
     var m = view.board.mod;
@@ -3428,7 +3511,11 @@
     var message = m.msg.trim();
     var job;
     var done;
-    if (m.act === "ban") {
+    if (m.act === "shown") {
+      var figureName = PS.cloud.boardOf(m.figure).name;
+      job = PS.cloud.setShown(m.id, m.figure, m.text.trim());
+      done = m.text.trim() ? m.name + "'s " + figureName + " now shows as “" + m.text.trim() + "”" : m.name + "'s real " + figureName + " is back";
+    } else if (m.act === "ban") {
       job = PS.cloud.banPlayer(m.id, 0, message);
       done = "Banned " + m.name;
     } else if (m.act === "timeout") {
@@ -3892,6 +3979,11 @@
         view.board.mod = null; // a second click on the same button closes the form
       } else {
         view.board.mod = { id: id, name: row.name, act: act, msg: "", minutes: 60, kind: "item", item: firstItem("weapon"), rarity: 0, amount: 1000, busy: false, error: "" };
+        if (act === "shown") {
+          // the figure the board is ranking by, and what it shows for it now
+          view.board.mod.figure = view.board.by;
+          view.board.mod.text = row.shown && typeof row.shown[view.board.by] === "string" ? row.shown[view.board.by] : "";
+        }
         if (act === "inv") {
           var inv = view.board.mod;
           inv.inv = null;
@@ -4701,6 +4793,28 @@
     "dev-notice": function () {
       openModal({ type: "notice" });
     },
+    "dev-boost": function () {
+      function read(id) {
+        var box = $("#" + id);
+        var v = box ? box.value.trim() : "";
+        return v === "" ? undefined : Number(v);
+      }
+      var stats = {};
+      BOOST_FIELDS.forEach(function (f) {
+        var v = read("dev-b-" + f[0]);
+        if (v !== undefined && isFinite(v) && v >= 0) stats[f[0]] = f[2] ? v / 100 : v;
+      });
+      var power = read("dev-b-power");
+      var label = $("#dev-b-label");
+      st.setBoost({ power: power !== undefined && isFinite(power) ? power : undefined, label: label ? label.value : "", stats: stats });
+      toast(st.boost() ? "Your power and stats are set" : "Nothing set: all back to normal");
+      renderModal();
+    },
+    "dev-boost-clear": function () {
+      st.setBoost(null);
+      toast("Your power and stats are back to normal");
+      renderModal();
+    },
     "dev-banner-save": function () {
       var box = $("#dev-banner");
       sendBanner((box ? box.value : "").replace(/\s+/g, " ").trim());
@@ -5067,9 +5181,25 @@
           var m = view.board.mod;
           var v = e.target.value;
           if (e.target.id === "mod-msg") m.msg = v;
+          else if (e.target.id === "mod-shown") m.text = v;
+          else if (e.target.id === "mod-figure") {
+            // start from what that figure shows now
+            m.figure = v;
+            var shownRow = boardFind(m.id) || {};
+            m.text = shownRow.shown && typeof shownRow.shown[v] === "string" ? shownRow.shown[v] : "";
+            paintBoard();
+            var fig = $("#mod-figure");
+            if (fig) fig.focus();
+            return;
+          }
           else if (e.target.id === "mod-minutes") m.minutes = Number(v);
           else if (e.target.id === "mod-item") m.item = v;
           else if (e.target.id === "mod-rarity") m.rarity = Number(v);
+          if (e.target.id === "mod-item" || e.target.id === "mod-rarity") {
+            // the picture follows the pickers
+            var preview = $("#mod-preview");
+            if (preview) preview.innerHTML = givePreview(m);
+          }
           else if (e.target.id === "mod-amount") m.amount = Number(v);
           else if (e.target.id === "mod-kind") {
             m.kind = v;

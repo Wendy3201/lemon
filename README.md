@@ -414,6 +414,16 @@ ticked (Supabase → Table Editor → players). `setup.sql` ticks `test`,
 - **Give** sends any weapon or piece of gear at any rarity, or gold, or gems,
   with an optional message. It arrives the next time the player's game checks
   in (within a minute while they play) and pops up as a gift.
+- **Show as...** makes the leaderboard show any number or text (up to 24
+  characters, "noob" say) in place of one of a player's figures, for
+  everyone. The real figure still decides the order; leaving the box empty
+  shows it again. (The `shown` column in setup.sql.)
+- **My power and stats**, at the top of the admin menu's Overview, sets your
+  own Power and any stat (attack, health, crit, speed and so on) by hand,
+  over what your gear gives. They work in battles too, and the Power goes on
+  the leaderboard. "Power shows as" puts text in place of the number on your
+  own screens (top bar, Battle, Equipment, and what a friend sees when you
+  join their room). Back to normal clears it all.
 - **Removing things** happens in the **Inventory**, online or offline: every
   item (worn or in the bag) has a **Remove** button, and coins and gems have
   an amount box with **Remove** and **Remove all**. Gear that isn't listed

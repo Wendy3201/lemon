@@ -35,6 +35,11 @@ alter table public.players add column if not exists ban_message text;
 alter table public.players add column if not exists banned_by uuid references auth.users (id) on delete set null;
 -- arena duels won against friends (playing together)
 alter table public.players add column if not exists duels integer not null default 0 check (duels between 0 and 1000000);
+-- what the leaderboard shows instead of a figure, set by an admin (for fun):
+-- { "power": "noob", "chapter": "999" }; the real figures still decide the order
+alter table public.players add column if not exists shown jsonb not null default '{}'::jsonb;
+alter table public.players drop constraint if exists players_shown_size;
+alter table public.players add constraint players_shown_size check (octet_length(shown::text) <= 1000);
 alter table public.players drop constraint if exists players_ban_message_length;
 alter table public.players add constraint players_ban_message_length check (char_length(ban_message) <= 200);
 
@@ -451,6 +456,32 @@ begin
   delete from public.takes where id = take_id and claimed_at is null;
   if not found then
     raise exception 'Too late: their game has already picked that up.';
+  end if;
+end;
+$$;
+
+/* What the leaderboard shows for one of a player's figures: any number or
+   text (24 characters at most); '' or null shows the real figure again. */
+create or replace function public.pip_set_shown(target uuid, figure text, shown_as text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  clean text := left(btrim(coalesce(shown_as, '')), 24);
+begin
+  if not public.pip_is_admin() then
+    raise exception 'Only admins can do that.';
+  end if;
+  if figure is null or figure not in ('chapter', 'power', 'endless', 'kills', 'challenges', 'collection', 'duels') then
+    raise exception 'Pick a figure.';
+  end if;
+  update public.players
+  set shown = case when clean = '' then shown - figure else shown || jsonb_build_object(figure, clean) end
+  where id = target;
+  if not found then
+    raise exception 'That player has gone.';
   end if;
 end;
 $$;
@@ -995,6 +1026,7 @@ revoke execute on function public.pip_trade_pending() from public, anon;
 revoke execute on function public.pip_dev_token() from public, anon;
 revoke execute on function public.pip_dev_check(uuid) from public, anon;
 revoke execute on function public.pip_seen(boolean, text) from public, anon;
+revoke execute on function public.pip_set_shown(uuid, text, text) from public, anon;
 revoke execute on function public.pip_take(uuid, text, text, integer, bigint, text) from public, anon;
 revoke execute on function public.pip_claim_takes() from public, anon;
 revoke execute on function public.pip_takes_waiting(uuid) from public, anon;
@@ -1024,6 +1056,7 @@ grant execute on function public.pip_trade_pending() to authenticated;
 grant execute on function public.pip_dev_token() to authenticated;
 grant execute on function public.pip_dev_check(uuid) to authenticated;
 grant execute on function public.pip_seen(boolean, text) to authenticated;
+grant execute on function public.pip_set_shown(uuid, text, text) to authenticated;
 grant execute on function public.pip_take(uuid, text, text, integer, bigint, text) to authenticated;
 grant execute on function public.pip_claim_takes() to authenticated;
 grant execute on function public.pip_takes_waiting(uuid) to authenticated;
