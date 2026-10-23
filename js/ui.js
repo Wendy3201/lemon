@@ -2717,10 +2717,43 @@
     return Math.max(here, mine ? mine[key] || 0 : 0, held ? held[key] || 0 : 0);
   }
 
+  /** The rank a row shows on a board: the one an admin picked ("tier:power"), or the real one. */
+  function shownTier(row, key, value) {
+    var pick = row && row.shown && typeof row.shown === "object" ? row.shown["tier:" + key] : null;
+    for (var i = 0; pick && i < PS.cloud.TIERS.length; i++) if (PS.cloud.TIERS[i].key === pick) return i;
+    return PS.cloud.tierOf(key, value);
+  }
+
+  /** The place an admin picked for a row on a board ("place:power"), or 0. */
+  function shownPlace(row, key) {
+    var pick = row && row.shown && typeof row.shown === "object" ? Math.floor(Number(row.shown["place:" + key])) : 0;
+    return pick >= 1 && pick <= 100000 ? pick : 0;
+  }
+
+  /** The rows in the order shown: rows given a place move there and show that number. */
+  function placed(rows, key) {
+    var moved = [];
+    var rest = [];
+    rows.forEach(function (row) {
+      var at = shownPlace(row, key);
+      if (at) {
+        var copy = {};
+        for (var k in row) copy[k] = row[k];
+        copy.rank = at;
+        moved.push(copy);
+      } else {
+        rest.push(row);
+      }
+    });
+    moved.sort(function (a, b) { return a.rank - b.rank; });
+    moved.forEach(function (row) { rest.splice(Math.min(row.rank - 1, rest.length), 0, row); });
+    return rest;
+  }
+
   /** Your rank on every board, at the top of the account window; a tap shows that board. */
   function myRanks() {
     return PS.cloud.BOARDS.map(function (def) {
-      var tier = PS.cloud.tierOf(def.key, myFigure(def.key));
+      var tier = shownTier(myRow(), def.key, myFigure(def.key));
       return (
         '<button class="ranks__cell' + (def.key === view.board.by ? " is-on" : "") + '" type="button" data-act="board-by" data-by="' + def.key + '" title="' + esc(def.text) + '">' +
           tierBadge(tier, "tier--lg") +
@@ -2735,7 +2768,7 @@
   function ladder() {
     var def = PS.cloud.boardOf(view.board.by);
     var value = myFigure(def.key);
-    var tier = PS.cloud.tierOf(def.key, value);
+    var tier = shownTier(myRow(), def.key, value);
     var steps = PS.cloud.TIERS.slice(1).map(function (t, i) {
       return (
         '<li class="ladder__step' + (i + 1 <= tier ? " is-got" : "") + (i + 1 === tier ? " is-now" : "") + '">' +
@@ -2799,7 +2832,7 @@
     var bits = [];
     if (who.joined) bits.push("Joined " + esc(dayText(who.joined)));
     var mine = myRow();
-    if (mine) bits.push("<b>#" + mine.rank + "</b> in " + esc(PS.cloud.boardOf(view.board.by).name));
+    if (mine) bits.push("<b>#" + (shownPlace(mine, view.board.by) || mine.rank) + "</b> in " + esc(PS.cloud.boardOf(view.board.by).name));
     return bits.join(" · ");
   }
 
@@ -2818,7 +2851,7 @@
         '<span class="board__who"><span class="board__name"><span class="board__nm">' + esc(row.name) + "</span>" + (you ? " <em>you</em>" : "") + title + "</span>" +
           "<small>" + (ban ? '<b class="board__ban">' + (ban.timeout ? "Timed out until " + esc(whenText(ban.until)) : "Banned") + "</b>"
             : (mod && view.board.presence ? presenceHtml(row.id) : esc(ago(row.updated_at)))) + "</small></span>" +
-        '<span class="board__value">' + tierBadge(PS.cloud.tierOf(board.key, row[board.key])) + "<span>" + esc(PS.cloud.shownAs(row, board.key)) + "</span></span>" +
+        '<span class="board__value">' + tierBadge(shownTier(row, board.key, row[board.key])) + "<span>" + esc(PS.cloud.shownAs(row, board.key)) + "</span></span>" +
         (mod ? modButtons(row, who) : "") +
         (open ? modForm() : "") +
       "</li>"
@@ -2857,7 +2890,8 @@
     }
     var board = PS.cloud.boardOf(b.by);
     var find = b.q.trim().toLowerCase();
-    var rows = find ? b.rows.filter(function (row) { return row.name.toLowerCase().indexOf(find) !== -1; }) : b.rows;
+    var all = placed(b.rows, board.key); // anyone an admin gave a place to is moved there
+    var rows = find ? all.filter(function (row) { return row.name.toLowerCase().indexOf(find) !== -1; }) : all;
     var when = b.span === "today" ? "today" : "this week";
     if (!rows.length) {
       var none = find
@@ -2866,7 +2900,7 @@
       return '<div class="board__empty"><p>' + none + "</p></div>" + bannedPart(board, who, find);
     }
     var shown = rows.slice(0, BOARD_SHOW);
-    var mine = myRow();
+    var mine = who ? all.filter(function (row) { return row.id === who.id; })[0] || null : null;
     var html = '<ol class="board__list">' + shown.map(function (row) { return boardRow(row, board, who); }).join("") + "</ol>";
     if (rows.length > shown.length) html += '<p class="hint board__more">Showing the top ' + shown.length + " of " + fmt(rows.length) + ". Search for a name to find anyone else.</p>";
     if (!find && mine && shown.indexOf(mine) === -1) html += '<ol class="board__list board__list--me">' + boardRow(mine, board, who) + "</ol>";
@@ -3484,7 +3518,12 @@
             options(PS.cloud.BOARDS.map(function (def) { return [def.key, def.name]; }), m.figure) + "</select></label>" +
           '<label class="board__field"><span>Show it as (any number or text)</span><input id="mod-shown" type="text" maxlength="24" value="' + esc(m.text) + '" placeholder="' + esc(PS.cloud.show(m.figure, row[m.figure] || 0)) + '" /></label>' +
         "</div>" +
-        '<p class="hint">Everyone sees this on the leaderboard in place of the real figure; the real one still decides the order. Leave it empty to show the real one again.' +
+        '<div class="board__pair">' +
+          '<label class="board__field"><span>Place on this board (empty = real)</span><input id="mod-place" type="number" min="1" max="100000" step="1" value="' + esc(m.place) + '" placeholder="' + esc(String(row.rank || "")) + '" /></label>' +
+          '<label class="board__field"><span>Rank badge</span><select id="mod-tier">' +
+            options([["", "Real rank"]].concat(PS.cloud.TIERS.map(function (t) { return [t.key, t.name]; })), m.tier) + "</select></label>" +
+        "</div>" +
+        '<p class="hint">Everyone sees these on this leaderboard. The figure text and rank badge only change what is shown; a place moves the row to that spot. Leave them empty to show the real ones again.' +
           (now.length ? " Showing now: " + now.join(", ") + "." : "") + "</p>" +
         '<p class="board__formerr" role="alert">' + esc(m.error || "") + "</p>" +
         '<div class="board__formbtns">' +
@@ -3513,8 +3552,16 @@
     var done;
     if (m.act === "shown") {
       var figureName = PS.cloud.boardOf(m.figure).name;
-      job = PS.cloud.setShown(m.id, m.figure, m.text.trim());
-      done = m.text.trim() ? m.name + "'s " + figureName + " now shows as “" + m.text.trim() + "”" : m.name + "'s real " + figureName + " is back";
+      var place = Math.floor(Number(m.place) || 0);
+      job = Promise.all([
+        PS.cloud.setShown(m.id, m.figure, m.text.trim()),
+        PS.cloud.setShown(m.id, "place:" + m.figure, place >= 1 ? String(place) : ""),
+        PS.cloud.setShown(m.id, "tier:" + m.figure, m.tier || "")
+      ]).then(function (all) {
+        for (var i = 0; i < all.length; i++) if (all[i].error) return all[i];
+        return {};
+      });
+      done = m.name + "'s " + figureName + " board is set";
     } else if (m.act === "ban") {
       job = PS.cloud.banPlayer(m.id, 0, message);
       done = "Banned " + m.name;
@@ -3982,7 +4029,10 @@
         if (act === "shown") {
           // the figure the board is ranking by, and what it shows for it now
           view.board.mod.figure = view.board.by;
-          view.board.mod.text = row.shown && typeof row.shown[view.board.by] === "string" ? row.shown[view.board.by] : "";
+          var sh0 = row.shown && typeof row.shown === "object" ? row.shown : {};
+          view.board.mod.text = typeof sh0[view.board.by] === "string" ? sh0[view.board.by] : "";
+          view.board.mod.place = typeof sh0["place:" + view.board.by] === "string" ? sh0["place:" + view.board.by] : "";
+          view.board.mod.tier = typeof sh0["tier:" + view.board.by] === "string" ? sh0["tier:" + view.board.by] : "";
         }
         if (act === "inv") {
           var inv = view.board.mod;
@@ -5182,11 +5232,16 @@
           var v = e.target.value;
           if (e.target.id === "mod-msg") m.msg = v;
           else if (e.target.id === "mod-shown") m.text = v;
+          else if (e.target.id === "mod-place") m.place = v;
+          else if (e.target.id === "mod-tier") m.tier = v;
           else if (e.target.id === "mod-figure") {
-            // start from what that figure shows now
+            // start from what that board shows now
             m.figure = v;
             var shownRow = boardFind(m.id) || {};
-            m.text = shownRow.shown && typeof shownRow.shown[v] === "string" ? shownRow.shown[v] : "";
+            var sh = shownRow.shown && typeof shownRow.shown === "object" ? shownRow.shown : {};
+            m.text = typeof sh[v] === "string" ? sh[v] : "";
+            m.place = typeof sh["place:" + v] === "string" ? sh["place:" + v] : "";
+            m.tier = typeof sh["tier:" + v] === "string" ? sh["tier:" + v] : "";
             paintBoard();
             var fig = $("#mod-figure");
             if (fig) fig.focus();

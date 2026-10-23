@@ -474,7 +474,8 @@ begin
   if not public.pip_is_admin() then
     raise exception 'Only admins can do that.';
   end if;
-  if figure is null or figure not in ('chapter', 'power', 'endless', 'kills', 'challenges', 'collection', 'duels') then
+  -- a figure ("power"), or the place ("place:power") or rank ("tier:power") shown on its board
+  if figure is null or figure !~ '^((place|tier):)?(chapter|power|endless|kills|challenges|collection|duels)$' then
     raise exception 'Pick a figure.';
   end if;
   update public.players
