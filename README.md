@@ -291,6 +291,7 @@ lemon/
 │   ├── dev.js        the DEV / admin panel inside a battle (cheats, upgrades, spawning, stats)
 │   ├── net.js        rooms on the server and the direct link between two games
 │   ├── multi.js      the "Play with a friend" window, and starting a battle for two
+│   ├── trade.js      the Trade window (the server holds both offers)
 │   └── ui.js         the menus: Battle, Equipment, Forge, Shop, Talents, Quests
 ├── supabase/setup.sql   the leaderboard table and its rules, run once in Supabase
 ├── assets/icons/lemon.svg
@@ -413,11 +414,38 @@ ticked (Supabase → Table Editor → players). `setup.sql` ticks `test`,
 - **Give** sends any weapon or piece of gear at any rarity, or gold, or gems,
   with an optional message. It arrives the next time the player's game checks
   in (within a minute while they play) and pops up as a gift.
+- **Inventory** shows what the player owns: gold, gems, SS shards, Power, the
+  gear they wear and their pet team. Their whole pet list and their **bag** are
+  folded away and only drawn when opened, 120 items at a time, so a huge bag
+  cannot freeze the admin's computer. Each game sends its inventory now and
+  then while the player plays (at most every 30 seconds, only the best 3,000
+  bag items, and the server refuses anything over 200 KB), and once more as
+  the game closes or goes into the background. The server keeps the last copy,
+  so it can be looked at while the player is offline (it says so). A player
+  only shows up once they have opened the game since this was added. What
+  arrives is checked before it is shown: unknown items are left out and counted.
+- **Online or offline**: under each name admins see a green **Online** (with
+  what they're doing: in the menus, in a battle, playing co-op, in a duel or
+  trading) or **Offline · seen 3h ago**. Each signed-in game tells the server
+  it is open about every 45 seconds and says when it closes; a game not heard
+  from for 2 minutes counts as offline (a computer gone to sleep, say). Someone
+  playing with **Play offline** shows as offline. The open board checks again
+  every 30 seconds. Only admins can see any of this (`pip_presence` in
+  setup.sql); everyone else's leaderboard looks as before.
 
 Banned and timed-out players disappear from everyone else's leaderboard and
 cannot post scores. A game checks for bans and gifts every 45 seconds, and a
 ban ends a battle on the spot. All of this is checked by the server, so the
 buttons do nothing for anyone who is not an admin. Admins cannot be banned.
+
+**The banner** (the yellow strip above the top bar) is changed for every
+player from the admin menu: **Settings → Banner**. Type the new text and press
+**Show to everyone** (or Enter); **Hide the banner** takes it away, and **Use
+the text in index.html** goes back to the text written in `index.html`, which
+is also what shows until a banner has been set. Games pick up a new banner
+when they open and within a minute while they play. The text is kept in the
+`banner` table, which needs the newer `setup.sql` (run it again); until then
+the buttons say the server needs an update. Up to 200 characters, plain text.
 
 ## Playing with a friend
 
@@ -444,13 +472,55 @@ between the two browsers (WebRTC), so it does not use the project's monthly
 Realtime allowance. Where the two cannot reach each other directly (some
 school, office or phone networks), it falls back to going through the room,
 which does use the allowance (about 10 messages a second per battle). The room
-maker's game runs the battle and sends the other game what to show about
-fifteen times a second; the other game moves its own lemon at once so it feels
-quick. Keep the room maker's game window open and in front: a browser slows
+maker's game runs the battle and sends the other game what to show thirty
+times a second on a direct link (about six through the room); the other game
+moves its own lemon at once so it feels quick. The partner panel in the battle
+shows the ping (the round trip between the two games, in milliseconds), in
+amber above 120 and red above 250, and says "server" when the battle is going
+through the room. Keep the room maker's game window open and in front: a browser slows
 down a tab in the background, and the battle with it.
 
 The Duels board needs the newer `supabase/setup.sql` (run it again); until
 then everything else keeps working and the Duels board says so.
+
+**The admin menu in co-op and the arena.** With the admin password, the DEV
+button (or the ` key) works in battles together too. The battle does not stop
+while it is open. Cheats work on your own lemon only (Freeze and Stop spawning
+work on the whole battle), and game speed stays at 1× so both games keep
+time. Restarting is not offered, and a duel has no clock, boss or win button.
+If you made the room, everything works straight away. If you joined someone
+else's room, your game sends what you press to theirs (which runs the
+battle), and theirs first asks the server whether you really are on an admin
+account (`pip_dev_token` and `pip_dev_check` in setup.sql). Until it says yes,
+nothing you press does anything.
+
+## Trading
+
+**Trade** (under Battle, next to Play with a friend) swaps gear, pets, gold
+and gems between two players. One makes a trade code, the other types it in;
+both need an account and the game open.
+
+- Each side picks from their bag (worn gear can't be traded) and pets, up to
+  20 items and 6 pets, plus any gold and gems they have.
+- **Changing either offer takes back both accepts**, and the other player's
+  side lights up when it changes.
+- When both press **Accept**, the trade **locks**: neither offer can change.
+  **3 seconds later it goes through.** In those 3 seconds either player can
+  press **Stop**, which unlocks it (nobody accepted), or leave.
+- Then each game takes away what it gave and adds what it got. Pets are kept
+  one per kind and rarity, so a pet you already have just takes the higher
+  level (the trade window says so beforehand).
+
+The server holds both offers (the `trades` table and the `pip_trade_*`
+functions in setup.sql), not the players' games. So what you see when you
+accept is exactly what you get: nobody can swap their offer at the last
+moment, and nobody can keep their side and still get yours. An accept only
+counts for the offers you were looking at. A trade that locked before someone
+closed the game still goes through, and their game picks it up when it is next
+opened. Each game remembers which trades it has done, so none is added twice.
+(Saves are still kept in the browser, so someone who edits their own save
+could put made-up items in a trade, just as they could give them to
+themselves.) Trading needs the newer `supabase/setup.sql`.
 
 ## How saving works
 

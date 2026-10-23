@@ -10,6 +10,13 @@
  * Which switches exist lives in PS.dev (core.js), so the lobby menu and this
  * panel always offer the same ones.
  *
+ * Playing together (co-op and the arena) the panel is there with the admin
+ * password, and the battle does not stop for it. Cheats act on your own lemon
+ * only. In the room maker's game the buttons work straight away; in the other
+ * player's game each press is sent to the room maker's game, which runs the
+ * battle and does it on that player's lemon, once the server has confirmed
+ * they are on an admin account.
+ *
  * Copyright (c) 2026 Lemon. MIT licensed (see LICENSE).
  */
 (function () {
@@ -53,13 +60,37 @@
   var filterText = ""; // upgrades tab: the search box
   var tierFilter = -1; // upgrades tab: -1 shows every tier
   var spawn = { kind: "grunt", elite: false, near: false };
+  // set while running something the other player pressed: their number boxes and pickers
+  var inputs = null;
+
+  /* buttons that only change this panel, never the battle */
+  var PANEL_ONLY = { close: 1, tab: 1, tier: 1, "pick-kind": 1, "spawn-elite": 1, "spawn-near": 1 };
+  /* the cheat switches: the other player's game sends them over whole */
+  var SWITCHES = { toggle: 1, mult: 1, "reset-cheats": 1 };
+  /* never from the other player's game: starting over would end the battle for both */
+  var NOT_SHARED = { restart: 1, "restart-at": 1, lose: 1 };
 
   function run() {
     return B.run;
   }
 
+  function together() {
+    var R = run();
+    return Boolean(R && R.mp);
+  }
+
   function tabs() {
+    var R = run();
+    // the other player's game does not have the numbers the Stats tab reads out
+    if (R && R.mirror) return ADMIN_TABS.filter(function (t) { return t[0] !== "stats"; });
     return PS.dev.admin ? ADMIN_TABS : TABS;
+  }
+
+  /** A number box or picker's value, from this panel or from what the other player's game sent. */
+  function field(id) {
+    if (inputs) return inputs[id] !== undefined ? String(inputs[id]) : "";
+    var box = el && el.querySelector("#" + id);
+    return box ? box.value : "";
   }
 
   function pct(value) {
@@ -122,13 +153,16 @@
 
   function cheatsTab(R) {
     var admin = PS.dev.admin;
+    var shared = Boolean(R.mp);
     return (
       '<div class="devbox__toggles">' +
         PS.dev.TOGGLES.filter(function (t) { return admin || !t.admin; }).map(function (t) {
           return toggle(t.key, t.label, t.hint);
         }).join("") +
       "</div>" +
-      PS.dev.MULTS.filter(function (m) { return admin || !m.admin; }).map(multRow).join("") +
+      // playing together the battle keeps one speed, so the other game keeps up
+      PS.dev.MULTS.filter(function (m) { return (admin || !m.admin) && !(shared && m.key === "speed"); }).map(multRow).join("") +
+      (shared ? '<p class="hint">Playing together: these work on your lemon only (Freeze and Stop spawning work on the whole battle). Game speed stays at 1×.</p>' : "") +
       (admin ? row(action("reset-cheats", "Switch every cheat off")) : "") +
       label("You") +
       row(
@@ -289,7 +323,8 @@
 
   function runTab(R) {
     var admin = PS.dev.admin;
-    var normal = R.mode !== "swarm";
+    var duel = Boolean(R.duel);
+    var normal = R.mode !== "swarm" && !duel;
     var boss = R.boss && !R.boss.dead;
     var out =
       row(
@@ -297,11 +332,14 @@
         action("coins", "+100 coins") +
         (normal && R.phase === "swarm" ? action("boss", "Skip to the boss") : "")
       ) +
-      row(
+      // a duel is won in the ring
+      (duel ? "" : row(
         action("win", "Win this battle") +
-        action("lose", "End as a loss")
-      );
-    if (admin) {
+        action("lose", R.mirror ? "Leave this battle" : "End as a loss")
+      ));
+    if (admin && duel) {
+      out += '<p class="hint">A duel has no clock or boss. Cheats, upgrades, pests and pickups are all in the other tabs.</p>';
+    } else if (admin) {
       out +=
         label("Clock") +
         row(
@@ -319,15 +357,16 @@
           action("boss-spawn", "Call the boss now", R.phase === "swarm" ? "" : " disabled") +
           action("boss-dead", "Kill the boss", boss ? "" : " disabled")
         ) +
-        label("Start over") +
-        row(action("restart", "Restart this battle")) +
-        numberRow("devbox-chapter", "Restart on chapter", R.ch.n, 1, PS.BAL.CHAPTERS, "restart-at", "Start") +
-        '<p class="hint">Restarting throws this run away. It is saved only if you win the new one.</p>';
+        (R.mp ? "" :
+          label("Start over") +
+          row(action("restart", "Restart this battle")) +
+          numberRow("devbox-chapter", "Restart on chapter", R.ch.n, 1, PS.BAL.CHAPTERS, "restart-at", "Start") +
+          '<p class="hint">Restarting throws this run away. It is saved only if you win the new one.</p>');
     }
     return (
       out +
-      '<p class="hint">Chapter ' + R.ch.n + " · " + PS.esc(R.ch.name) + " · " + PS.clock(R.t) + " · " + R.kills + " kills" +
-        (normal ? "" : " · swarm mode") + "</p>"
+      '<p class="hint">' + (duel ? "Arena duel · round " + R.duel.round : "Chapter " + R.ch.n + " · " + PS.esc(R.ch.name)) + " · " + PS.clock(R.t) + " · " + R.kills + " kills" +
+        (R.mode === "swarm" ? " · swarm mode" : "") + "</p>"
     );
   }
 
@@ -400,10 +439,23 @@
     var body = views[tab](R);
     var scroll = el.querySelector(".devbox__body");
     var top = scroll ? scroll.scrollTop : 0;
+    var shared = "";
+    if (R.mirror) {
+      var host = PS.esc((R.partner && R.partner.name) || "The room maker");
+      var ok = R.mp ? R.mp.devOk : null;
+      shared = ok === true
+        ? host + "'s game runs this battle: what you press here is sent to it and done on your lemon. The battle keeps going while this is open."
+        : ok === false
+          ? host + "'s game could not confirm that you are on an admin account, so nothing here works in this battle. (It needs the newer setup.sql.)"
+          : "Checking your admin account with " + host + "'s game...";
+    } else if (R.mp) {
+      shared = "Playing together: the battle keeps going while this is open, and cheats work on your lemon only.";
+    }
     el.innerHTML =
       '<div class="panel devbox">' +
         '<div class="devbox__head"><h2>' + (PS.dev.admin ? "Admin menu" : "Dev menu") + "</h2>" +
           '<button class="btn btn--primary btn--sm" type="button" data-dev="close">Back to the battle</button></div>' +
+        (shared ? '<p class="hint devbox__shared">' + shared + "</p>" : "") +
         '<div class="devbox__tabs" role="tablist">' + list.map(function (t) {
           return '<button class="devbox__tab' + (tab === t[0] ? " is-active" : "") + '" type="button" role="tab" aria-selected="' + (tab === t[0]) + '" data-dev="tab" data-value="' + t[0] + '">' + t[1] + "</button>";
         }).join("") + "</div>" +
@@ -418,10 +470,14 @@
   function takeUpgrade(id, toMax) {
     var R = run();
     var up = B.upgrade(id);
+    if (!up) return;
     var have = R.p.up[id] || 0;
     var times = toMax ? up.max - have : 1;
     for (var i = 0; i < times && (R.p.up[id] || 0) < up.max; i++) B.takeUpgrade({ id: id });
-    if (!toMax) B.devResolve();
+    if (toMax) return;
+    // with the cards up, Pick counts as the choice (the other player's cards, for their lemon)
+    if (R.ally && R.p === R.ally) B.devResolveAlly();
+    else B.devResolve();
   }
 
   /** Max every upgrade that is allowed (and, when `tier` is given, only that tier). */
@@ -467,7 +523,7 @@
   function eachPest(R, fn) {
     var count = 0;
     R.enemies.forEach(function (e) {
-      if (e.dead) return;
+      if (e.dead || e.proxyOf) return; // a duel's lemons are not pests
       fn(e);
       count++;
     });
@@ -500,8 +556,7 @@
   }
 
   function chapterInput(id) {
-    var box = el.querySelector("#" + id);
-    return PS.clamp(Math.round(Number(box && box.value) || 1), 1, PS.BAL.CHAPTERS);
+    return PS.clamp(Math.round(Number(field(id)) || 1), 1, PS.BAL.CHAPTERS);
   }
 
   var ACTIONS = {
@@ -581,8 +636,7 @@
       return "Level " + R.p.level;
     },
     "set-level": function (R) {
-      var box = el.querySelector("#devbox-level");
-      var target = Math.min(200, Math.round(Number(box && box.value) || 0));
+      var target = Math.min(200, Math.round(Number(field("devbox-level")) || 0));
       if (target <= R.p.level) return "Pick a level above " + R.p.level;
       autoLevels(R, target - R.p.level);
       return "Level " + R.p.level;
@@ -593,11 +647,14 @@
       return "+" + PS.fmt(n) + " XP: any level-ups come up when you go back";
     },
     "weapon-swap": function (R) {
-      var id = el.querySelector("#devbox-weapon").value;
+      var id = field("devbox-weapon");
       if (!B.WEAPONS[id]) return;
       if (id === R.weaponId) return "Already holding the " + weaponName(id);
       R.weaponId = id;
       R.weapon = B.WEAPONS[id];
+      // each lemon keeps its own weapon (playing together, the battle swaps them round)
+      R.p.weaponId = id;
+      R.p.weapon = R.weapon;
       R.src = id;
       R.p.cd = 0.2;
       return "Now holding the " + weaponName(id);
@@ -745,7 +802,7 @@
     "kill-all": function (R) {
       var n = 0;
       R.enemies.slice().forEach(function (e) {
-        if (!e.dead && !e.boss) {
+        if (!e.dead && !e.boss && !e.proxyOf) {
           B.hit(e, e.hp + 1, { dot: true });
           n++;
         }
@@ -755,7 +812,7 @@
     "remove-pests": function (R) {
       var n = 0;
       R.enemies.forEach(function (e) {
-        if (!e.dead && !e.boss) {
+        if (!e.dead && !e.boss && !e.proxyOf) {
           e.dead = true;
           n++;
         }
@@ -834,27 +891,90 @@
     }
   };
 
+  /** What a button says about itself, for sending to the room maker's game. */
+  function attrsOf(node) {
+    var out = {};
+    ["value", "key", "id"].forEach(function (k) {
+      var v = node && node.getAttribute ? node.getAttribute("data-" + k) : null;
+      if (v !== null) out[k] = String(v).slice(0, 40);
+    });
+    return out;
+  }
+
+  /** The other player's game: send the press to the room maker's game, which runs the battle. */
+  function sendOn(R, name, node) {
+    if (R.mp.devOk === false) return "Not confirmed as an admin account, so this did nothing.";
+    if (R.mp.devOk !== true) return "Still checking your admin account. Try again in a moment.";
+    if (SWITCHES[name]) {
+      ACTIONS[name](R, node); // this panel shows the switches as they now are
+      B.mpDevSend("devcheats", { cheats: PS.dev.cheats });
+      return name === "reset-cheats" ? "Every cheat is off" : "";
+    }
+    B.mpDevSend("dev", {
+      name: name,
+      attrs: attrsOf(node),
+      inputs: { "devbox-level": field("devbox-level"), "devbox-weapon": field("devbox-weapon") },
+      spawn: { kind: spawn.kind, elite: spawn.elite, near: spawn.near }
+    });
+    return "Sent to " + ((R.partner && R.partner.name) || "the room maker") + "'s game...";
+  }
+
+  /** A press from this panel: here, or (the other player's game) passed on. */
+  function press(name, node) {
+    var R = run();
+    var fn = ACTIONS[name];
+    if (!fn || !R) return;
+    var said;
+    if (PANEL_ONLY[name] || (R.mirror && name === "lose")) said = fn(R, node);
+    else if (R.mirror) said = sendOn(R, name, node);
+    else if (R.mp && NOT_SHARED[name] && name !== "lose") said = "Not while playing together";
+    else if (R.players) said = B.ownAs(R.players[0], function () { return fn(R, node); }); // this game's own lemon
+    else said = fn(R, node);
+    if (typeof said === "string" && said) note = said;
+    if (run() && run().devOpen) render();
+  }
+
   function onClick(e) {
     var node = e.target.closest("[data-dev]");
     if (!node || node.disabled || !run()) return;
-    var name = node.getAttribute("data-dev");
-    var fn = ACTIONS[name];
-    if (!fn) return;
     PS.sfx.play("click");
-    var said = fn(run(), node);
-    if (typeof said === "string") note = said;
-    if (run() && run().devOpen) render();
+    press(node.getAttribute("data-dev"), node);
   }
 
   /* Enter in a number box does what its button does */
   function onKey(e) {
     if (e.key !== "Enter" || !run()) return;
     var name = e.target && e.target.getAttribute ? e.target.getAttribute("data-enter") : null;
-    var fn = name && ACTIONS[name];
-    if (!fn) return;
-    var said = fn(run(), e.target);
-    if (typeof said === "string") note = said;
-    if (run() && run().devOpen) render();
+    if (name && ACTIONS[name]) press(name, e.target);
+  }
+
+  /** A button the other player pressed, done on their lemon (q) in this game, which runs the battle. */
+  function runFor(q, m) {
+    var R = run();
+    var name = m && typeof m.name === "string" ? m.name : "";
+    var fn = ACTIONS[name];
+    if (!R || !fn || PANEL_ONLY[name] || SWITCHES[name] || NOT_SHARED[name]) return "";
+    if (R.duel && (name === "win" || name === "boss" || name === "time")) return "Not in a duel";
+    var attrs = m.attrs && typeof m.attrs === "object" ? m.attrs : {};
+    var node = {
+      getAttribute: function (k) {
+        var v = attrs[String(k).replace(/^data-/, "")];
+        return v === undefined || v === null ? null : String(v).slice(0, 40);
+      }
+    };
+    var theirs = m.spawn && typeof m.spawn === "object" ? m.spawn : {};
+    var mine = spawn;
+    spawn = { kind: B.KINDS[theirs.kind] ? theirs.kind : "grunt", elite: theirs.elite === true, near: theirs.near === true };
+    inputs = m.inputs && typeof m.inputs === "object" ? m.inputs : {};
+    var said;
+    try {
+      said = B.ownAs(q, function () { return fn(R, node); });
+    } finally {
+      spawn = mine;
+      inputs = null;
+    }
+    B.hud.build(R); // taking an upgrade as that lemon drew its chips; put this game's back
+    return typeof said === "string" && said ? said : "Done";
   }
 
   /* the search box filters the list in place, so typing never loses its focus */
@@ -891,6 +1011,18 @@
       var R = run();
       if (R) R.devOpen = false;
       if (el) el.hidden = true;
+    },
+    runFor: runFor,
+    /** Redraw if open (the room maker's game has answered, say). */
+    refresh: function () {
+      var R = run();
+      if (R && R.devOpen) render();
+    },
+    /** Show what the room maker's game did with a press. */
+    say: function (text) {
+      note = text;
+      var R = run();
+      if (R && R.devOpen) render();
     }
   };
 

@@ -273,7 +273,8 @@
       meterOpen = PS.store.get("lemon:meter", window.innerWidth >= 900) === true;
       applyMeter();
       var devButtons = el.hud.parentNode.querySelectorAll('[data-hud="dev"]');
-      for (var i = 0; i < devButtons.length; i++) devButtons[i].hidden = !PS.dev.unlocked || Boolean(R.mp);
+      // playing together, only the admin password brings the dev menu along
+      for (var i = 0; i < devButtons.length; i++) devButtons[i].hidden = !PS.dev.unlocked || (Boolean(R.mp) && !PS.dev.admin);
       el.hud.hidden = false;
       el.choose.hidden = true;
       el.pause.hidden = true;

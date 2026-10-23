@@ -327,7 +327,8 @@ ul {
   margin-inline: auto;
 }
 
-/* the announcement strip above the top bar (text lives in index.html) */
+/* the announcement strip above the top bar (the owner sets it in the admin
+   menu; until then it is the text in index.html) */
 .status {
   margin: 0;
   padding: 7px clamp(12px, 3vw, 24px);
@@ -345,6 +346,27 @@ ul {
 
 .status:empty {
   display: none;
+}
+
+/* the admin menu's preview of it */
+.devbanner {
+  margin: 4px 0 12px;
+  border: 1px solid var(--rind);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+
+.devbanner__note {
+  margin-top: 8px;
+}
+
+.devbanner__field label {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.devbanner__field input[type="text"] {
+  width: 100%;
 }
 
 .topbar {
@@ -7697,6 +7719,19 @@ body::before {
   margin-top: 10px;
 }
 
+/* "Play with a friend" and "Trade", side by side under Battle */
+.home__social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.home__social .btn {
+  flex: 1 1 140px;
+  margin-top: 0;
+}
+
 /* the "Play with a friend" window */
 .mp {
   position: fixed;
@@ -8018,4 +8053,398 @@ body::before {
 .hud__mate[data-lag="2"] small {
   color: #ff8a80;
   font-weight: 800;
+}
+
+/* ------------------------------------------------------------ trading */
+.trade__box {
+  width: min(100%, 760px);
+}
+
+.trade__how {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  color: var(--ink-soft);
+  font-size: 14.5px;
+}
+
+.trade__how li + li {
+  margin-top: 4px;
+}
+
+.trade__state,
+.trade__lock {
+  margin: 6px 0 12px;
+  color: var(--ink-soft);
+}
+
+.trade__lock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 2px solid var(--rind);
+  border-radius: 14px;
+  background: var(--lemon-pale);
+  color: var(--charcoal);
+  font-weight: 700;
+}
+
+.trade__lock b {
+  font-family: var(--font-mono);
+  font-size: 22px;
+}
+
+:root[data-theme="dark"] .trade__lock {
+  background: #3d3520;
+  color: var(--lemon-bright);
+}
+
+.trade__sides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.trade__side {
+  min-width: 0;
+  padding: 12px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-2);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.trade__side + .trade__side {
+  margin-top: 0;
+}
+
+.trade__box > .trade__side {
+  margin-top: 10px;
+}
+
+.trade__side h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-family: var(--font-display);
+  font-size: 17px;
+}
+
+.trade__side.is-ok {
+  border-color: var(--good);
+}
+
+.trade__side.is-changed {
+  border-color: #e0a030;
+  box-shadow: 0 0 0 4px rgba(224, 160, 48, 0.2);
+}
+
+.trade__sides.is-locked .trade__side {
+  border-style: dashed;
+  border-color: var(--rind);
+}
+
+.trade__ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--good);
+  color: #fff;
+  font-family: var(--font-body, inherit);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.trade__ok .ico {
+  width: 13px;
+  height: 13px;
+}
+
+.trade__flash {
+  margin: -2px 0 8px;
+  color: #b06d00;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+:root[data-theme="dark"] .trade__flash {
+  color: #ffcf73;
+}
+
+.trade__offer,
+.trade__grid,
+.inv__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 8px;
+}
+
+.trade__grid {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.trade__cell,
+.inv__cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px 4px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+}
+
+button.trade__cell {
+  cursor: pointer;
+}
+
+button.trade__cell:hover:not(:disabled),
+button.trade__cell:focus-visible {
+  border-color: var(--rind);
+  background: var(--surface);
+}
+
+button.trade__cell:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.trade__cell .tile,
+.inv__cell .tile {
+  width: 56px;
+  height: 56px;
+}
+
+.trade__cell small,
+.inv__cell small {
+  display: block;
+  max-width: 100%;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.trade__cell em,
+.inv__cell em {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-faint);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.trade__cell > i {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  color: var(--bad);
+  font-style: normal;
+  font-weight: 800;
+}
+
+.trade__cell--money {
+  justify-content: center;
+}
+
+.trade__pet {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+}
+
+.trade__pet .art {
+  width: 56px;
+  height: 56px;
+}
+
+.trade__pet b {
+  position: absolute;
+  bottom: -4px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--ring, var(--rind));
+  color: #fff;
+  font-size: 10.5px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+
+.trade__unknown {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 2px dashed var(--line-strong);
+  border-radius: 12px;
+  color: var(--ink-faint);
+  font-weight: 800;
+}
+
+.trade__none {
+  grid-column: 1 / -1;
+  color: var(--ink-faint);
+  font-size: 14px;
+}
+
+.trade__money {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.trade__money label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 110px;
+}
+
+.trade__money input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm, 10px);
+  background: var(--bg-soft);
+  color: var(--ink);
+  font: inherit;
+}
+
+.trade__pick {
+  margin-top: 14px;
+}
+
+.trade__pick h3 {
+  font-family: var(--font-display);
+  font-size: 17px;
+}
+
+.trade__pick h3 small {
+  color: var(--ink-faint);
+  font-family: var(--font-body, inherit);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.trade__tabs {
+  margin: 8px 0;
+}
+
+.trade__more {
+  display: flex;
+  margin: 10px auto 0;
+}
+
+.trade__rules {
+  margin-top: 12px;
+}
+
+/* ----------------------------------------- an admin's look at an inventory */
+.inv {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.inv__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.inv__facts {
+  margin-bottom: 10px;
+}
+
+.inv__label {
+  margin: 10px 0 6px;
+  font-weight: 800;
+  font-size: 13.5px;
+}
+
+.inv__cell--empty {
+  justify-content: center;
+  min-height: 72px;
+  border: 1px dashed var(--line-strong);
+  color: var(--ink-faint);
+}
+
+.inv__fold {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.inv__fold > summary {
+  padding: 10px 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.inv__fold > .inv__grid,
+.inv__fold > .hint {
+  padding: 0 10px 10px;
+}
+
+.inv__fold > .inv__grid {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.inv__more {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+
+/* the in-battle dev menu, playing together: who runs what */
+.devbox__shared {
+  margin: 6px 0 0;
+}
+
+/* for admins: who has the game open (green) and who is offline */
+.seen {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  color: var(--ink-faint);
+}
+
+.seen i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  flex: none;
+}
+
+.seen.is-on {
+  color: var(--good);
+}
+
+.seen.is-on i {
+  background: var(--good);
+  box-shadow: 0 0 0 3px rgba(93, 154, 63, 0.22);
 }

@@ -225,7 +225,8 @@
     PS.net.off("peer");
     PS.net.off("link");
     PS.net.off("left");
-    ["start", "go", "begin", "s", "cards", "end", "in", "dash", "pick", "reroll", "again"].forEach(function (t) { PS.net.off(t); });
+    ["start", "go", "begin", "s", "cards", "end", "in", "dash", "pick", "reroll", "again",
+      "devme", "devcheats", "dev", "devok", "devnote"].forEach(function (t) { PS.net.off(t); });
 
     PS.net.on("link", function (link) {
       view.link = link;
@@ -282,6 +283,13 @@
     PS.net.on("pick", function (m) { PS.B.mpPick(m); });
     PS.net.on("reroll", function () { PS.B.mpReroll(); });
     PS.net.on("again", function () { PS.B.mpCardsAgain(); });
+    // the friend's dev menu: only once the server says the proof came from an admin account
+    PS.net.on("devme", function (m) {
+      if (!session || session.role !== "host" || !session.inBattle) return;
+      PS.cloud.checkDevToken(m && m.token).then(function (ok) { PS.B.mpAllyAdmin(ok); });
+    });
+    PS.net.on("devcheats", function (m) { PS.B.mpDevCheats(m); });
+    PS.net.on("dev", function (m) { PS.B.mpDev(m); });
 
     // the guest's side
     PS.net.on("start", function () {
@@ -298,9 +306,18 @@
         guest: true, kind: m.kind, chapter: m.chapter, duelMode: m.duelMode, host: m.host, myName: myName(),
         link: view.link
       });
+      // an admin brings the dev menu along: prove it to the host's game, through the server
+      if (PS.dev.admin && PS.cloud.isAdmin()) {
+        PS.cloud.devToken().then(function (res) {
+          if (res.data && session && session.inBattle) PS.net.send("devme", { token: String(res.data) }, true);
+          else PS.B.mirrorDevOk({ ok: false });
+        });
+      }
     });
     PS.net.on("s", function (m) { PS.B.mirrorSnapshot(m); });
     PS.net.on("cards", function (m) { PS.B.mirrorCards(m); });
+    PS.net.on("devok", function (m) { PS.B.mirrorDevOk(m); });
+    PS.net.on("devnote", function (m) { PS.B.mirrorDevNote(m); });
     PS.net.on("end", function (m) {
       PS.B.mirrorEnd(m);
     });

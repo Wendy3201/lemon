@@ -262,8 +262,12 @@
     // attack felling the boss): nothing more may spawn after that
     if (R.phase !== "swarm" && R.phase !== "boss") return;
     R.spawnIn -= dt;
-    if (R.duel) return duelDirector(dt);
-    if (PS.dev.cheats.noSpawn) {
+    var noSpawn = B.anyCheat("noSpawn");
+    if (R.duel) {
+      if (!noSpawn) duelDirector(dt);
+      return;
+    }
+    if (noSpawn) {
       // the admin's "stop spawning": only the boss still turns up on time
       R.spawnIn = Math.max(R.spawnIn, 0.5);
       if (R.mode !== "swarm" && R.phase === "swarm" && R.t >= R.dur) startBoss();

@@ -32,8 +32,9 @@
     results: null,
     gate: null, // { mode: "login" | "signup", name, error, down, checking, busy } while the log-in screen shows
     // the leaderboard: filters, rows, banned players (for admins), an admin's open form
-    board: { by: "chapter", span: "all", q: "", rows: null, banned: [], showBanned: false, error: "", mod: null },
+    board: { by: "chapter", span: "all", q: "", rows: null, banned: [], showBanned: false, error: "", mod: null, presence: null, presenceAt: 0 },
     giftsWaiting: null, // gifts from a moderator, shown as soon as the menus are free
+    banner: null, // the banner as the server last gave it: { text, at }; text null means the one in index.html
     // the Shop's casino: the bet in the box (null until one is typed), the blackjack hand, the wheel
     casino: { bet: null, bj: null, bw: { pick: "black", angle: 0, spinning: null, last: null, history: [] } }
   };
@@ -332,7 +333,10 @@
           "</dl>" +
 
           '<button class="btn btn--primary btn--xl" type="button" data-act="fight" data-key="fight">' + PS.icon("tabBattle") + "Battle</button>" +
-          '<button class="btn home__together" type="button" data-act="together" data-key="together">' + PS.icon("atk") + "Play with a friend</button>" +
+          '<div class="home__social">' +
+            '<button class="btn home__together" type="button" data-act="together" data-key="together">' + PS.icon("atk") + "Play with a friend</button>" +
+            '<button class="btn home__trade" type="button" data-act="trade" data-key="trade">' + PS.icon("gift") + "Trade</button>" +
+          "</div>" +
           '<p class="hint">Move with WASD or the arrow keys, or drag on the screen. Your lemon attacks by itself.</p>' +
           '<button class="btn btn--sm home__guide" type="button" data-act="howto" data-key="howto">' + PS.icon("info") + "New here? How to play</button>" +
         "</div>" +
@@ -2200,12 +2204,37 @@
           return '<button class="btn btn--sm' + (PS.prefs.get("vol") === PS.VOLUME_STEPS[i] ? " btn--primary" : "") + '" type="button" data-act="dev-volume" data-value="' + i + '">' + v.name + "</button>";
         }).join(""))
       ) +
+      devBanner() +
       devCard("Messages",
         devRow(
           devButton("dev-notice", "Show the data-reset notice") +
           devButton("dev-lock", "Lock the dev menu again")
         )
       )
+    );
+  }
+
+  /** The banner above the top bar, for every player. Admin accounts only (the server checks too). */
+  function devBanner() {
+    if (!PS.dev.admin || !PS.cloud.isAdmin()) return "";
+    var b = view.banner;
+    var live = b && typeof b.text === "string" ? b.text : null;
+    var draft = typeof view.dev.banner === "string" ? view.dev.banner : live !== null ? live : builtInBanner;
+    var note = view.dev.bannerNote;
+    return devCard("Banner",
+      '<p class="hint">The strip of text above the top bar. Every player sees it, within a minute while they play or straight away when they open the game. Leave it empty to hide it.</p>' +
+      '<p class="status devbanner" id="dev-banner-preview" aria-hidden="true">' + esc(draft) + "</p>" +
+      '<div class="dev__give devbanner__field"><label>Text<input id="dev-banner" type="text" maxlength="200" value="' + esc(draft) + '" autocomplete="off" /></label></div>' +
+      devRow(
+        devButton("dev-banner-save", "Show to everyone", "", "btn--primary") +
+        devButton("dev-banner-hide", "Hide the banner") +
+        devButton("dev-banner-reset", "Use the text in index.html")
+      ) +
+      (note ? '<p class="hint devbanner__note" role="status">' + esc(note) + "</p>" : ""),
+      [
+        ["Showing now", live === null ? "the text in index.html" : live === "" ? "nothing (hidden)" : "the text set here"],
+        ["Last changed", b && b.at ? whenText(new Date(b.at).getTime()) : "not from here yet"]
+      ]
     );
   }
 
@@ -2738,7 +2767,8 @@
         '<span class="board__rank board__rank--' + Math.min(row.rank || 4, 4) + '">' + (row.rank || "\u2013") + "</span>" +
         avatar(row.name) +
         '<span class="board__who"><span class="board__name"><span class="board__nm">' + esc(row.name) + "</span>" + (you ? " <em>you</em>" : "") + title + "</span>" +
-          "<small>" + (ban ? '<b class="board__ban">' + (ban.timeout ? "Timed out until " + esc(whenText(ban.until)) : "Banned") + "</b>" : esc(ago(row.updated_at))) + "</small></span>" +
+          "<small>" + (ban ? '<b class="board__ban">' + (ban.timeout ? "Timed out until " + esc(whenText(ban.until)) : "Banned") + "</b>"
+            : (mod && view.board.presence ? presenceHtml(row.id) : esc(ago(row.updated_at)))) + "</small></span>" +
         '<span class="board__value">' + tierBadge(PS.cloud.tierOf(board.key, row[board.key])) + "<span>" + esc(PS.cloud.show(board.key, row[board.key])) + "</span></span>" +
         (mod ? modButtons(row, who) : "") +
         (open ? modForm() : "") +
@@ -2870,6 +2900,7 @@
       b.error = res.error || "";
       paintBoard();
     });
+    loadPresence();
   }
 
   /** A row on the board or in the banned list. */
@@ -3092,7 +3123,7 @@
     function button(act, label, cls) {
       return '<button class="board__act' + (cls ? " " + cls : "") + '" type="button" data-act="mod-open" data-mod="' + act + '" data-id="' + esc(row.id) + '" aria-pressed="' + (open === act) + '">' + label + "</button>";
     }
-    var out = [button("give", PS.icon("gift") + "Give")];
+    var out = [button("give", PS.icon("gift") + "Give"), button("inv", PS.icon("tabGear") + "Inventory")];
     if (!self && !row.admin) {
       if (banned) {
         out.push('<button class="board__act" type="button" data-act="mod-unban" data-id="' + esc(row.id) + '">Unban</button>');
@@ -3104,9 +3135,131 @@
     return '<div class="board__mod">' + out.join("") + "</div>";
   }
 
+  /* ---- an admin looking at a player's inventory */
+
+  var INV_PAGE = 120; // bag items drawn at once, so a giant bag cannot freeze the page
+
+  /** A player's inventory as their game sent it, keeping only what makes sense:
+   *  real item and pet ids, rarities in range, whole numbers. Never trusted as it came. */
+  function cleanInv(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    function n(v, max) {
+      v = Math.floor(Number(v));
+      return isFinite(v) && v > 0 ? Math.min(v, max) : 0;
+    }
+    function rarity(r) {
+      r = Math.floor(Number(r));
+      return isFinite(r) && r >= 0 && r <= PS.MAX_RARITY ? r : -1;
+    }
+    var worn = [];
+    PS.SLOTS.forEach(function (slot) {
+      var w = raw.worn && Array.isArray(raw.worn[slot.key]) ? raw.worn[slot.key] : null;
+      var ok = w && PS.ITEMS[w[0]] && PS.ITEMS[w[0]].slot === slot.key && rarity(w[1]) >= 0;
+      worn.push({ slot: slot, item: ok ? { id: w[0], r: rarity(w[1]) } : null, lv: ok ? Math.max(1, n(w[2], 1000)) : 0 });
+    });
+    var bag = [];
+    var bad = 0;
+    var list = Array.isArray(raw.bag) ? raw.bag : [];
+    for (var i = 0; i < list.length && i < 5000; i++) {
+      var x = list[i];
+      if (Array.isArray(x) && PS.ITEMS[x[0]] && rarity(x[1]) >= 0) bag.push({ id: x[0], r: rarity(x[1]) });
+      else bad++;
+    }
+    var pets = [];
+    (Array.isArray(raw.pets) ? raw.pets.slice(0, 500) : []).forEach(function (p) {
+      if (Array.isArray(p) && PS.PET[p[0]] && PS.PET_RARITY[p[1]]) {
+        pets.push({ sp: p[0], r: Number(p[1]), lv: Math.max(1, n(p[2], PS.PET_RARITY[p[1]].cap)), team: Boolean(p[3]) });
+      } else {
+        bad++;
+      }
+    });
+    return {
+      gold: n(raw.gold, 1e15), gems: n(raw.gems, 1e15), shards: n(raw.shards, 1e15), power: n(raw.power, 1e15), best: n(raw.best, 1e4),
+      worn: worn, bag: bag, bagCount: Math.max(bag.length, n(raw.bagCount, 1e9)), bad: bad, pets: pets, petSlots: n(raw.petSlots, 10)
+    };
+  }
+
+  function invCell(item, sub) {
+    return '<span class="inv__cell">' + tile(item, { plain: true }) + "<small>" + esc(PS.RARITY[item.r].name + " " + PS.ITEMS[item.id].name) + (sub ? "<em>" + esc(sub) + "</em>" : "") + "</small></span>";
+  }
+
+  function invPet(pet) {
+    return (
+      '<span class="inv__cell"><span class="trade__pet" style="--ring:' + PS.RARITY[pet.r].color + '">' + PS.petArt(pet.sp, pet.r) + "<b>Lv " + pet.lv + "</b></span>" +
+      "<small>" + esc(PS.RARITY[pet.r].name + " " + PS.PET[pet.sp].name) + (pet.team ? "<em>on the team</em>" : "") + "</small></span>"
+    );
+  }
+
+  /** The bag's tiles, drawn only once its fold is opened, a page at a time. */
+  function invBagCells(m) {
+    var inv = m.inv;
+    var cells = inv.bag.slice(0, m.shown).map(function (item) { return invCell(item); }).join("");
+    var left = inv.bag.length - Math.min(m.shown, inv.bag.length);
+    return cells + (left > 0 ? '<button class="btn btn--sm inv__more" type="button" data-act="inv-more">Show ' + fmt(Math.min(INV_PAGE, left)) + " more (" + fmt(left) + " left)</button>" : "");
+  }
+
+  function invPanel(m) {
+    var head = '<div class="inv__head"><b>' + esc(m.name) + "'s inventory</b>" +
+      '<span><button class="btn btn--sm" type="button" data-act="inv-refresh">Refresh</button> <button class="btn btn--sm" type="button" data-act="mod-cancel">Close</button></span></div>';
+    if (m.busy) return '<div class="inv">' + head + '<p class="hint">Loading...</p></div>';
+    if (m.error) return '<div class="inv">' + head + '<p class="board__formerr">' + esc(m.error) + "</p></div>";
+    var inv = m.inv;
+    if (!inv) {
+      return '<div class="inv">' + head +
+        '<p class="hint">Nothing yet. ' + esc(m.name) + " hasn't played on the newest version of the game since inventories started being sent. " +
+        "Once they open it (logged in, not offline), their game sends a copy, and it stays here for you to look at while they are offline.</p></div>";
+    }
+    var team = inv.pets.filter(function (p) { return p.team; });
+    var away = view.board.presence && !(view.board.presence[m.id] && view.board.presence[m.id].online);
+    return (
+      '<div class="inv">' + head +
+        '<dl class="facts facts--tight inv__facts">' +
+          "<div><dt>Gold</dt><dd>" + fmt(inv.gold) + "</dd></div>" +
+          "<div><dt>Gems</dt><dd>" + fmt(inv.gems) + "</dd></div>" +
+          "<div><dt>SS shards</dt><dd>" + fmt(inv.shards) + "</dd></div>" +
+          "<div><dt>Power</dt><dd>" + fmt(inv.power) + "</dd></div>" +
+          "<div><dt>Chapters cleared</dt><dd>" + fmt(inv.best) + "</dd></div>" +
+          "<div><dt>Sent</dt><dd>" + esc(m.at ? ago(m.at) : "?") + "</dd></div>" +
+          (view.board.presence ? "<div><dt>Status</dt><dd>" + presenceHtml(m.id) + "</dd></div>" : "") +
+        "</dl>" +
+        (away ? '<p class="hint">' + esc(m.name) + " is offline: this is what they had when they last played.</p>" : "") +
+        '<p class="inv__label">Wearing</p>' +
+        '<div class="inv__grid">' + inv.worn.map(function (w) {
+          return w.item ? invCell(w.item, w.slot.name + " · Lv " + w.lv) : '<span class="inv__cell inv__cell--empty"><small>' + esc(w.slot.name) + ": nothing</small></span>";
+        }).join("") + "</div>" +
+        '<p class="inv__label">Pet team (' + team.length + "/" + inv.petSlots + ")</p>" +
+        '<div class="inv__grid">' + (team.length ? team.map(invPet).join("") : '<span class="hint">No pets along.</span>') + "</div>" +
+        '<details class="inv__fold" data-invpart="pets"' + (m.petsOpen ? " open" : "") + "><summary>All pets (" + fmt(inv.pets.length) + ")</summary>" +
+          '<div class="inv__grid">' + (m.petsOpen ? inv.pets.map(invPet).join("") || '<span class="hint">None.</span>' : "") + "</div></details>" +
+        '<details class="inv__fold" data-invpart="bag"' + (m.bagOpen ? " open" : "") + "><summary>Bag (" + fmt(inv.bagCount) + " item" + (inv.bagCount === 1 ? "" : "s") + ")</summary>" +
+          (inv.bagCount > inv.bag.length ? '<p class="hint">Showing the best ' + fmt(inv.bag.length) + ": the rest are not sent.</p>" : "") +
+          '<div class="inv__grid" id="inv-bag">' + (m.bagOpen ? invBagCells(m) : "") + "</div></details>" +
+        (inv.bad ? '<p class="hint">' + fmt(inv.bad) + " entries this game doesn't recognise were left out.</p>" : "") +
+      "</div>"
+    );
+  }
+
+  function loadInv(m) {
+    m.busy = true;
+    m.error = "";
+    paintBoard();
+    loadPresence(); // whether they are playing right now (so whether this is up to date)
+    PS.cloud.inventoryOf(m.id).then(function (res) {
+      if (view.board.mod !== m) return;
+      m.busy = false;
+      if (res.error) m.error = res.error;
+      else {
+        m.inv = cleanInv(res.data);
+        m.at = res.at;
+      }
+      paintBoard();
+    });
+  }
+
   /** The form that opens under a row: the ban or timeout message, or what to give. */
   function modForm() {
     var m = view.board.mod;
+    if (m.act === "inv") return invPanel(m);
     var fields = "";
     var go = "";
     if (m.act === "ban" || m.act === "timeout") {
@@ -3266,14 +3419,103 @@
     );
   }
 
-  /** Every so often (and on coming back to the tab): banned since? any gifts? */
+  /* ---------------------------------------------------------- the banner */
+  /* The strip above the top bar. The owner sets its text from the admin menu
+     (Settings) and the server keeps it; until then, or after "Use the text in
+     index.html", it shows the text written in index.html. */
+  var KEY_BANNER = "lemon:banner"; // the last banner the server gave, so a reload shows it at once
+  var builtInBanner = "";
+
+  function showBanner(text) {
+    var shown = typeof text === "string" ? text : builtInBanner;
+    if (el.status && el.status.textContent !== shown) el.status.textContent = shown; // text only, never markup
+  }
+
+  function keepBanner(text, at) {
+    view.banner = { text: typeof text === "string" ? text : null, at: at || null };
+    PS.store.set(KEY_BANNER, view.banner);
+    showBanner(view.banner.text);
+  }
+
+  /** Ask the server for the banner. Without an answer the last one stays up. */
+  function refreshBanner() {
+    return PS.cloud.banner().then(function (res) {
+      if (!res.error) keepBanner(res.text, res.at);
+    });
+  }
+
+  /** The admin menu's buttons: send a new banner, '' to hide it, null for index.html's. */
+  function sendBanner(text) {
+    view.dev.bannerNote = "Sending…";
+    renderModal();
+    PS.cloud.setBanner(text).then(function (res) {
+      if (res.error) {
+        view.dev.bannerNote = res.error;
+      } else {
+        view.dev.banner = null; // the box goes back to showing what is up now
+        view.dev.bannerNote = text === null ? "Back to the text in index.html, for everyone."
+          : text === "" ? "The banner is hidden for everyone."
+          : "Done: everyone sees the new banner.";
+        keepBanner(text, new Date().toISOString());
+      }
+      if (view.modal && view.modal.type === "secret") renderModal();
+    });
+  }
+
+  /* ------------------------------------------------- who is online (admins see it) */
+
+  var PRESENCE_EVERY = 30000; // how often an admin's open leaderboard asks again
+  var DOING = { menus: "in the menus", battle: "in a battle", "co-op": "playing co-op", duel: "in a duel", trading: "trading" };
+
+  /** What this game is doing right now, for the admins' view. */
+  function doing() {
+    var R = PS.B.run;
+    if (!el.battle.hidden && R) return R.mp ? (R.duel ? "duel" : "co-op") : "battle";
+    if (PS.trade && PS.trade.active()) return "trading";
+    return "menus";
+  }
+
+  /** Tell the server this game is open, and what it is doing. */
+  function heartbeat() {
+    if (PS.cloud.me() && !PS.cloud.offline()) PS.cloud.seen(true, doing());
+  }
+
+  /** "Online · in a battle" or "Offline · seen 3h ago", for an admin. */
+  function presenceText(p) {
+    if (!p) return { on: false, text: "Offline" };
+    if (p.online) return { on: true, text: "Online" + (DOING[p.doing] ? " · " + DOING[p.doing] : "") };
+    return { on: false, text: "Offline · seen " + ago(new Date(Date.now() - p.seconds * 1000).toISOString()) };
+  }
+
+  function presenceHtml(id) {
+    var map = view.board.presence;
+    if (!map) return "";
+    var p = presenceText(map[id]);
+    return '<b class="seen' + (p.on ? " is-on" : "") + '"><i aria-hidden="true"></i>' + esc(p.text) + "</b>";
+  }
+
+  /** For admins: ask the server who is online, and redraw the board with it. */
+  function loadPresence() {
+    if (!PS.cloud.isAdmin() || !PS.cloud.me() || PS.cloud.offline()) return;
+    view.board.presenceAt = Date.now();
+    PS.cloud.presence().then(function (res) {
+      if (res.error) return; // an older server, or no connection: the board just goes without
+      view.board.presence = res.map;
+      paintBoard();
+    });
+  }
+
+  /** Every so often (and on coming back to the tab): a new banner? banned since? any gifts? */
   function watch() {
+    if (el.gate.hidden) refreshBanner();
     if (!PS.cloud.me() || PS.cloud.offline() || !el.gate.hidden) return;
+    heartbeat();
     PS.cloud.status().then(function (ban) {
       if (ban) {
         if (el.gate.hidden) kick();
         return;
       }
+      if (PS.trade && el.battle.hidden) PS.trade.pickUp(); // a trade that went through while this game was closed
       return PS.cloud.claimGifts().then(function (gifts) {
         if (gifts.length && el.gate.hidden) receiveGifts(gifts);
       });
@@ -3294,6 +3536,7 @@
     var R = PS.B.start(chapter, mode, twist);
     if (mode === "swarm") PS.B.toast("Endless swarm! Survive as long as you can.", 4);
     else if (R.twist) PS.B.toast("Daily challenge: " + R.twist.name + ". " + R.twist.text, 5);
+    heartbeat();
   }
 
   /** A battle with a friend. mp.guest: this game shows the host's battle;
@@ -3310,9 +3553,11 @@
     if (mp.guest) {
       PS.B.startGuest(mp);
       PS.B.toast(mp.kind === "duel" ? "Duel! Best of three rounds." : "Playing with " + (mp.host && mp.host.name ? mp.host.name : "your friend") + "!", 4);
+      heartbeat();
       return;
     }
     PS.B.start(mp.chapter, undefined, undefined, mp);
+    heartbeat();
     PS.B.toast(mp.kind === "duel" ? "Duel! Best of three rounds." : "Playing with " + (mp.ally && mp.ally.name ? mp.ally.name : "your friend") + "!", 4);
   }
 
@@ -3327,6 +3572,7 @@
     view.results = null;
     view.tab = "battle";
     render();
+    heartbeat();
   }
 
   function showSwarmResults(result) {
@@ -3483,6 +3729,15 @@
         view.board.mod = null; // a second click on the same button closes the form
       } else {
         view.board.mod = { id: id, name: row.name, act: act, msg: "", minutes: 60, kind: "item", item: firstItem("weapon"), rarity: 0, amount: 1000, busy: false, error: "" };
+        if (act === "inv") {
+          var inv = view.board.mod;
+          inv.inv = null;
+          inv.shown = INV_PAGE;
+          inv.bagOpen = false;
+          inv.petsOpen = false;
+          loadInv(inv);
+          return;
+        }
       }
       paintBoard();
       var first = view.board.mod ? $("#board .board__form select, #board .board__form textarea") : null;
@@ -3495,6 +3750,17 @@
     "mod-cancel": function () {
       view.board.mod = null;
       paintBoard();
+    },
+    "inv-refresh": function () {
+      var m = view.board.mod;
+      if (m && m.act === "inv") loadInv(m);
+    },
+    "inv-more": function () {
+      var m = view.board.mod;
+      var list = $("#inv-bag");
+      if (!m || !m.inv || !list) return;
+      m.shown += INV_PAGE;
+      list.innerHTML = invBagCells(m);
     },
     "mod-unban": function (node) {
       var id = node.getAttribute("data-id");
@@ -3610,6 +3876,7 @@
     "bw-spin": bwSpin,
     fight: function () { startBattle(st.get().chapter); },
     together: function () { if (PS.multi) PS.multi.open(); },
+    trade: function () { if (PS.trade) PS.trade.open(); },
     endless: function () {
       var info = st.endlessInfo();
       if (info.open) startBattle(info.chapter, "swarm");
@@ -4216,6 +4483,16 @@
     "dev-notice": function () {
       openModal({ type: "notice" });
     },
+    "dev-banner-save": function () {
+      var box = $("#dev-banner");
+      sendBanner((box ? box.value : "").replace(/\s+/g, " ").trim());
+    },
+    "dev-banner-hide": function () {
+      sendBanner("");
+    },
+    "dev-banner-reset": function () {
+      sendBanner(null);
+    },
     "dev-copy": function () {
       var text = st.exportSave();
       view.modal.exported = text;
@@ -4342,6 +4619,8 @@
   /** Once a second: keep the countdowns moving and notice a gift coming due. */
   function tick() {
     if (el.app.hidden) return;
+    // an admin with the leaderboard open sees who comes and goes
+    if (view.modal && view.modal.type === "account" && view.board.presence && Date.now() - view.board.presenceAt > PRESENCE_EVERY) loadPresence();
     if (view.giftsWaiting && !view.modal) {
       openModal({ type: "gift", got: view.giftsWaiting });
       view.giftsWaiting = null;
@@ -4459,6 +4738,9 @@
 
   PS.ui = {
     startTogether: function (mp) { startTogether(mp); },
+    // for the trade window (trade.js), so items look the same everywhere
+    tile: tile,
+    price: price,
     init: function () {
       el.app = $("#app");
       el.screen = $("#screen");
@@ -4471,6 +4753,16 @@
       el.battle = $("#battle");
       el.gate = $("#gate");
       el.account = $("#open-account");
+      el.status = $("#status");
+
+      // the banner: what index.html says, unless the owner has set one since
+      builtInBanner = el.status ? el.status.textContent.trim() : "";
+      var heldBanner = PS.store.get(KEY_BANNER, null);
+      if (heldBanner && typeof heldBanner === "object") {
+        view.banner = { text: typeof heldBanner.text === "string" ? heldBanner.text : null, at: heldBanner.at || null };
+        showBanner(view.banner.text);
+      }
+      refreshBanner();
 
       if (PS.motionMode() !== "auto") document.documentElement.setAttribute("data-motion", PS.motionMode());
       var theme = PS.store.get(KEY_THEME, null);
@@ -4501,6 +4793,17 @@
       el.modal.addEventListener("toggle", function (e) {
         var id = e.target && e.target.getAttribute ? e.target.getAttribute("data-guide") : null;
         if (id) GUIDE_OPEN[id] = e.target.open;
+        // an admin's look at an inventory: the bag and the pets are only drawn once unfolded
+        var invPart = e.target && e.target.getAttribute ? e.target.getAttribute("data-invpart") : null;
+        var invMod = view.board.mod;
+        if (invPart && invMod && invMod.act === "inv" && invMod.inv) {
+          if (invPart === "bag") invMod.bagOpen = e.target.open;
+          else invMod.petsOpen = e.target.open;
+          var grid = e.target.querySelector(".inv__grid");
+          if (e.target.open && grid && !grid.firstChild) {
+            grid.innerHTML = invPart === "bag" ? invBagCells(invMod) : invMod.inv.pets.map(invPet).join("") || '<span class="hint">None.</span>';
+          }
+        }
         // a chest's slot list: remember it, and draw its items the first time it opens
         var part = e.target && e.target.getAttribute ? e.target.getAttribute("data-chestpart") : null;
         if (part) {
@@ -4521,6 +4824,13 @@
         if (e.target.id === "board-search") {
           view.board.q = e.target.value;
           paintBoard();
+          return;
+        }
+        if (e.target.id === "dev-banner") {
+          // the draft survives a redraw, and the preview follows the typing
+          view.dev.banner = e.target.value;
+          var preview = $("#dev-banner-preview");
+          if (preview) preview.textContent = e.target.value;
           return;
         }
         if (/^mod-/.test(e.target.id) && view.board.mod) {
@@ -4578,6 +4888,13 @@
       el.modal.addEventListener("click", function (e) {
         // a click on the dimmed backdrop lands on the dialog itself
         if (e.target === el.modal) closeModal();
+      });
+      el.modal.addEventListener("keydown", function (e) {
+        // Enter in the admin menu's banner box sends it
+        if (e.key === "Enter" && e.target.id === "dev-banner") {
+          e.preventDefault();
+          ACTIONS["dev-banner-save"]();
+        }
       });
 
       PS.on("change", function () {

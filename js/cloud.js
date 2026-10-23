@@ -105,6 +105,20 @@
   var cache = {}; // "board:span" -> { at, rows }
   var stored = null; // this player's figures as the server holds them, once known
 
+  /* The inventory admins can look at: sent now and then, not on every change. */
+  var INV_EVERY = 30000; // at most this often
+  var INV_BAG = 3000; // the best items in the bag that are sent; the count is always the real one
+  var invSent = ""; // the inventory last sent, as text
+  var invAt = 0;
+  var invTimer = 0;
+  var invOk = true; // false once the server turns out not to have inventories yet
+
+  /* Whether this game is open, for the admins' "online" dots. */
+  var seenOk = true; // false once the server turns out not to have it yet
+  var seenAt = 0;
+  var seenDoing = "";
+  var token = ""; // the signed-in player's access token, for the last word when the page closes
+
   function noop() {}
 
   function boardOf(key) {
@@ -204,6 +218,10 @@
     };
     offline = false;
     sent = "";
+    invSent = "";
+    invAt = 0;
+    seenAt = 0;
+    seenDoing = "";
     cache = {};
     stored = row ? keepFigures(row) : null;
     PS.store.set(KEY_LAST, { id: me.id, name: me.name, joined: me.joined, admin: me.admin });
@@ -259,12 +277,108 @@
     return out;
   }
 
+  /** What this player owns, short, for the admins' inventory view: worn gear
+   *  [id, rarity, slot level], the bag [id, rarity] best first, and pets
+   *  [species, rarity, level, on the team]. */
+  function inventory() {
+    var st = PS.state;
+    var S = st.get();
+    var worn = {};
+    PS.SLOTS.forEach(function (slot) {
+      var item = st.equipped(slot.key);
+      worn[slot.key] = item ? [item.id, item.r, S.lv[slot.key]] : null;
+    });
+    var bag = st.tradeable().items;
+    return {
+      v: 1,
+      gold: S.gold,
+      gems: S.gems,
+      shards: S.shards,
+      power: st.calc().power,
+      best: S.best,
+      worn: worn,
+      bagCount: bag.length,
+      bag: bag.slice(0, INV_BAG).map(function (item) { return [item.id, item.r]; }),
+      pets: S.pets.map(function (pet) { return [pet.sp, pet.r, pet.lv, S.petTeam.indexOf(pet.u) !== -1 ? 1 : 0]; }),
+      petSlots: S.petSlots
+    };
+  }
+
+  /** Send the inventory if it changed, at most every INV_EVERY (`now` skips the wait). */
+  function pushInventory(now) {
+    clearTimeout(invTimer);
+    invTimer = 0;
+    if (!client || !me || offline || !invOk || PS.cloud.ban()) return Promise.resolve();
+    var wait = INV_EVERY - (Date.now() - invAt);
+    if (!now && wait > 0) {
+      invTimer = setTimeout(function () { pushInventory(true); }, wait);
+      return Promise.resolve();
+    }
+    var data = inventory();
+    var text = JSON.stringify(data);
+    if (text === invSent) return Promise.resolve();
+    invAt = Date.now();
+    var id = me.id;
+    return client.rpc("pip_put_inventory", { inv: data }).then(function (res) {
+      if (res.error) {
+        // an older server without inventories: stop asking until the next page load
+        if (res.error.code === "PGRST202" || res.error.code === "42883") invOk = false;
+        return;
+      }
+      if (me && me.id === id) invSent = text;
+    }, noop);
+  }
+
+  /** A server function called so that it still goes through while the page
+   *  closes (a keepalive request). False if it could not even be sent. */
+  function lastWord(fn, args) {
+    if (!client || !me || offline || !token || !window.fetch) return false;
+    try {
+      window.fetch(URL + "/rest/v1/rpc/" + fn, {
+        method: "POST",
+        keepalive: true,
+        headers: { apikey: KEY, Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify(args)
+      }).catch(noop);
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  // a keepalive request can carry about 64 KB, so a huge bag is cut to fit (best items kept)
+  var LAST_WORD_MAX = 60000;
+
+  /** The inventory once more as the game goes into the background or closes,
+   *  so what admins see while this player is offline is how they left it. */
+  function inventoryOnLeave() {
+    clearTimeout(invTimer);
+    invTimer = 0;
+    if (!client || !me || offline || !invOk || PS.cloud.ban()) return;
+    var data = inventory();
+    var text = JSON.stringify(data);
+    if (text === invSent) return;
+    var body = data;
+    while (JSON.stringify({ inv: body }).length > LAST_WORD_MAX && body.bag.length) {
+      var cut = {};
+      for (var key in body) cut[key] = body[key];
+      cut.bag = body.bag.slice(0, Math.floor(body.bag.length * 0.7));
+      body = cut;
+    }
+    if (lastWord("pip_put_inventory", { inv: body })) {
+      // a cut-down copy does not count as sent: the whole one goes next time the game is open
+      invSent = body === data ? text : "";
+      invAt = Date.now();
+    }
+  }
+
   /** Send the figures if they changed since last time. Never fails loudly:
    *  what did not go up goes up with the next change. */
   function push() {
     clearTimeout(timer);
     timer = 0;
     if (!client || !me || offline || PS.cloud.ban()) return Promise.resolve();
+    pushInventory(false);
     var now = figures();
     if (!duelsOk) delete now.duels;
     var text = JSON.stringify(now);
@@ -288,12 +402,16 @@
     if (me && !offline && !timer) timer = setTimeout(push, SEND_AFTER);
   });
   document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "hidden") push();
+    if (document.visibilityState === "hidden") {
+      push();
+      inventoryOnLeave();
+    }
   });
 
   if (client) {
     // signed out from somewhere else (or the session ran out): stop sending
-    client.auth.onAuthStateChange(function (event) {
+    client.auth.onAuthStateChange(function (event, session) {
+      token = session && session.access_token ? session.access_token : "";
       if (event === "SIGNED_OUT" && me && !offline) {
         me = null;
         PS.emit("cloud");
@@ -301,12 +419,47 @@
     });
   }
 
+  function noServerFunction(error) {
+    return Boolean(error && (error.code === "PGRST202" || error.code === "42883"));
+  }
+
+  /** Tell the server this game is open (here) or closing, and what it is doing.
+   *  Never fails loudly; the same news twice within 20 seconds is not sent again. */
+  function seen(here, doing) {
+    if (!client || !me || offline || !seenOk) return Promise.resolve();
+    doing = here ? String(doing || "") : "";
+    if (here && doing === seenDoing && Date.now() - seenAt < 20000) return Promise.resolve();
+    seenAt = here ? Date.now() : 0;
+    seenDoing = doing;
+    return client.rpc("pip_seen", { here: Boolean(here), doing: doing }).then(function (res) {
+      if (res.error && noServerFunction(res.error)) seenOk = false;
+    }, noop);
+  }
+
+  // closing the page: the inventory as it is now, and a last word that the game is
+  // gone, so it shows offline at once (without it, the admins' view notices after
+  // two minutes anyway)
+  window.addEventListener("pagehide", function () {
+    inventoryOnLeave();
+    if (seenOk) lastWord("pip_seen", { here: false, doing: "" });
+    seenAt = 0;
+    seenDoing = "";
+  });
+
   function moderate(name, args) {
     if (!client || !me || offline) return Promise.resolve({ error: DOWN, down: true });
     return client.rpc(name, args).then(function (res) {
       if (res.error) return failed(res.error);
       cache = {};
       return {};
+    }, failed);
+  }
+
+  /** A server function for a signed-in player. Resolves with { data } or { error, down }. */
+  function ask(name, args) {
+    if (!client || !me || offline) return Promise.resolve({ error: "Trading needs an account and the internet.", down: true });
+    return client.rpc(name, args || {}).then(function (res) {
+      return res.error ? failed(res.error) : { data: res.data };
     }, failed);
   }
 
@@ -414,6 +567,70 @@
         message: gift.message || ""
       });
     },
+    seen: seen,
+
+    /** For admins: who has the game open. Resolves with { map: { id: { online, doing, seconds } } }
+     *  (seconds since the game was last heard from) or { error }. */
+    presence: function () {
+      if (!client || !me || offline) return Promise.resolve({ error: DOWN, down: true });
+      return client.rpc("pip_presence").then(function (res) {
+        if (res.error) return failed(res.error);
+        var map = {};
+        (Array.isArray(res.data) ? res.data : []).forEach(function (row) {
+          if (row && typeof row.player === "string") {
+            map[row.player] = { online: row.online === true, doing: String(row.doing || ""), seconds: Math.max(0, Number(row.seconds) || 0) };
+          }
+        });
+        return { map: map };
+      }, failed);
+    },
+
+    /** For admins: what a player owns, as their game last sent it.
+     *  Resolves with { data, at } (data null if nothing came yet) or { error }. */
+    inventoryOf: function (id) {
+      if (!client || !me || offline) return Promise.resolve({ error: DOWN, down: true });
+      return client.from("inventories").select("data, updated_at").eq("player", id).maybeSingle().then(function (res) {
+        if (res.error) return failed(res.error);
+        return { data: res.data ? res.data.data : null, at: res.data ? res.data.updated_at : null };
+      }, failed);
+    },
+
+    /* Trading. The server holds both offers (setup.sql explains the rules);
+       each resolves with { data: the trade as this player sees it } or { error }. */
+    tradeOpen: function () { return ask("pip_trade_open"); },
+    tradeJoin: function (code) { return ask("pip_trade_join", { join_code: String(code || "") }); },
+    tradeState: function (id) { return ask("pip_trade_state", { trade_id: id }); },
+    tradeOffer: function (id, offer) { return ask("pip_trade_offer", { trade_id: id, offer: offer }); },
+    tradeAccept: function (id, version, ok) { return ask("pip_trade_accept", { trade_id: id, seen_version: version, ok: Boolean(ok) }); },
+    tradeLeave: function (id) { return ask("pip_trade_cancel", { trade_id: id }); },
+    tradeGot: function (id) { return ask("pip_trade_got", { trade_id: id }); },
+    /** Finished trades this game has not picked up yet: { data: [trade, ...] }. */
+    tradePending: function () { return ask("pip_trade_pending"); },
+
+    /* Co-op and the arena: an admin who joins someone else's room proves to
+       that game that they are an admin, through the server. */
+    devToken: function () { return ask("pip_dev_token"); },
+    checkDevToken: function (token) {
+      if (typeof token !== "string" || !/^[0-9a-f-]{36}$/i.test(token)) return Promise.resolve(false);
+      return ask("pip_dev_check", { check_token: token }).then(function (res) { return res.data === true; });
+    },
+
+    /** Change the banner above the top bar for everyone ('' hides it, null
+     *  goes back to the text in index.html). Admins only, checked by the server. */
+    setBanner: function (text) {
+      return moderate("pip_set_banner", { new_text: text === null ? null : String(text) });
+    },
+
+    /** The banner as the owner last set it. Needs no account. Resolves with
+     *  { text, at } (text null: use the one in index.html) or { error }. */
+    banner: function () {
+      if (!client) return Promise.resolve({ error: DOWN, down: true });
+      return client.from("banner").select("message, updated_at").limit(1).maybeSingle().then(function (res) {
+        if (res.error) return failed(res.error);
+        var row = res.data;
+        return { text: row && typeof row.message === "string" ? row.message : null, at: row ? row.updated_at : null };
+      }, failed);
+    },
     offline: function () {
       return offline;
     },
@@ -455,7 +672,7 @@
     /** Send what is waiting, then sign out on this device only. */
     signOut: function () {
       var online = Boolean(client && me && !offline);
-      return (online ? push() : Promise.resolve()).then(function () {
+      return (online ? Promise.all([push(), pushInventory(true), seen(false)]) : Promise.resolve()).then(function () {
         me = null;
         offline = false;
         sent = "";

@@ -14,6 +14,7 @@
   var BASE_KEY = "lemon:pips:save";
   var KEY = BASE_KEY; // each account on this device has its own: BASE_KEY + ":" + account id
   var VERSION = 1;
+  var TRADES_KEPT = 200; // how many finished trade ids the save remembers
 
   var S = null; // the save
   var cache = null; // computed stats, dropped on every change
@@ -47,9 +48,11 @@
       challenge: { won: "", count: 0 }, // the day the daily challenge was last won, and how many in all
       found: {}, // every item id ever owned, for the collection book
       book: 0, // how many collection steps have been claimed
+      traded: [], // ids of the trades already put into this save, so none is done twice
       stats: {
         kills: 0, runs: 0, wins: 0, forges: 0, chests: 0, upgrades: 0, talents: 0,
-        bestLevel: 0, bestPower: 0, maxRarity: 0, grade: 0, time: 0, earned: 0, eggs: 0, bestCombo: 0, duels: 0, duelsPlayed: 0
+        bestLevel: 0, bestPower: 0, maxRarity: 0, grade: 0, time: 0, earned: 0, eggs: 0, bestCombo: 0, duels: 0, duelsPlayed: 0,
+        trades: 0
       }
     };
     PS.SLOTS.forEach(function (slot) {
@@ -179,6 +182,9 @@
     }
     save.items.forEach(function (item) { save.found[item.id] = 1; });
     save.book = Math.floor(num(raw.book, 0, 0, PS.BOOK.length));
+    save.traded = (Array.isArray(raw.traded) ? raw.traded : []).filter(function (id) {
+      return typeof id === "number" && isFinite(id);
+    }).slice(-TRADES_KEPT);
 
     PS.QUESTS.forEach(function (quest) {
       var claimed = Math.floor(num(raw.quests ? raw.quests[quest.id] : 0, 0, 0, quest.tiers.length));
@@ -1374,6 +1380,94 @@
     return doomed.length;
   }
 
+  /* ------------------------------------------------------------- trading */
+
+  /** What this player can put in a trade: gear that is not being worn, and every pet. */
+  function tradeable() {
+    return {
+      items: sorted(S.items.filter(function (item) { return !isEquipped(item); })),
+      pets: S.pets.slice().sort(function (a, b) { return b.r - a.r || b.lv - a.lv; })
+    };
+  }
+
+  /** One of this save's items that matches what an offer said: the very one, or else the same kind. */
+  function offeredItem(x) {
+    var item = byUid(x.u);
+    if (item && item.id === x.id && item.r === x.r && !isEquipped(item)) return item;
+    for (var i = 0; i < S.items.length; i++) {
+      var it = S.items[i];
+      if (it.id === x.id && it.r === x.r && !isEquipped(it)) return it;
+    }
+    return null;
+  }
+
+  function offeredPet(x) {
+    var pet = petByUid(x.u);
+    if (pet && pet.sp === x.sp && pet.r === x.r) return pet;
+    for (var i = 0; i < S.pets.length; i++) if (S.pets[i].sp === x.sp && S.pets[i].r === x.r) return S.pets[i];
+    return null;
+  }
+
+  /** A finished trade (`id` from the server): take away what this player gave
+   *  and add what they got. A trade already in the save is not done again
+   *  (returns null). Pets are kept one per kind and rarity, so a pet you
+   *  already have just takes the higher of the two levels. */
+  function applyTrade(id, give, get) {
+    if (typeof id !== "number" || S.traded.indexOf(id) !== -1) return null;
+    give = give || {};
+    get = get || {};
+    var out = { items: [], pets: [], gold: 0, gems: 0, skipped: 0 };
+    (Array.isArray(give.items) ? give.items : []).forEach(function (x) {
+      var item = x && offeredItem(x);
+      if (item) remove(item.u);
+    });
+    (Array.isArray(give.pets) ? give.pets : []).forEach(function (x) {
+      var pet = x && offeredPet(x);
+      if (!pet) return;
+      S.pets.splice(S.pets.indexOf(pet), 1);
+      var onTeam = S.petTeam.indexOf(pet.u);
+      if (onTeam !== -1) S.petTeam.splice(onTeam, 1);
+    });
+    S.gold = Math.max(0, S.gold - Math.floor(num(give.gold, 0, 0, 1e12)));
+    S.gems = Math.max(0, S.gems - Math.floor(num(give.gems, 0, 0, 1e12)));
+
+    (Array.isArray(get.items) ? get.items : []).forEach(function (x) {
+      if (!x || !PS.ITEMS[x.id]) {
+        out.skipped++;
+        return;
+      }
+      out.items.push(add(x.id, Math.floor(num(x.r, 0, 0, PS.MAX_RARITY))));
+    });
+    (Array.isArray(get.pets) ? get.pets : []).forEach(function (x) {
+      if (!x || !PS.PET[x.sp] || !PS.PET_RARITY[x.r]) {
+        out.skipped++;
+        return;
+      }
+      var lv = Math.floor(num(x.lv, 1, 1, PS.PET_RARITY[x.r].cap));
+      var have = null;
+      S.pets.forEach(function (pet) { if (pet.sp === x.sp && pet.r === x.r) have = pet; });
+      if (have) {
+        var before = have.lv;
+        have.lv = Math.max(have.lv, lv);
+        out.pets.push({ pet: have, status: have.lv > before ? "level" : "same" });
+        return;
+      }
+      var pet = { u: S.petUid++, sp: x.sp, r: x.r, lv: lv };
+      S.pets.push(pet);
+      if (S.petTeam.length < S.petSlots) S.petTeam.push(pet.u);
+      out.pets.push({ pet: pet, status: "new" });
+    });
+    out.gold = Math.floor(num(get.gold, 0, 0, 1e12));
+    out.gems = Math.floor(num(get.gems, 0, 0, 1e12));
+    S.gold += out.gold;
+    S.gems += out.gems;
+    S.traded.push(id);
+    if (S.traded.length > TRADES_KEPT) S.traded.splice(0, S.traded.length - TRADES_KEPT);
+    S.stats.trades += 1;
+    commit();
+    return out;
+  }
+
   /* ------------------------------------------------------------- badges */
 
   /** Which tabs have something waiting. */
@@ -1468,6 +1562,10 @@
     sellValue: sellValue,
     sell: sell,
     badges: badges,
+    // trading
+    tradeable: tradeable,
+    applyTrade: applyTrade,
+    traded: function (id) { return S.traded.indexOf(id) !== -1; },
     // dev menu
     give: function (id, rarity) {
       var item = add(id, rarity);

@@ -101,8 +101,45 @@
       pending: 0, choices: null, choiceKind: null,
       hurtWindow: 0, leeched: 0, windowT: 0,
       down: false, reviveT: 0, // playing together: knocked out, and help getting up
-      remote: false, input: null, ack: 0, name: ""
+      remote: false, input: null, ack: 0, name: "",
+      // the dev menu's cheats for this lemon: null means this game's own (PS.dev.cheats);
+      // the other player's lemon gets its own, which only their admin account can switch on
+      cheats: null
     };
+  }
+
+  function cheatsOf(q) {
+    return (q && q.cheats) || PS.dev.cheats;
+  }
+
+  /** Cheats that change the whole battle (frozen pests, no spawning): on if any lemon has them on. */
+  function anyCheat(key) {
+    if (!R || !R.players) return Boolean(PS.dev.cheats[key]);
+    for (var i = 0; i < R.players.length; i++) {
+      if (!R.players[i].gone && cheatsOf(R.players[i])[key]) return true;
+    }
+    return false;
+  }
+  B.anyCheat = anyCheat;
+
+  /** Every cheat off, for the other player's lemon until their game says otherwise. */
+  function noCheats() {
+    var out = {};
+    for (var key in PS.dev.cheats) out[key] = typeof PS.dev.cheats[key] === "number" ? 1 : false;
+    return out;
+  }
+
+  /** The other player's cheats as their game sent them: only known switches, sensible values. */
+  function cleanCheats(raw) {
+    var out = noCheats();
+    if (!raw || typeof raw !== "object") return out;
+    PS.dev.TOGGLES.forEach(function (t) { out[t.key] = raw[t.key] === true; });
+    PS.dev.MULTS.forEach(function (m) {
+      var v = Number(raw[m.key]);
+      var allowed = m.values.concat(m.more || []);
+      out[m.key] = m.key !== "speed" && allowed.indexOf(v) !== -1 ? v : 1;
+    });
+    return out;
   }
 
   B.mount = function (root) {
@@ -137,7 +174,7 @@
     applyPrefs();
     var cheats = PS.dev.cheats;
     if (mp) {
-      // playing together: no cheats, they would act on both lemons
+      // playing together: cheats start off; an admin can switch them on for their own lemon
       for (var off in cheats) cheats[off] = typeof cheats[off] === "number" ? 1 : false;
     } else {
       for (var key in PS.dev.startWith) cheats[key] = PS.dev.startWith[key];
@@ -290,7 +327,8 @@
       B.hud.update(R);
       return;
     }
-    var speed = PS.dev.cheats.speed;
+    // playing together, the battle always runs at normal speed: the other game keeps time with it
+    var speed = R.mp ? 1 : PS.dev.cheats.speed;
     if (speed < 1) {
       B.step(dt * speed);
     } else {
@@ -307,8 +345,8 @@
   /** One tick of the simulation. Does nothing while paused or choosing. */
   B.step = function (dt) {
     if (!R || R.mirror) return;
-    // playing together, a pause only shows the panel: the other player plays on
-    if ((R.paused && !R.mp) || R.choices || (R.ally && R.ally.choices) || R.done || R.devOpen) return;
+    // playing together, a pause (or the dev menu) only shows the panel: the other player plays on
+    if ((R.paused && !R.mp) || R.choices || (R.ally && R.ally.choices) || R.done || (R.devOpen && !R.mp)) return;
     if (R.phase === "won" || R.phase === "lost") {
       R.over -= dt;
       updateDrops(dt, R.phase === "won");
@@ -474,7 +512,7 @@
   /** Damage of one plain hit, before a weapon's own multiplier. */
   B.dmg = function () {
     var p = R.p;
-    var d = p.atk * p.mods.dmg * (1 + p.lvlAtk) * PS.dev.cheats.dmgMul;
+    var d = p.atk * p.mods.dmg * (1 + p.lvlAtk) * cheatsOf(p).dmgMul;
     if (p.fx.movingDmg && p.moving) d *= 1 + p.fx.movingDmg;
     if (R.weaponId === "solstice" && p.fx.q && p.hp > p.maxHp * 0.7) d *= 1.5;
     return d;
@@ -484,7 +522,7 @@
   B.pierce = function () { return (R.p.fx.pierce || 0) + R.p.mods.pierce; };
   B.cooldown = function (base) {
     var p = R.p;
-    return base / ((1 + p.haste + p.mods.haste + p.frenzy * 0.04) * PS.dev.cheats.hasteMul * (p.buffs.frenzy > 0 ? 2 : 1));
+    return base / ((1 + p.haste + p.mods.haste + p.frenzy * 0.04) * cheatsOf(p).hasteMul * (p.buffs.frenzy > 0 ? 2 : 1));
   };
 
   /** How close a pest has to be before the weapon bothers to attack. */
@@ -595,7 +633,7 @@
       p.moving = true;
       if (gfx >= 1 && R.fx.length < 180) R.fx.push({ type: "ghost", x: p.x, y: p.y, t: 0, dur: 0.28 });
     } else if (move) {
-      var speed = p.moveSpeed * p.mods.speed * move.mag * (1 - p.slow) * PS.dev.cheats.moveMul * (p.buffs.swift > 0 ? 1.45 : 1);
+      var speed = p.moveSpeed * p.mods.speed * move.mag * (1 - p.slow) * cheatsOf(p).moveMul * (p.buffs.swift > 0 ? 1.45 : 1);
       p.vx = move.x * speed;
       p.vy = move.y * speed;
       p.x += p.vx * dt;
@@ -664,7 +702,7 @@
   /** Hurt the lemon. `amount` is raw damage; armour and shields come off here. */
   B.hurt = function (amount) {
     var p = R.p;
-    if (p.invuln > 0 || PS.dev.cheats.god || R.phase === "won" || R.phase === "lost") return;
+    if (p.invuln > 0 || cheatsOf(p).god || R.phase === "won" || R.phase === "lost") return;
     if (p.bubble) {
       // the bubble shield takes the hit and bursts, pushing pests away
       p.bubble = false;
@@ -1065,7 +1103,7 @@
     var p = R.p;
     var fx = p.fx;
     var dot = opts && opts.dot;
-    var dmg = PS.dev.cheats.oneHit ? Math.max(amount, e.hp) : amount;
+    var dmg = cheatsOf(p).oneHit ? Math.max(amount, e.hp) : amount;
     var flags = 1;
     if (!dot && Math.random() < p.crit + p.mods.crit) {
       dmg *= p.critDmg + p.mods.critDmg;
@@ -1388,7 +1426,8 @@
 
       for (var j = 0, n = enemies.length; j < n && !spent; j++) {
         var e = enemies[j];
-        if (e.dead || s.seen.indexOf(e) !== -1) continue;
+        // in a duel, a shot starts inside its own lemon's stand-in: it must fly through it
+        if (e.dead || e.proxyOf === p || s.seen.indexOf(e) !== -1) continue;
         var dx = e.x - s.x;
         var dy = e.y - s.y;
         var reach = e.r + s.r;
@@ -1541,7 +1580,7 @@
     var thorns = p.fx.thorns ? B.dmg() * p.fx.thorns * dt : 0;
     var far = view.ring + 330;
     var decay = Math.exp(-7 * dt);
-    var frozen = PS.dev.cheats.freeze;
+    var frozen = anyCheat("freeze");
     var many = R.players && R.players.length > 1;
 
     for (var i = 0, n = list.length; i < n; i++) {
@@ -1662,7 +1701,7 @@
   function collect(d) {
     var p = R.p;
     if (d.type === "xp") {
-      p.xp += d.value * p.xpMul * PS.dev.cheats.xpMul;
+      p.xp += d.value * p.xpMul * cheatsOf(p).xpMul;
       PS.sfx.play("gem");
     } else if (d.type === "coin") {
       R.coins += d.value;
@@ -1682,12 +1721,22 @@
     var first = R.p;
     var p = R.p;
     var list = R.drops;
-    hoover = hoover || PS.dev.cheats.vacuum;
+    // the vacuum cheat pulls everything to the lemon that has it on
+    var vacuum = null;
+    if (R.players) {
+      for (var v = 0; v < R.players.length && !vacuum; v++) {
+        var q = R.players[v];
+        if (!q.down && !q.gone && cheatsOf(q).vacuum) vacuum = q;
+      }
+    } else if (PS.dev.cheats.vacuum) {
+      vacuum = R.p;
+    }
+    hoover = hoover || Boolean(vacuum);
     for (var i = list.length - 1; i >= 0; i--) {
       var d = list[i];
       if (R.players) {
         // each gem, coin or pickup heads for (and goes to) the lemon nearest it
-        var taker = nearestPlayer(d.x, d.y);
+        var taker = vacuum || nearestPlayer(d.x, d.y);
         if (taker !== R.p) own(taker);
         p = R.p;
       }
@@ -1822,7 +1871,11 @@
     a.remote = true;
     a.input = { x: 0, y: 0 };
     a.pending = a.fx.startUp || 0;
-    R.mp = { kind: mp.kind, host: true, partnerName: a.name, rate: mp.relay ? 160 : 33, sentAt: 0, link: mp.relay ? "room" : "direct", ping: 0 };
+    a.cheats = noCheats(); // the other player's own, switched on only once the server says they are an admin
+    R.mp = {
+      kind: mp.kind, host: true, partnerName: a.name, rate: mp.relay ? 160 : 33, sentAt: 0, link: mp.relay ? "room" : "direct", ping: 0,
+      allyAdmin: false
+    };
     host.x = -40;
     a.x = 40;
     R.players = [host, a];
@@ -2029,7 +2082,7 @@
   function lemonState(q) {
     var buffs = {};
     for (var key in q.buffs) if (q.buffs[key] > 0) buffs[key] = r1(q.buffs[key]);
-    var speed = q.moveSpeed * q.mods.speed * (1 - q.slow) * (q.buffs.swift > 0 ? 1.45 : 1);
+    var speed = q.moveSpeed * q.mods.speed * (1 - q.slow) * cheatsOf(q).moveMul * (q.buffs.swift > 0 ? 1.45 : 1);
     return {
       x: r1(q.x), y: r1(q.y), hp: Math.round(q.hp), mh: Math.round(q.maxHp), ba: Math.round(q.barrier), bm: Math.round(q.barrierMax),
       lv: q.level, xp: r1(q.xp), nd: q.need, am: r2(q.aim), mv: q.moving ? 1 : 0, fl: r2(q.flash), iv: r2(q.invuln), sw: r2(q.swing),
@@ -2172,6 +2225,37 @@
     if (R && R.mp) R.mp.ping = ms;
   };
 
+  /* The other player's dev menu. Their game sends what they press; this game
+     runs it on their lemon, but only once the server has said (multi.js asks)
+     that they play on an admin account. */
+  B.mpAllyAdmin = function (ok) {
+    if (!R || R.mirror || !R.mp || !R.ally) return;
+    R.mp.allyAdmin = Boolean(ok);
+    if (!ok) R.ally.cheats = noCheats();
+    mpSend("devok", { ok: Boolean(ok) }, true);
+  };
+  B.mpDevCheats = function (m) {
+    if (!R || R.mirror || !R.ally || !R.mp || !R.mp.allyAdmin) return;
+    R.ally.cheats = cleanCheats(m && m.cheats);
+  };
+  B.mpDev = function (m) {
+    if (!R || R.mirror || !R.ally || !R.mp || !m || !B.devPanel) return;
+    var note = R.mp.allyAdmin ? B.devPanel.runFor(R.ally, m) : "This game could not confirm your admin account, so it did nothing.";
+    if (note) mpSend("devnote", { note: String(note).slice(0, 200) }, true);
+  };
+  /** Sending from this game's own dev menu, playing together as the guest. */
+  B.mpDevSend = function (type, data) {
+    mpSend(type, data, true);
+  };
+  /** The dev menu's "Pick" for the other player's lemon: it counts as their card choice. */
+  B.devResolveAlly = function () {
+    var a = R && R.ally;
+    if (!a || !a.choices) return;
+    a.choices = null;
+    if (a.pending > 0) openAllyChoices();
+    else mpSend("cards", { list: null }, true);
+  };
+
   /** The other player has gone (closed the game, or lost the connection). */
   B.mpPartnerLeft = function () {
     if (!R || !R.mp || R.done) return;
@@ -2238,7 +2322,8 @@
       shake: 0, procs: 0, toast: "", toastT: 0, twist: null, hurtMul: 1, pestMul: null, pets: [], shrine: null,
       mp: {
         kind: info.kind, host: false, partnerName: pa.name, seq: 0, sendT: 0, hist: [], lastSnap: performance.now(), byId: {}, petsBy: {}, lastToast: "",
-        link: info.link || "room", inGap: info.link === "direct" ? 0.033 : 0.1, ping: 0
+        link: info.link || "room", inGap: info.link === "direct" ? 0.033 : 0.1, ping: 0,
+        devOk: null // whether the host's game takes this player's dev menu: null until it says
       },
       duel: info.kind === "duel" ? { mode: info.duelMode === "full" ? "full" : "equal", round: 1, wins: [0, 0], roundT: 0, hold: 0 } : null,
       waitText: "", uid: 0
@@ -2572,6 +2657,18 @@
     stick.on = false;
     PS.sfx.play("levelup");
     B.hud.choices(R);
+  };
+
+  /** The host's game says whether it will take this player's dev menu (an admin account, checked by the server). */
+  B.mirrorDevOk = function (m) {
+    if (!R || !R.mirror || !R.mp) return;
+    R.mp.devOk = Boolean(m && m.ok);
+    if (B.devPanel) B.devPanel.refresh();
+  };
+  /** What the host's game did with something pressed in this player's dev menu. */
+  B.mirrorDevNote = function (m) {
+    if (!R || !R.mirror || !m || !B.devPanel) return;
+    B.devPanel.say(String(m.note || "").slice(0, 200));
   };
 
   function mirrorPick(index) {
@@ -3504,8 +3601,9 @@
   function bindInput() {
     window.addEventListener("keydown", function (e) {
       if (!R || R.done) return;
-      // the backtick key opens and closes the DEV panel (when it is unlocked)
-      if (e.key === "`" && PS.dev.unlocked && B.devPanel && !R.mp) {
+      // the backtick key opens and closes the DEV panel (when it is unlocked;
+      // playing together, only with the admin password)
+      if (e.key === "`" && PS.dev.unlocked && B.devPanel && (!R.mp || PS.dev.admin)) {
         if (R.devOpen) B.devPanel.close();
         else B.devPanel.open();
         e.preventDefault();

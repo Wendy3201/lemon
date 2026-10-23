@@ -162,7 +162,7 @@
     if (R.duel) return; // a duel's ring has none of these
     if (R.shrine) updateShrine(R, dt);
     // the admin's "Stop spawning" keeps the field clear of these too
-    if (PS.dev.cheats.noSpawn) return;
+    if (B.anyCheat("noSpawn")) return;
 
     // a new shrine now and then, but not in the closing seconds of a chapter
     if (!R.shrine && R.phase === "swarm") {
