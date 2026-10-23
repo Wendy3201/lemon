@@ -8448,3 +8448,61 @@ button.trade__cell:disabled {
   background: var(--good);
   box-shadow: 0 0 0 3px rgba(93, 154, 63, 0.22);
 }
+
+/* an admin taking things away: the player's gear can be pressed */
+button.inv__cell {
+  cursor: pointer;
+}
+
+button.inv__cell:hover,
+button.inv__cell:focus-visible {
+  border-color: var(--bad);
+  background: var(--surface);
+}
+
+.inv__take {
+  margin: 4px 0 10px;
+  border: 2px solid var(--bad);
+  border-radius: 14px;
+}
+
+.inv__amount {
+  align-items: end;
+}
+
+.inv__all {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  font-weight: 700;
+  font-size: 13.5px;
+}
+
+.inv__waiting {
+  margin-bottom: 8px;
+}
+
+.inv__waiting ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inv__waiting li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+
+.inv__waiting em {
+  color: var(--ink-faint);
+}
+
+.takennote .giftnote__money {
+  color: var(--bad);
+}

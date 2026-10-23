@@ -540,6 +540,16 @@
       }, function () { return PS.cloud.ban(); });
     },
 
+    /** Pick up what an admin is taking away from this player; each comes once.
+     *  Resolves with a list of { kind, item, rarity, amount (0: all of it), message }. */
+    claimTakes: function () {
+      if (!client || !me || offline) return Promise.resolve([]);
+      var id = me.id;
+      return client.rpc("pip_claim_takes").then(function (res) {
+        return !res.error && Array.isArray(res.data) && me && me.id === id ? res.data : [];
+      }, function () { return []; });
+    },
+
     /** Pick up the gifts waiting for this player; each comes once. Resolves with a list. */
     claimGifts: function () {
       if (!client || !me || offline) return Promise.resolve([]);
@@ -630,6 +640,28 @@
         var row = res.data;
         return { text: row && typeof row.message === "string" ? row.message : null, at: row ? row.updated_at : null };
       }, failed);
+    },
+    /** Take gold, gems or gear away from a player (amount 0: all of it). Their
+     *  game does it when it next checks in, online or the next time they play. */
+    take: function (target, t) {
+      return moderate("pip_take", {
+        target: target,
+        kind: t.kind,
+        item: t.kind === "item" ? t.item : null,
+        rarity: t.kind === "item" ? t.rarity || 0 : 0,
+        amount: Math.max(0, Math.floor(t.amount || 0)),
+        message: t.message || ""
+      });
+    },
+    /** What is still waiting to be taken from a player: { rows } or { error }. */
+    takesWaiting: function (target) {
+      if (!client || !me || offline) return Promise.resolve({ error: DOWN, down: true });
+      return client.rpc("pip_takes_waiting", { target: target }).then(function (res) {
+        return res.error ? failed(res.error) : { rows: Array.isArray(res.data) ? res.data : [] };
+      }, failed);
+    },
+    cancelTake: function (id) {
+      return moderate("pip_take_cancel", { take_id: id });
     },
     offline: function () {
       return offline;

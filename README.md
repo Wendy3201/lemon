@@ -414,6 +414,16 @@ ticked (Supabase → Table Editor → players). `setup.sql` ticks `test`,
 - **Give** sends any weapon or piece of gear at any rarity, or gold, or gems,
   with an optional message. It arrives the next time the player's game checks
   in (within a minute while they play) and pops up as a gift.
+- **Take** takes gold, gems or a piece of gear away, online or offline: an
+  amount (or all of it), or some copies of an item at a rarity (or every
+  copy), with an optional message. It opens the player's inventory with the
+  form on top, and pressing any of their gear there fills it in. Their game
+  does it the next time it checks in (within a minute while they play, or as
+  soon as they next open the game) and tells them a moderator took it, with
+  the message. Gear in the bag goes before worn gear, and a lemon that loses
+  its weapon picks up its best other one (or a sling). Takes still waiting
+  for their game are listed with **Call off**. Takes are kept apart from
+  gifts, so a game too old to know about them leaves them waiting.
 - **Inventory** shows what the player owns: gold, gems, SS shards, Power, the
   gear they wear and their pet team. Their whole pet list and their **bag** are
   folded away and only drawn when opened, 120 items at a time, so a huge bag

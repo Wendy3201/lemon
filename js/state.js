@@ -1468,6 +1468,43 @@
     return out;
   }
 
+  /* ------------------------------------------------- taken away by an admin */
+
+  /** Something an admin is taking away: { kind: "gold"|"gems"|"item", item,
+   *  rarity, amount } where amount 0 means all of it (every copy of an item).
+   *  Items in the bag go first, then worn ones; a lemon that loses its weapon
+   *  picks up another (or a sling). Returns how much was really taken. */
+  function applyTake(t) {
+    if (!t || typeof t !== "object") return 0;
+    var amount = Math.floor(num(Number(t.amount), 0, 0, 1e12));
+    var taken = 0;
+    if (t.kind === "gold" || t.kind === "gems") {
+      var have = S[t.kind];
+      taken = amount ? Math.min(have, amount) : have;
+      S[t.kind] = have - taken;
+    } else if (t.kind === "item" && PS.ITEMS[t.item]) {
+      var r = Math.floor(num(Number(t.rarity), 0, 0, PS.MAX_RARITY));
+      var matches = S.items.filter(function (item) { return item.id === t.item && item.r === r; });
+      matches.sort(function (a, b) { return (isEquipped(a) ? 1 : 0) - (isEquipped(b) ? 1 : 0); });
+      if (amount) matches = matches.slice(0, amount);
+      matches.forEach(function (item) {
+        var slot = defOf(item).slot;
+        if (S.eq[slot] === item.u) S.eq[slot] = 0;
+        remove(item.u);
+        taken++;
+      });
+      if (!S.eq.weapon) {
+        var spare = null;
+        S.items.forEach(function (it) {
+          if (defOf(it).slot === "weapon" && (!spare || it.r > spare.r)) spare = it;
+        });
+        S.eq.weapon = (spare || add("sling", 0)).u;
+      }
+    }
+    if (taken) commit();
+    return taken;
+  }
+
   /* ------------------------------------------------------------- badges */
 
   /** Which tabs have something waiting. */
@@ -1566,6 +1603,7 @@
     tradeable: tradeable,
     applyTrade: applyTrade,
     traded: function (id) { return S.traded.indexOf(id) !== -1; },
+    applyTake: applyTake,
     // dev menu
     give: function (id, rarity) {
       var item = add(id, rarity);

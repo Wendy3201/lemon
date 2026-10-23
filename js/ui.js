@@ -34,6 +34,7 @@
     // the leaderboard: filters, rows, banned players (for admins), an admin's open form
     board: { by: "chapter", span: "all", q: "", rows: null, banned: [], showBanned: false, error: "", mod: null, presence: null, presenceAt: 0 },
     giftsWaiting: null, // gifts from a moderator, shown as soon as the menus are free
+    takenWaiting: null, // what a moderator took away, shown the same way
     banner: null, // the banner as the server last gave it: { text, at }; text null means the one in index.html
     // the Shop's casino: the bet in the box (null until one is typed), the blackjack hand, the wheel
     casino: { bet: null, bj: null, bw: { pick: "black", angle: 0, spinning: null, last: null, history: [] } }
@@ -2546,6 +2547,7 @@
     else if (modal.type === "book") html = bookModal(modal);
     else if (modal.type === "account") html = accountModal();
     else if (modal.type === "gift") html = giftModal(modal);
+    else if (modal.type === "taken") html = takenModal(modal);
     else if (modal.type === "blackjack") html = blackjackModal();
     else if (modal.type === "spinner") html = spinnerModal();
     if (html === null) {
@@ -3123,7 +3125,7 @@
     function button(act, label, cls) {
       return '<button class="board__act' + (cls ? " " + cls : "") + '" type="button" data-act="mod-open" data-mod="' + act + '" data-id="' + esc(row.id) + '" aria-pressed="' + (open === act) + '">' + label + "</button>";
     }
-    var out = [button("give", PS.icon("gift") + "Give"), button("inv", PS.icon("tabGear") + "Inventory")];
+    var out = [button("give", PS.icon("gift") + "Give"), button("take", "Take"), button("inv", PS.icon("tabGear") + "Inventory")];
     if (!self && !row.admin) {
       if (banned) {
         out.push('<button class="board__act" type="button" data-act="mod-unban" data-id="' + esc(row.id) + '">Unban</button>');
@@ -3179,8 +3181,128 @@
     };
   }
 
+  /** Is the open form under a row a look at the inventory (with or without the take form)? */
+  function isInv(m) {
+    return Boolean(m && (m.act === "inv" || m.act === "take"));
+  }
+
+  /** One of the player's items; pressing it opens the take form for it. */
   function invCell(item, sub) {
-    return '<span class="inv__cell">' + tile(item, { plain: true }) + "<small>" + esc(PS.RARITY[item.r].name + " " + PS.ITEMS[item.id].name) + (sub ? "<em>" + esc(sub) + "</em>" : "") + "</small></span>";
+    var name = PS.RARITY[item.r].name + " " + PS.ITEMS[item.id].name;
+    return (
+      '<button class="inv__cell" type="button" data-act="inv-take" data-item="' + item.id + '" data-r="' + item.r + '" title="Take away: ' + esc(name) + '">' +
+        tile(item, { plain: true }) + "<small>" + esc(name) + (sub ? "<em>" + esc(sub) + "</em>" : "") + "</small></button>"
+    );
+  }
+
+  /** How many of something the player has, by their inventory copy (null if not known). */
+  function invHas(m, t) {
+    var inv = m.inv;
+    if (!inv) return null;
+    if (t.kind === "gold" || t.kind === "gems") return inv[t.kind];
+    var n = 0;
+    inv.bag.forEach(function (x) { if (x.id === t.item && x.r === t.rarity) n++; });
+    inv.worn.forEach(function (w) { if (w.item && w.item.id === t.item && w.item.r === t.rarity) n++; });
+    return inv.bagCount > inv.bag.length ? null : n; // a cut-down bag cannot say for sure
+  }
+
+  function newTake(kind, item, rarity) {
+    return { kind: kind, item: item || firstItem("weapon"), rarity: rarity || 0, amount: 1, all: false, msg: "", busy: false, error: "" };
+  }
+
+  /** What a take does, in words: "all their gold", "3 Rare Sprout Staffs". */
+  function takeText(t) {
+    if (t.kind === "gold" || t.kind === "gems") {
+      return !t.amount ? "all their " + t.kind : fmt(t.amount) + " " + t.kind;
+    }
+    var def = PS.ITEMS[t.item];
+    var name = (PS.RARITY[t.rarity] ? PS.RARITY[t.rarity].name + " " : "") + (def ? def.name : t.item);
+    return !t.amount ? "every " + name : t.amount === 1 ? "1 " + name : t.amount + " × " + name;
+  }
+
+  /** The form for taking gold, gems or gear away. */
+  function takeForm(m) {
+    var t = m.take;
+    var has = invHas(m, t);
+    var fields = '<label class="board__field"><span>What to take</span><select id="take-kind">' +
+      options([["gold", "Gold"], ["gems", "Gems"], ["item", "A weapon or gear"]], t.kind) + "</select></label>";
+    if (t.kind === "item") {
+      fields += '<div class="board__pair">' +
+        '<label class="board__field"><span>Item</span><select id="take-item">' + itemOptions(t.item) + "</select></label>" +
+        '<label class="board__field"><span>Rarity</span><select id="take-rarity">' + options(rarityOptions(PS.RARITY.length), t.rarity) + "</select></label>" +
+      "</div>";
+    }
+    var unit = t.kind === "item" ? "copies" : t.kind;
+    fields +=
+      '<div class="board__pair inv__amount">' +
+        '<label class="board__field"><span>How many ' + unit + "?</span>" +
+          '<input id="take-amount" type="number" min="1" max="1000000000000" step="1" value="' + esc(String(t.amount)) + '"' + (t.all ? " disabled" : "") + " /></label>" +
+        '<label class="inv__all"><input id="take-all" type="checkbox"' + (t.all ? " checked" : "") + " /> " + (t.kind === "item" ? "Every copy" : "All of it") + "</label>" +
+      "</div>" +
+      (has !== null ? '<p class="hint">' + esc(m.name) + " has " + fmt(has) + (t.kind === "item" ? (has === 1 ? " copy" : " copies") : " " + t.kind) + " (as their game last sent it).</p>" : "") +
+      '<label class="board__field"><span>Message (optional)</span><input id="take-msg" type="text" maxlength="200" value="' + esc(t.msg) + '" placeholder="' + esc(m.name) + ' will see this" /></label>';
+    return (
+      '<form class="board__form inv__take" data-form="take" novalidate>' +
+        "<b>Take away from " + esc(m.name) + "</b>" + fields +
+        '<p class="board__formerr" role="alert">' + esc(t.error || "") + "</p>" +
+        '<p class="hint">It happens when their game next checks in: within a minute if they are playing, or as soon as they next open the game.</p>' +
+        '<div class="board__formbtns">' +
+          '<button class="btn btn--sm" type="button" data-act="take-close">Cancel</button>' +
+          '<button class="btn btn--sm btn--danger" type="submit"' + (t.busy ? " disabled" : "") + ">Take " + esc(takeText({ kind: t.kind, item: t.item, rarity: t.rarity, amount: t.all ? 0 : t.amount })) + "</button>" +
+        "</div>" +
+      "</form>"
+    );
+  }
+
+  /** Takes the player's game has not picked up yet, each with a button to call it off. */
+  function takesWaitingHtml(m) {
+    if (!m.waiting || !m.waiting.length) return "";
+    return (
+      '<div class="inv__waiting"><p class="inv__label">Waiting for ' + esc(m.name) + "'s game to pick up</p><ul>" +
+        m.waiting.map(function (row) {
+          return "<li><span>Take " + esc(takeText({ kind: row.kind, item: row.item, rarity: row.rarity, amount: Number(row.amount) || 0 })) +
+            (row.message ? " <em>“" + esc(row.message) + "”</em>" : "") + "</span>" +
+            '<button class="btn btn--sm" type="button" data-act="take-undo" data-take="' + Number(row.id) + '">Call off</button></li>';
+        }).join("") +
+      "</ul></div>"
+    );
+  }
+
+  function loadTakes(m) {
+    PS.cloud.takesWaiting(m.id).then(function (res) {
+      if (view.board.mod !== m) return;
+      m.waiting = res.error ? [] : res.rows;
+      paintBoard();
+    });
+  }
+
+  function takeSubmit(e) {
+    e.preventDefault();
+    var m = view.board.mod;
+    var t = m && m.take;
+    if (!t || t.busy) return;
+    var amount = t.all ? 0 : Math.floor(Number(t.amount) || 0);
+    if (!t.all && amount < 1) {
+      t.error = "Pick how many, or tick " + (t.kind === "item" ? "Every copy" : "All of it") + ".";
+      paintBoard();
+      return;
+    }
+    var what = takeText({ kind: t.kind, item: t.item, rarity: t.rarity, amount: amount });
+    t.busy = true;
+    t.error = "";
+    paintBoard();
+    PS.cloud.take(m.id, { kind: t.kind, item: t.item, rarity: t.rarity, amount: amount, message: t.msg.trim() }).then(function (res) {
+      if (view.board.mod !== m) return;
+      t.busy = false;
+      if (res.error) {
+        t.error = res.error;
+        paintBoard();
+        return;
+      }
+      m.take = null;
+      toast("Taking " + what + " from " + m.name);
+      loadTakes(m);
+    });
   }
 
   function invPet(pet) {
@@ -3200,14 +3322,17 @@
 
   function invPanel(m) {
     var head = '<div class="inv__head"><b>' + esc(m.name) + "'s inventory</b>" +
-      '<span><button class="btn btn--sm" type="button" data-act="inv-refresh">Refresh</button> <button class="btn btn--sm" type="button" data-act="mod-cancel">Close</button></span></div>';
+      "<span>" + (m.take ? "" : '<button class="btn btn--sm btn--danger" type="button" data-act="take-open">Take away...</button> ') +
+        '<button class="btn btn--sm" type="button" data-act="inv-refresh">Refresh</button> <button class="btn btn--sm" type="button" data-act="mod-cancel">Close</button></span></div>' +
+      (m.take ? takeForm(m) : "") + takesWaitingHtml(m);
     if (m.busy) return '<div class="inv">' + head + '<p class="hint">Loading...</p></div>';
     if (m.error) return '<div class="inv">' + head + '<p class="board__formerr">' + esc(m.error) + "</p></div>";
     var inv = m.inv;
     if (!inv) {
       return '<div class="inv">' + head +
         '<p class="hint">Nothing yet. ' + esc(m.name) + " hasn't played on the newest version of the game since inventories started being sent. " +
-        "Once they open it (logged in, not offline), their game sends a copy, and it stays here for you to look at while they are offline.</p></div>";
+        "Once they open it (logged in, not offline), their game sends a copy, and it stays here for you to look at while they are offline. " +
+        "You can still take gold, gems or gear away now: it happens when they next play.</p></div>";
     }
     var team = inv.pets.filter(function (p) { return p.team; });
     var away = view.board.presence && !(view.board.presence[m.id] && view.board.presence[m.id].online);
@@ -3244,6 +3369,7 @@
     m.error = "";
     paintBoard();
     loadPresence(); // whether they are playing right now (so whether this is up to date)
+    loadTakes(m);
     PS.cloud.inventoryOf(m.id).then(function (res) {
       if (view.board.mod !== m) return;
       m.busy = false;
@@ -3259,7 +3385,7 @@
   /** The form that opens under a row: the ban or timeout message, or what to give. */
   function modForm() {
     var m = view.board.mod;
-    if (m.act === "inv") return invPanel(m);
+    if (isInv(m)) return invPanel(m);
     var fields = "";
     var go = "";
     if (m.act === "ban" || m.act === "timeout") {
@@ -3399,6 +3525,39 @@
     toast("A moderator sent you a gift!");
   }
 
+  /** Take out of the save what a moderator is taking away, and say so as soon as the menus show. */
+  function loseTakes(list) {
+    var lost = [];
+    list.forEach(function (t) {
+      var n = st.applyTake(t);
+      if (!n) return; // they had none of it left
+      if (t.kind === "item") lost.push({ item: { id: t.item, r: Number(t.rarity) || 0 }, count: n, message: t.message || "" });
+      else lost.push({ kind: t.kind, amount: n, message: t.message || "" });
+    });
+    if (!lost.length) return;
+    view.takenWaiting = (view.takenWaiting || []).concat(lost);
+    toast("A moderator took something away");
+  }
+
+  function takenModal(modal) {
+    var notes = [];
+    modal.lost.forEach(function (g) { if (g.message && notes.indexOf(g.message) === -1) notes.push(g.message); });
+    return (
+      '<div class="notice giftnote takennote">' +
+        '<h2 id="modal-title">A moderator took something away</h2>' +
+        '<div class="giftnote__got">' +
+          modal.lost.map(function (g) {
+            return g.item
+              ? '<span class="giftnote__item">' + tile(g.item, { plain: true }) + "<small>" + (g.count > 1 ? g.count + " × " : "") + esc(PS.RARITY[g.item.r].name + " " + PS.ITEMS[g.item.id].name) + "</small></span>"
+              : '<span class="giftnote__money">−' + price(g.kind, g.amount) + "</span>";
+          }).join("") +
+        "</div>" +
+        notes.map(function (n) { return '<p class="giftnote__msg">“' + esc(n) + "”</p>"; }).join("") +
+        '<div class="modal__actions"><button class="btn btn--primary" type="button" data-act="close" autofocus>OK</button></div>' +
+      "</div>"
+    );
+  }
+
   function giftModal(modal) {
     var notes = [];
     modal.got.forEach(function (g) { if (g.message && notes.indexOf(g.message) === -1) notes.push(g.message); });
@@ -3518,6 +3677,9 @@
       if (PS.trade && el.battle.hidden) PS.trade.pickUp(); // a trade that went through while this game was closed
       return PS.cloud.claimGifts().then(function (gifts) {
         if (gifts.length && el.gate.hidden) receiveGifts(gifts);
+        return PS.cloud.claimTakes();
+      }).then(function (takes) {
+        if (takes && takes.length) loseTakes(takes);
       });
     });
   }
@@ -3729,12 +3891,15 @@
         view.board.mod = null; // a second click on the same button closes the form
       } else {
         view.board.mod = { id: id, name: row.name, act: act, msg: "", minutes: 60, kind: "item", item: firstItem("weapon"), rarity: 0, amount: 1000, busy: false, error: "" };
-        if (act === "inv") {
+        if (act === "inv" || act === "take") {
+          // Take opens the inventory with the take form, so what they have is right there
           var inv = view.board.mod;
           inv.inv = null;
           inv.shown = INV_PAGE;
           inv.bagOpen = false;
           inv.petsOpen = false;
+          inv.waiting = null;
+          inv.take = act === "take" ? newTake("gold") : null;
           loadInv(inv);
           return;
         }
@@ -3753,12 +3918,43 @@
     },
     "inv-refresh": function () {
       var m = view.board.mod;
-      if (m && m.act === "inv") loadInv(m);
+      if (isInv(m)) loadInv(m);
+    },
+    "inv-take": function (node) {
+      var m = view.board.mod;
+      var id = node.getAttribute("data-item");
+      if (!isInv(m) || !PS.ITEMS[id]) return;
+      m.take = newTake("item", id, Number(node.getAttribute("data-r")) || 0);
+      paintBoard();
+      var form = $(".inv__take");
+      if (form) form.scrollIntoView({ block: "nearest" });
+    },
+    "take-open": function () {
+      var m = view.board.mod;
+      if (!isInv(m)) return;
+      m.take = newTake("gold");
+      paintBoard();
+    },
+    "take-close": function () {
+      var m = view.board.mod;
+      if (!isInv(m)) return;
+      m.take = null;
+      paintBoard();
+    },
+    "take-undo": function (node) {
+      var m = view.board.mod;
+      if (!isInv(m)) return;
+      node.disabled = true;
+      PS.cloud.cancelTake(Number(node.getAttribute("data-take"))).then(function (res) {
+        if (res.error) toast(res.error);
+        else toast("Called off");
+        loadTakes(m);
+      });
     },
     "inv-more": function () {
       var m = view.board.mod;
       var list = $("#inv-bag");
-      if (!m || !m.inv || !list) return;
+      if (!isInv(m) || !m.inv || !list) return;
       m.shown += INV_PAGE;
       list.innerHTML = invBagCells(m);
     },
@@ -4593,6 +4789,10 @@
       modSubmit(e);
       return;
     }
+    if (e.target.getAttribute("data-form") === "take") {
+      takeSubmit(e);
+      return;
+    }
     if (e.target.getAttribute("data-form") !== "secret") return;
     e.preventDefault();
     if (!view.modal) return;
@@ -4624,6 +4824,10 @@
     if (view.giftsWaiting && !view.modal) {
       openModal({ type: "gift", got: view.giftsWaiting });
       view.giftsWaiting = null;
+    }
+    if (view.takenWaiting && !view.modal) {
+      openModal({ type: "taken", lost: view.takenWaiting });
+      view.takenWaiting = null;
     }
     var giftReady = st.giftWait() === 0;
     var nodes = document.querySelectorAll("[data-countdown]");
@@ -4796,7 +5000,7 @@
         // an admin's look at an inventory: the bag and the pets are only drawn once unfolded
         var invPart = e.target && e.target.getAttribute ? e.target.getAttribute("data-invpart") : null;
         var invMod = view.board.mod;
-        if (invPart && invMod && invMod.act === "inv" && invMod.inv) {
+        if (invPart && isInv(invMod) && invMod.inv) {
           if (invPart === "bag") invMod.bagOpen = e.target.open;
           else invMod.petsOpen = e.target.open;
           var grid = e.target.querySelector(".inv__grid");
@@ -4831,6 +5035,25 @@
           view.dev.banner = e.target.value;
           var preview = $("#dev-banner-preview");
           if (preview) preview.textContent = e.target.value;
+          return;
+        }
+        if (/^take-/.test(e.target.id) && view.board.mod && view.board.mod.take) {
+          var tk = view.board.mod.take;
+          var tv = e.target.value;
+          if (e.target.id === "take-msg") tk.msg = tv;
+          else if (e.target.id === "take-amount") tk.amount = Math.max(0, Math.floor(Number(tv) || 0));
+          else {
+            // these change what the form shows: draw it again, and keep the focus where it was
+            if (e.target.id === "take-kind") tk.kind = tv;
+            else if (e.target.id === "take-item") tk.item = tv;
+            else if (e.target.id === "take-rarity") tk.rarity = Number(tv) || 0;
+            else if (e.target.id === "take-all") tk.all = e.target.checked;
+            tk.error = "";
+            var keep = e.target.id;
+            paintBoard();
+            var again = $("#" + keep);
+            if (again) again.focus();
+          }
           return;
         }
         if (/^mod-/.test(e.target.id) && view.board.mod) {

@@ -8,10 +8,10 @@
 -- not banned; a player can only change the figures on their own row. Chapter,
 -- Power and Collection show the save as it is now, so they go down when a
 -- player resets; Endless, Pests, Challenges and Duels never go down when a
--- player sends them. Admins can ban, time out, unban, send gifts, change the
--- banner, look at a player's inventory and see who is online, but only
--- through the functions and rules below, which check that the caller is an
--- admin. Trades go through the server too, which holds both offers so nobody
+-- player sends them. Admins can ban, time out, unban, send gifts, take things
+-- away, change the banner, look at a player's inventory and see who is online,
+-- but only through the functions and rules below, which check that the caller
+-- is an admin. Trades go through the server too, which holds both offers so nobody
 -- can swap theirs at the last moment. The Table Editor and this SQL editor can
 -- still change anything.
 
@@ -157,6 +157,28 @@ create table if not exists public.gifts (
 create index if not exists gifts_waiting on public.gifts (player) where claimed_at is null;
 alter table public.gifts enable row level security;
 revoke all on public.gifts from anon, authenticated;
+
+-- What an admin takes away from a player (gold, gems or gear), waiting until
+-- the player's game picks it up: straight away if they are playing, or the
+-- next time they open the game. amount 0 means all of it (every copy of an
+-- item). A separate table from gifts, so a game too old to know about takes
+-- leaves them waiting instead of mistaking them for gifts.
+create table if not exists public.takes (
+  id bigint generated always as identity primary key,
+  player uuid not null references public.players (id) on delete cascade,
+  kind text not null check (kind in ('item', 'gold', 'gems')),
+  item text check (char_length(item) <= 64),
+  rarity integer not null default 0 check (rarity between 0 and 20),
+  amount bigint not null default 0 check (amount between 0 and 1000000000000),
+  message text check (char_length(message) <= 200),
+  sent_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  claimed_at timestamptz
+);
+
+create index if not exists takes_waiting on public.takes (player) where claimed_at is null;
+alter table public.takes enable row level security;
+revoke all on public.takes from anon, authenticated;
 
 -- The banner: the strip of text above the game's top bar, which an admin
 -- changes from the admin menu (Settings). One row at most. No row, or no
@@ -349,6 +371,88 @@ as $$
   set claimed_at = now()
   where g.player = (select auth.uid()) and g.claimed_at is null
   returning g.kind, g.item, g.rarity, g.amount, g.message;
+$$;
+
+/* Take something away. kind 'item': item is an item id, rarity its rarity and
+   amount how many copies; 'gold' or 'gems': amount. amount 0 takes all of it. */
+create or replace function public.pip_take(target uuid, kind text, item text, rarity integer, amount bigint, message text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.pip_is_admin() then
+    raise exception 'Only admins can do that.';
+  end if;
+  if not exists (select 1 from public.players p where p.id = target) then
+    raise exception 'That player has gone.';
+  end if;
+  if kind is null or kind not in ('item', 'gold', 'gems') then
+    raise exception 'Pick what to take.';
+  end if;
+  if kind = 'item' and coalesce(item, '') !~ '^[a-z0-9_]{1,40}$' then
+    raise exception 'Pick an item.';
+  end if;
+  if coalesce(amount, 0) < 0 then
+    raise exception 'Pick an amount.';
+  end if;
+  insert into public.takes (player, kind, item, rarity, amount, message, sent_by)
+  values (
+    target,
+    kind,
+    case when kind = 'item' then item end,
+    case when kind = 'item' then least(greatest(coalesce(rarity, 0), 0), 20) else 0 end,
+    least(coalesce(amount, 0), 1000000000000),
+    nullif(left(coalesce(message, ''), 200), ''),
+    (select auth.uid())
+  );
+end;
+$$;
+
+/* the player's game picks up what is to be taken away; each one is handed out once */
+create or replace function public.pip_claim_takes()
+returns table (kind text, item text, rarity integer, amount bigint, message text)
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.takes t
+  set claimed_at = now()
+  where t.player = (select auth.uid()) and t.claimed_at is null
+  returning t.kind, t.item, t.rarity, t.amount, t.message;
+$$;
+
+/* For admins: what is still waiting to be taken from a player (their game has not picked it up). */
+create or replace function public.pip_takes_waiting(target uuid)
+returns table (id bigint, kind text, item text, rarity integer, amount bigint, message text, created_at timestamptz)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select t.id, t.kind, t.item, t.rarity, t.amount, t.message, t.created_at
+  from public.takes t
+  where t.player = target and t.claimed_at is null and public.pip_is_admin()
+  order by t.created_at;
+$$;
+
+/* For admins: call off a take the player's game has not picked up yet. */
+create or replace function public.pip_take_cancel(take_id bigint)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.pip_is_admin() then
+    raise exception 'Only admins can do that.';
+  end if;
+  delete from public.takes where id = take_id and claimed_at is null;
+  if not found then
+    raise exception 'Too late: their game has already picked that up.';
+  end if;
+end;
 $$;
 
 /* new_text: what the banner says ('' hides it); null goes back to the text in index.html */
@@ -891,6 +995,10 @@ revoke execute on function public.pip_trade_pending() from public, anon;
 revoke execute on function public.pip_dev_token() from public, anon;
 revoke execute on function public.pip_dev_check(uuid) from public, anon;
 revoke execute on function public.pip_seen(boolean, text) from public, anon;
+revoke execute on function public.pip_take(uuid, text, text, integer, bigint, text) from public, anon;
+revoke execute on function public.pip_claim_takes() from public, anon;
+revoke execute on function public.pip_takes_waiting(uuid) from public, anon;
+revoke execute on function public.pip_take_cancel(bigint) from public, anon;
 revoke execute on function public.pip_presence() from public, anon;
 -- the helpers behind the trades are only for the functions above
 revoke execute on function public.pip_trade_clean(jsonb) from public, anon, authenticated;
@@ -916,4 +1024,8 @@ grant execute on function public.pip_trade_pending() to authenticated;
 grant execute on function public.pip_dev_token() to authenticated;
 grant execute on function public.pip_dev_check(uuid) to authenticated;
 grant execute on function public.pip_seen(boolean, text) to authenticated;
+grant execute on function public.pip_take(uuid, text, text, integer, bigint, text) to authenticated;
+grant execute on function public.pip_claim_takes() to authenticated;
+grant execute on function public.pip_takes_waiting(uuid) to authenticated;
+grant execute on function public.pip_take_cancel(bigint) to authenticated;
 grant execute on function public.pip_presence() to authenticated;
