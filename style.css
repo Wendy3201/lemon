@@ -8506,3 +8506,55 @@ button.inv__cell:focus-visible {
 .takennote .giftnote__money {
   color: var(--bad);
 }
+
+/* removing things, right in an admin's look at an inventory */
+.inv__takebar {
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.inv__money {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.inv__have {
+  min-width: 90px;
+  font-weight: 800;
+}
+
+.inv__money input {
+  width: 110px;
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm, 10px);
+  background: var(--bg-soft);
+  color: var(--ink);
+  font: inherit;
+}
+
+.inv__other {
+  padding: 0 10px 10px;
+}
+
+.inv__cell .inv__remove {
+  margin-top: 2px;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.inv__remove {
+  color: var(--bad);
+}
+
+.inv__remove.is-sure {
+  border-color: var(--bad);
+  background: var(--bad);
+  color: #fff;
+}
