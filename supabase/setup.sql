@@ -219,10 +219,14 @@ create table if not exists public.events (
   fired_by uuid references auth.users (id) on delete set null
 );
 
--- the list of events can grow, so it is refreshed on every run
+-- several events can go at once ("disco,rain"), for a set number of seconds
+-- (0: each event's own time). The list can grow, so these are refreshed on every run.
+alter table public.events add column if not exists seconds integer not null default 0;
 alter table public.events drop constraint if exists events_kind_check;
 alter table public.events add constraint events_kind_check
-  check (kind in ('confetti', 'flip', 'rain', 'wobble', 'disco', 'tiny', 'mirror', 'blackout', 'shout'));
+  check (char_length(kind) <= 100 and string_to_array(kind, ',') <@ array['confetti', 'flip', 'rain', 'wobble', 'disco', 'tiny', 'mirror', 'blackout', 'shout']);
+alter table public.events drop constraint if exists events_seconds_check;
+alter table public.events add constraint events_seconds_check check (seconds between 0 and 120);
 
 alter table public.events enable row level security;
 
@@ -233,7 +237,7 @@ create policy "Everyone can read the event"
   using (true);
 
 revoke all on public.events from anon, authenticated;
-grant select (id, kind, message, at) on public.events to anon, authenticated;
+grant select (id, kind, message, at, seconds) on public.events to anon, authenticated;
 
 -- Public chat: everyone signed in can read it; messages only go in through pip_say.
 create table if not exists public.chat (
@@ -594,24 +598,33 @@ begin
 end;
 $$;
 
-/* Admin abuse, part two: fire an event for every open game. */
-create or replace function public.pip_set_event(event_kind text, event_message text)
+/* Admin abuse, part two: fire one or more events (a comma-separated list, at
+   most nine) for every open game, for a set number of seconds (0: each
+   event's own time, up to 120). */
+drop function if exists public.pip_set_event(text, text);
+create or replace function public.pip_set_event(event_kind text, event_message text, event_seconds integer default 0)
 returns void
 language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  kinds text[] := string_to_array(replace(coalesce(event_kind, ''), ' ', ''), ',');
 begin
   if not public.pip_is_admin() then
     raise exception 'Only admins can do that.';
   end if;
-  if event_kind is null or event_kind not in ('confetti', 'flip', 'rain', 'wobble', 'disco', 'tiny', 'mirror', 'blackout', 'shout') then
+  if cardinality(kinds) < 1 or kinds = array['']
+     or not (kinds <@ array['confetti', 'flip', 'rain', 'wobble', 'disco', 'tiny', 'mirror', 'blackout', 'shout']) then
     raise exception 'Pick an event.';
   end if;
-  insert into public.events (id, kind, message, at, fired_by)
-  values (1, event_kind, nullif(left(btrim(coalesce(event_message, '')), 100), ''), now(), (select auth.uid()))
+  if coalesce(event_seconds, 0) < 0 or coalesce(event_seconds, 0) > 120 then
+    raise exception 'Pick between 1 and 120 seconds (or leave it empty).';
+  end if;
+  insert into public.events (id, kind, message, at, seconds, fired_by)
+  values (1, array_to_string(kinds, ','), nullif(left(btrim(coalesce(event_message, '')), 100), ''), now(), coalesce(event_seconds, 0), (select auth.uid()))
   on conflict (id) do update
-    set kind = excluded.kind, message = excluded.message, at = excluded.at, fired_by = excluded.fired_by;
+    set kind = excluded.kind, message = excluded.message, at = excluded.at, seconds = excluded.seconds, fired_by = excluded.fired_by;
 end;
 $$;
 
@@ -1258,12 +1271,16 @@ grant execute on function public.pip_dev_token() to authenticated;
 grant execute on function public.pip_dev_check(uuid) to authenticated;
 grant execute on function public.pip_seen(boolean, text) to authenticated;
 grant execute on function public.pip_set_shown(uuid, text, text) to authenticated;
+revoke execute on function public.pip_say(text) from public, anon;
+revoke execute on function public.pip_chat_delete(bigint) from public, anon;
+grant execute on function public.pip_say(text) to authenticated;
+grant execute on function public.pip_chat_delete(bigint) to authenticated;
 revoke execute on function public.pip_rename(text) from public, anon;
 grant execute on function public.pip_rename(text) to authenticated;
 revoke execute on function public.pip_give_many(text, text, integer, bigint, text, text) from public, anon;
-revoke execute on function public.pip_set_event(text, text) from public, anon;
+revoke execute on function public.pip_set_event(text, text, integer) from public, anon;
 grant execute on function public.pip_give_many(text, text, integer, bigint, text, text) to authenticated;
-grant execute on function public.pip_set_event(text, text) to authenticated;
+grant execute on function public.pip_set_event(text, text, integer) to authenticated;
 grant execute on function public.pip_take(uuid, text, text, integer, bigint, text) to authenticated;
 grant execute on function public.pip_claim_takes() to authenticated;
 grant execute on function public.pip_takes_waiting(uuid) to authenticated;
