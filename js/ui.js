@@ -349,6 +349,7 @@
           '<div class="home__social">' +
             '<button class="btn home__together" type="button" data-act="together" data-key="together">' + PS.icon("atk") + "Play with a friend</button>" +
             '<button class="btn home__trade" type="button" data-act="trade" data-key="trade">' + PS.icon("gift") + "Trade</button>" +
+            '<button class="btn home__chat" type="button" data-act="chat" data-key="chat">' + PS.icon("info") + "Chat</button>" +
           "</div>" +
           '<p class="hint">Move with WASD or the arrow keys, or drag on the screen. Your lemon attacks by itself.</p>' +
           '<button class="btn btn--sm home__guide" type="button" data-act="howto" data-key="howto">' + PS.icon("info") + "New here? How to play</button>" +
@@ -2596,6 +2597,7 @@
     else if (modal.type === "account") html = accountModal();
     else if (modal.type === "gift") html = giftModal(modal);
     else if (modal.type === "taken") html = takenModal(modal);
+    else if (modal.type === "chat") html = chatModal();
     else if (modal.type === "blackjack") html = blackjackModal();
     else if (modal.type === "spinner") html = spinnerModal();
     if (html === null) {
@@ -3738,6 +3740,103 @@
     toast("A moderator sent you a gift!");
   }
 
+  /* ------------------------------------------------------- public chat */
+  /* Everyone signed in can read and write. The window asks for the newest
+     messages every few seconds while it is open, and only redraws the list,
+     so what is being typed is never lost. */
+
+  var CHAT_EVERY = 4000;
+  var chat = { rows: null, error: "", timer: 0, sending: false };
+
+  function chatOpen() {
+    return Boolean(view.modal && view.modal.type === "chat");
+  }
+
+  function chatTime(iso) {
+    var date = new Date(iso);
+    return isNaN(date.getTime()) ? "" : date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+
+  function chatListHtml() {
+    if (chat.error && !chat.rows) return '<p class="chat__empty">' + esc(chat.error) + "</p>";
+    if (!chat.rows) return '<p class="chat__empty">Loading...</p>';
+    if (!chat.rows.length) return '<p class="chat__empty">No one has said anything yet. Say hi!</p>';
+    var who = PS.cloud.me();
+    var mod = PS.cloud.isAdmin();
+    return chat.rows.map(function (m) {
+      var mine = Boolean(who && m.player === who.id);
+      return '<div class="chat__msg' + (mine ? " is-mine" : "") + '">' +
+        '<span class="chat__who">' + avatar(m.name) + "<b>" + esc(m.name) + "</b><small>" + esc(chatTime(m.created_at)) + "</small>" +
+        (mod ? '<button class="chat__del" type="button" data-act="chat-del" data-id="' + Number(m.id) + '" aria-label="Delete this message" title="Delete">&times;</button>' : "") + "</span>" +
+        "<p>" + esc(m.message) + "</p></div>";
+    }).join("");
+  }
+
+  function chatModal() {
+    var who = PS.cloud.me();
+    var can = Boolean(who && !PS.cloud.offline());
+    return (
+      '<div class="chat">' +
+        '<button class="modal__close" type="button" data-act="close" aria-label="Close">' + PS.icon("close") + "</button>" +
+        '<h2 id="modal-title">Chat</h2>' +
+        '<p class="hint">Everyone playing can read this. Be kind: admins can delete messages and ban.</p>' +
+        '<div class="chat__list" id="chat-list" aria-live="polite">' + chatListHtml() + "</div>" +
+        (can
+          ? '<form class="chat__form" data-form="chat" novalidate>' +
+              '<input id="chat-input" type="text" maxlength="200" autocomplete="off" placeholder="Say something..." aria-label="Your message" />' +
+              '<button class="btn btn--primary btn--sm" type="submit">Send</button></form>' +
+            '<p class="board__formerr" id="chat-error" role="alert"></p>'
+          : '<p class="hint">Log in (not offline) to join in.</p>') +
+      "</div>"
+    );
+  }
+
+  /** Redraw just the list, keeping the scroll at the bottom if it was there. */
+  function paintChat() {
+    var box = $("#chat-list");
+    if (!box) return;
+    var atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+    box.innerHTML = chatListHtml();
+    if (atEnd) box.scrollTop = box.scrollHeight;
+  }
+
+  function loadChat() {
+    if (!chatOpen()) {
+      clearInterval(chat.timer);
+      chat.timer = 0;
+      return Promise.resolve();
+    }
+    return PS.cloud.chatList().then(function (res) {
+      if (!chatOpen()) return;
+      if (res.error) {
+        chat.error = res.error;
+      } else {
+        chat.error = "";
+        chat.rows = res.rows;
+      }
+      paintChat();
+    });
+  }
+
+  function chatSubmit(e) {
+    e.preventDefault();
+    var box = $("#chat-input");
+    var text = box ? box.value.trim() : "";
+    if (!text || chat.sending) return;
+    chat.sending = true;
+    PS.cloud.say(text).then(function (res) {
+      chat.sending = false;
+      var err = $("#chat-error");
+      if (err) err.textContent = res.error || "";
+      if (res.error) return;
+      if (box) box.value = "";
+      loadChat().then(function () {
+        var list = $("#chat-list");
+        if (list) list.scrollTop = list.scrollHeight;
+      });
+    });
+  }
+
   /** Take out of the save what an admin is taking away. Only a take that came with
    *  a message is mentioned (with the message); the rest just go, quietly. */
   function loseTakes(list) {
@@ -4487,6 +4586,26 @@
     fight: function () { startBattle(st.get().chapter); },
     together: function () { if (PS.multi) PS.multi.open(); },
     trade: function () { if (PS.trade) PS.trade.open(); },
+    chat: function () {
+      chat.rows = null;
+      chat.error = "";
+      openModal({ type: "chat" });
+      clearInterval(chat.timer);
+      chat.timer = setInterval(loadChat, CHAT_EVERY);
+      loadChat().then(function () {
+        var list = $("#chat-list");
+        if (list) list.scrollTop = list.scrollHeight;
+        var box = $("#chat-input");
+        if (box) box.focus();
+      });
+    },
+    "chat-del": function (node) {
+      node.disabled = true;
+      PS.cloud.chatDelete(Number(node.getAttribute("data-id"))).then(function (res) {
+        if (res.error) toast(res.error);
+        loadChat();
+      });
+    },
     endless: function () {
       var info = st.endlessInfo();
       if (info.open) startBattle(info.chapter, "swarm");
@@ -5277,6 +5396,10 @@
     }
     if (e.target.getAttribute("data-form") === "mod") {
       modSubmit(e);
+      return;
+    }
+    if (e.target.getAttribute("data-form") === "chat") {
+      chatSubmit(e);
       return;
     }
     if (e.target.getAttribute("data-form") === "rename") {

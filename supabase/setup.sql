@@ -235,6 +235,27 @@ create policy "Everyone can read the event"
 revoke all on public.events from anon, authenticated;
 grant select (id, kind, message, at) on public.events to anon, authenticated;
 
+-- Public chat: everyone signed in can read it; messages only go in through pip_say.
+create table if not exists public.chat (
+  id bigint generated always as identity primary key,
+  player uuid not null references public.players (id) on delete cascade,
+  name text not null,
+  message text not null check (char_length(message) between 1 and 200),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists chat_player_recent on public.chat (player, created_at desc);
+alter table public.chat enable row level security;
+
+drop policy if exists "Signed-in players can read the chat" on public.chat;
+create policy "Signed-in players can read the chat"
+  on public.chat for select
+  to authenticated
+  using (true);
+
+revoke all on public.chat from anon, authenticated;
+grant select on public.chat to authenticated;
+
 -- What each player owns (gear, pets, gold, gems), as their game last sent it,
 -- so an admin can look. A player can read their own; admins can read anyone's.
 -- The size limit keeps a giant made-up inventory from ever being stored.
@@ -591,6 +612,48 @@ begin
   values (1, event_kind, nullif(left(btrim(coalesce(event_message, '')), 100), ''), now(), (select auth.uid()))
   on conflict (id) do update
     set kind = excluded.kind, message = excluded.message, at = excluded.at, fired_by = excluded.fired_by;
+end;
+$$;
+
+/* Public chat: say something (200 characters, one message every 2 seconds,
+   not while banned or timed out). Only the newest 300 are kept. */
+create or replace function public.pip_say(said text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  me uuid := (select auth.uid());
+  my_name text := public.pip_trader_name();
+  clean text := btrim(regexp_replace(coalesce(said, ''), '[[:cntrl:]]+', ' ', 'g'));
+begin
+  if me is null or my_name is null then
+    raise exception 'Log in to chat.';
+  end if;
+  if clean = '' then
+    raise exception 'Type something first.';
+  end if;
+  if exists (select 1 from public.chat c where c.player = me and c.created_at > now() - interval '2 seconds') then
+    raise exception 'Slow down a little.';
+  end if;
+  insert into public.chat (player, name, message) values (me, my_name, left(clean, 200));
+  delete from public.chat where id <= (select max(id) from public.chat) - 300;
+end;
+$$;
+
+/* For admins: remove a message. */
+create or replace function public.pip_chat_delete(msg_id bigint)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.pip_is_admin() then
+    raise exception 'Only admins can do that.';
+  end if;
+  delete from public.chat where id = msg_id;
 end;
 $$;
 
@@ -1195,6 +1258,10 @@ grant execute on function public.pip_dev_token() to authenticated;
 grant execute on function public.pip_dev_check(uuid) to authenticated;
 grant execute on function public.pip_seen(boolean, text) to authenticated;
 grant execute on function public.pip_set_shown(uuid, text, text) to authenticated;
+revoke execute on function public.pip_say(text) from public, anon;
+revoke execute on function public.pip_chat_delete(bigint) from public, anon;
+grant execute on function public.pip_say(text) to authenticated;
+grant execute on function public.pip_chat_delete(bigint) to authenticated;
 revoke execute on function public.pip_rename(text) from public, anon;
 grant execute on function public.pip_rename(text) to authenticated;
 revoke execute on function public.pip_give_many(text, text, integer, bigint, text, text) from public, anon;

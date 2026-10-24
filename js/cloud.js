@@ -684,6 +684,21 @@
         return res.error ? failed(res.error) : { n: Number(d.n) || 0, name: d.name ? String(d.name) : "" };
       }, failed);
     },
+    /* Public chat. */
+    /** The newest messages, oldest first: { rows: [{ id, name, message, created_at, player }] } or { error }. */
+    chatList: function () {
+      if (!client || !me || offline) return Promise.resolve({ error: "Chat needs an account and the internet.", down: true });
+      return client.from("chat").select("id, player, name, message, created_at").order("id", { ascending: false }).limit(50).then(function (res) {
+        return res.error ? failed(res.error) : { rows: (res.data || []).slice().reverse() };
+      }, failed);
+    },
+    say: function (text) {
+      return moderate("pip_say", { said: String(text || "") });
+    },
+    chatDelete: function (id) {
+      return moderate("pip_chat_delete", { msg_id: id });
+    },
+
     /** Admin abuse: fire an event (confetti, flip, rain, wobble, disco, tiny, mirror, blackout, shout) for every open game. */
     fireEvent: function (kind, message) {
       return moderate("pip_set_event", { event_kind: kind, event_message: message || "" });
