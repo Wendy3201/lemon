@@ -700,13 +700,24 @@
     },
 
     /** Admin abuse: fire an event (confetti, flip, rain, wobble, disco, tiny, mirror, blackout, shout) for every open game. */
-    fireEvent: function (kind, message) {
-      return moderate("pip_set_event", { event_kind: kind, event_message: message || "" });
+    fireEvent: function (kinds, message, seconds) {
+      return moderate("pip_set_event", {
+        event_kind: Array.isArray(kinds) ? kinds.join(",") : String(kinds || ""),
+        event_message: message || "",
+        event_seconds: Math.max(0, Math.min(120, Math.floor(seconds || 0)))
+      });
     },
-    /** The latest event, for any game (no account needed): { kind, message, at } or { event: null }. */
+    /** The latest event, for any game (no account needed): { kind (maybe several, with commas),
+     *  message, at, seconds } or { event: null }. */
     event: function () {
       if (!client) return Promise.resolve({ error: DOWN, down: true });
-      return client.from("events").select("kind, message, at").limit(1).maybeSingle().then(function (res) {
+      return client.from("events").select("kind, message, at, seconds").limit(1).maybeSingle().then(function (res) {
+        if (res.error && (res.error.code === "42703" || res.error.code === "PGRST204" || res.error.code === "PGRST200")) {
+          // a server from before durations: ask without them
+          return client.from("events").select("kind, message, at").limit(1).maybeSingle().then(function (r2) {
+            return r2.error ? failed(r2.error) : { event: r2.data || null };
+          }, failed);
+        }
         return res.error ? failed(res.error) : { event: res.data || null };
       }, failed);
     },

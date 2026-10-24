@@ -429,11 +429,16 @@ ticked (Supabase → Table Editor → players). `setup.sql` ticks `test`,
     any rarity, with its picture). Your message, if any, goes with it. It
     arrives as a gift, so players who are offline get theirs the next time
     they open the game.
-  - **Events** play in every open game for a few seconds, with your message (or
-    a default) over the top: **Confetti**, **Flip every screen**, **Lemon
-    rain**, **Earthquake**, **Disco** (the colours cycle), **Shrink
-    everything**, **Mirror world**, **Lights out** and **Shout a message**
-    (just the words). A new event ends the one still playing.
+  - **Events** play in every open game, with your message (or a default) over
+    the top. Tick **as many as you like** and they all play together:
+    **Confetti**, **Flip every screen**, **Lemon rain**, **Earthquake**,
+    **Disco** (the colours cycle), **Shrink everything**, **Mirror world**,
+    **Lights out** and **Shout a message** (just the words). **How long, in
+    seconds** (1 to 120) sets how long they last; leave it empty and they last
+    as long as the longest of the ones ticked. A new event ends the ones still
+    playing. **Fire the ticked events at the same moment** next to Free stuff
+    sends a gift and the events together, so the gift pops up in the middle of
+    them.
   - Open games check every 10 seconds (yours plays it at once, and a gift to
     yourself is picked up at once); one that has only just opened doesn't
     replay an old event, and nothing in anyone's save changes. Players with

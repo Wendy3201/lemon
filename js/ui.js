@@ -3997,10 +3997,14 @@
   var eventTimer = 0;
   var eventClean = null; // puts back whatever the event now playing changed
 
-  function playEvent(kind, message) {
-    var def = EVENTS[kind];
-    if (!def) return;
-    // a new event ends the one still playing, so nothing of it is left behind
+  /** Play one or more events together (`kinds`, or one name, or "a,b"), for `seconds`
+   *  (empty or 0: the longest of their own times). */
+  function playEvent(kinds, message, seconds) {
+    kinds = (Array.isArray(kinds) ? kinds : String(kinds || "").split(",")).filter(function (k, i, all) {
+      return EVENTS[k] && all.indexOf(k) === i;
+    });
+    if (!kinds.length) return;
+    // a new event ends the ones still playing, so nothing of them is left behind
     clearTimeout(eventTimer);
     if (eventClean) eventClean();
     var root = document.documentElement;
@@ -4015,38 +4019,42 @@
     var note = document.createElement("div");
     note.className = "chaos__note";
     note.setAttribute("role", "status");
-    note.textContent = message || def.text;
+    note.textContent = message || EVENTS[kinds[0]].text;
     add(note);
     var classes = [];
     if (!calm) {
-      if (kind === "flip" || kind === "wobble" || kind === "disco" || kind === "tiny" || kind === "mirror") {
-        root.classList.add("chaos-" + kind);
-        classes.push("chaos-" + kind);
-      }
-      if (kind === "blackout") {
-        var dark = document.createElement("div");
-        dark.className = "chaos__dark";
-        add(dark);
-      }
-      var count = kind === "rain" ? 36 : kind === "confetti" ? 60 : 0;
-      for (var i = 0; i < count; i++) {
-        var bit = document.createElement("div");
-        bit.className = "chaos__bit" + (kind === "confetti" ? " is-confetti" : "");
-        bit.style.left = Math.random() * 100 + "vw";
-        bit.style.animationDelay = Math.random() * 2.2 + "s";
-        bit.style.animationDuration = 2.4 + Math.random() * 2 + "s";
-        if (kind === "confetti") bit.style.background = "hsl(" + Math.floor(Math.random() * 360) + ",85%,60%)";
-        else bit.innerHTML = PS.art("lemon");
-        add(bit);
-      }
+      kinds.forEach(function (kind) {
+        if (kind === "flip" || kind === "wobble" || kind === "disco" || kind === "tiny" || kind === "mirror") {
+          root.classList.add("chaos-" + kind);
+          classes.push("chaos-" + kind);
+        }
+        if (kind === "blackout") {
+          var dark = document.createElement("div");
+          dark.className = "chaos__dark";
+          add(dark);
+        }
+        var count = kind === "rain" ? 36 : kind === "confetti" ? 60 : 0;
+        for (var i = 0; i < count; i++) {
+          var bit = document.createElement("div");
+          bit.className = "chaos__bit" + (kind === "confetti" ? " is-confetti" : "");
+          bit.style.left = Math.random() * 100 + "vw";
+          bit.style.animationDelay = Math.random() * 2.2 + "s";
+          bit.style.animationDuration = 2.4 + Math.random() * 2 + "s";
+          bit.style.animationIterationCount = "infinite"; // keeps falling for as long as the event lasts
+          if (kind === "confetti") bit.style.background = "hsl(" + Math.floor(Math.random() * 360) + ",85%,60%)";
+          else bit.innerHTML = PS.art("lemon");
+          add(bit);
+        }
+      });
     }
-    PS.sfx.play(kind === "wobble" || kind === "blackout" ? "boss" : "reveal", 2);
+    PS.sfx.play(kinds.indexOf("wobble") !== -1 || kinds.indexOf("blackout") !== -1 ? "boss" : "reveal", 2);
+    var length = Math.floor(Number(seconds)) > 0 ? Math.min(120, Math.floor(Number(seconds))) : Math.max.apply(null, kinds.map(function (k) { return EVENTS[k].seconds; }));
     eventClean = function () {
       classes.forEach(function (c) { root.classList.remove(c); });
       bits.forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
       eventClean = null;
     };
-    eventTimer = setTimeout(function () { if (eventClean) eventClean(); }, def.seconds * 1000);
+    eventTimer = setTimeout(function () { if (eventClean) eventClean(); }, length * 1000);
   }
 
   /** Is there a new event? The first look only notes what is there. */
@@ -4061,13 +4069,13 @@
       }
       if (ev && at !== eventSeen) {
         eventSeen = at;
-        playEvent(ev.kind, ev.message ? String(ev.message).slice(0, 100) : "");
+        playEvent(String(ev.kind || "").split(","), ev.message ? String(ev.message).slice(0, 100) : "", ev.seconds);
       }
     });
   }
 
   /** The admin menu's card: free stuff for the players, and events. Each button asks twice. */
-  var abuse = { who: "all", withEvent: "", what: "gold", amount: 500, item: "", rarity: 0, message: "", confirm: "", note: "" };
+  var abuse = { who: "all", withEvent: false, events: [], seconds: "", what: "gold", amount: 500, item: "", rarity: 0, message: "", confirm: "", note: "" };
 
   var ABUSE_WHO = [["all", "Everyone"], ["online", "Everyone online right now"], ["random", "One random player (lucky dip)"]];
   var ABUSE_EVENTS = [
@@ -4079,23 +4087,33 @@
   function devAbuse() {
     if (!PS.dev.admin || !PS.cloud.isAdmin()) return "";
     if (!abuse.item) abuse.item = firstItem("weapon");
-    function button(key, label, cls) {
+    function button(key, label, cls, off) {
       var sure = abuse.confirm === key;
-      return '<button class="btn btn--sm' + (sure ? " btn--danger" : cls ? " " + cls : "") + '" type="button" data-act="abuse" data-what="' + key + '">' + (sure ? "Sure? " : "") + label + "</button>";
+      return '<button class="btn btn--sm' + (sure ? " btn--danger" : cls ? " " + cls : "") + '" type="button" data-act="abuse" data-what="' + key + '"' + (off ? " disabled" : "") + ">" + (sure ? "Sure? " : "") + label + "</button>";
     }
     var item = abuse.what === "item";
     var who = abuse.who === "all" ? "everyone" : abuse.who === "online" ? "everyone online" : "one random player";
     var stuff = item
       ? PS.RARITY[abuse.rarity].name + " " + PS.ITEMS[abuse.item].name
       : fmt(abuse.amount) + " " + abuse.what;
+    var picked = ABUSE_EVENTS.filter(function (e) { return abuse.events.indexOf(e[0]) !== -1; });
+    var pickedNames = picked.map(function (e) { return e[1]; }).join(" + ");
     return devCard("Admin abuse",
       '<p class="hint">It cannot be called back. Gifts reach players who are offline too (not the banned), the next time they open the game. ' +
-        "Events play in every open game within about 10 seconds (yours at once) and last a few seconds. Each button asks \"Sure?\" first.</p>" +
-      '<label class="devabuse__msg">Message (optional)<input id="abuse-msg" type="text" maxlength="100" value="' + esc(abuse.message) + '" placeholder="Shown with the gift or the event" /></label>' +
+        "Events play in every open game within about 10 seconds (yours at once). Each button asks \"Sure?\" first.</p>" +
+      '<label class="devabuse__msg">Message (optional)<input id="abuse-msg" type="text" maxlength="100" value="' + esc(abuse.message) + '" placeholder="Shown with the gift or the events" /></label>' +
+      '<p class="devbox__label">Events <small>(tick as many as you like)</small></p>' +
+      '<div class="devabuse__chips" role="group" aria-label="Events">' + ABUSE_EVENTS.map(function (e) {
+        var on = abuse.events.indexOf(e[0]) !== -1;
+        return '<button class="devabuse__chip' + (on ? " is-on" : "") + '" type="button" data-act="abuse-pick" data-ev="' + e[0] + '" aria-pressed="' + on + '">' + esc(e[1]) + "</button>";
+      }).join("") + "</div>" +
+      '<div class="dev__give">' +
+        '<label>How long, in seconds<input id="abuse-seconds" type="number" min="1" max="120" step="1" value="' + esc(String(abuse.seconds)) + '" placeholder="automatic" /></label>' +
+      "</div>" +
+      devRow(button("fire", picked.length ? "Fire " + pickedNames : "Fire the events (tick some first)", "btn--primary", !picked.length)) +
       '<p class="devbox__label">Free stuff</p>' +
       '<div class="dev__give">' +
         devSelect("abuse-who", "Who gets it", ABUSE_WHO, abuse.who) +
-        devSelect("abuse-with", "Plus an event, at the same time", [["", "No event"]].concat(ABUSE_EVENTS), abuse.withEvent) +
         devSelect("abuse-what", "What", [["gold", "Gold"], ["gems", "Gems"], ["item", "A weapon or gear"]], abuse.what) +
         (item ? "" : '<label>Amount<input id="abuse-amount" type="number" min="1" max="1000000000" step="1" value="' + abuse.amount + '" /></label>') +
       "</div>" +
@@ -4105,9 +4123,9 @@
               return [id, PS.ITEMS[id].name + (PS.ITEMS[id].grade !== "A" ? " (" + PS.ITEMS[id].grade + ")" : "")];
             }), abuse.item) + devSelect("abuse-rarity", "Rarity", rarityOptions(PS.RARITY.length), abuse.rarity) + "</div></div>"
         : "") +
-      devRow(button("give", "Send " + stuff + " to " + who + (abuse.withEvent ? " + " + abuse.withEvent : ""), "btn--primary")) +
-      '<p class="devbox__label">Events</p>' +
-      devRow(ABUSE_EVENTS.map(function (e) { return button(e[0], e[1]); }).join("")) +
+      '<label class="inv__all"><input id="abuse-with" type="checkbox"' + (abuse.withEvent ? " checked" : "") + (picked.length ? "" : " disabled") + " /> Fire the ticked events at the same moment" +
+        (picked.length ? "" : " (tick some above)") + "</label>" +
+      devRow(button("give", "Send " + stuff + " to " + who + (abuse.withEvent && picked.length ? " + " + pickedNames : ""), "btn--primary")) +
       (abuse.note ? '<p class="hint devbanner__note" role="status">' + esc(abuse.note) + "</p>" : "")
     );
   }
@@ -5234,6 +5252,15 @@
       toast("Your power and stats are back to normal");
       renderModal();
     },
+    "abuse-pick": function (node) {
+      var ev = node.getAttribute("data-ev");
+      var at = abuse.events.indexOf(ev);
+      if (at === -1) abuse.events.push(ev);
+      else abuse.events.splice(at, 1);
+      if (!abuse.events.length) abuse.withEvent = false;
+      abuse.confirm = "";
+      renderModal();
+    },
     abuse: function (node) {
       var what = node.getAttribute("data-what");
       var msgBox = $("#abuse-msg");
@@ -5253,23 +5280,28 @@
       }
       abuse.confirm = "";
       var message = abuse.message.trim();
+      var seconds = Math.max(0, Math.min(120, Math.floor(Number(abuse.seconds) || 0)));
+      // in the menu's order, the same as the button says
+      var events = ABUSE_EVENTS.map(function (e) { return e[0]; }).filter(function (k) { return abuse.events.indexOf(k) !== -1; });
+      var together = what === "give" && abuse.withEvent && events.length;
       var job;
       if (what === "give") {
         var gift = { kind: abuse.what, item: abuse.item, rarity: abuse.rarity, amount: abuse.amount, message: message, who: abuse.who };
         var label = abuse.what === "item" ? PS.RARITY[abuse.rarity].name + " " + PS.ITEMS[abuse.item].name : fmt(abuse.amount) + " " + abuse.what;
-        // the event goes at the same moment, so the gift pops up in the middle of it
-        var also = abuse.withEvent && EVENTS[abuse.withEvent] ? PS.cloud.fireEvent(abuse.withEvent, message) : Promise.resolve({});
+        // the events go at the same moment, so the gift pops up in the middle of them
+        var also = together ? PS.cloud.fireEvent(events, message, seconds) : Promise.resolve({});
         job = Promise.all([also, PS.cloud.giveMany(gift)]).then(function (both) {
           if (both[0].error) return both[0];
           var res = both[1];
           if (res.error) return res;
-          if (abuse.withEvent) label += " with " + abuse.withEvent;
+          if (together) label += " with " + events.join(" + ");
           if (abuse.who === "random") return { done: res.n ? res.name + " won " + label + "!" : "Nobody to give it to" };
           return { done: "Sent " + label + " to " + fmt(res.n) + " player" + (res.n === 1 ? "" : "s") + (message ? " (with your message)" : "") };
         });
       } else {
-        job = PS.cloud.fireEvent(what, message).then(function (res) {
-          return res.error ? res : { done: "Fired: " + what + ". Open games play it within about 10 seconds." };
+        if (!events.length) return;
+        job = PS.cloud.fireEvent(events, message, seconds).then(function (res) {
+          return res.error ? res : { done: "Fired " + events.join(" + ") + (seconds ? " for " + seconds + " seconds" : "") + ". Open games play it within about 10 seconds." };
         });
       }
       abuse.note = "Sending...";
@@ -5277,14 +5309,10 @@
       job.then(function (res) {
         abuse.note = res.error || res.done;
         if (view.modal && view.modal.type === "secret") renderModal();
-        // see it here at once: an event plays now, and a gift to yourself is picked up now
+        // see it here at once: events play now, and a gift to yourself is picked up now
         if (!res.error) {
-          if (what === "give") {
-            if (abuse.withEvent) checkEvent();
-            watch();
-          } else {
-            checkEvent();
-          }
+          if (together || what === "fire") checkEvent();
+          if (what === "give") watch();
         }
       });
     },
@@ -5664,10 +5692,11 @@
           if (key === "amount") abuse.amount = Math.max(1, Math.min(1e9, Math.floor(Number(e.target.value) || 1)));
           else if (key === "msg") abuse.message = e.target.value;
           else if (key === "rarity") abuse.rarity = Number(e.target.value) || 0;
-          else if (key === "with") abuse.withEvent = e.target.value;
+          else if (key === "with") abuse.withEvent = e.target.checked;
+          else if (key === "seconds") abuse.seconds = e.target.value;
           else abuse[key] = e.target.value; // who, what, item
           abuse.confirm = "";
-          if (key !== "amount" && key !== "msg") {
+          if (key !== "amount" && key !== "msg" && key !== "seconds") {
             // what is shown depends on these: draw it again, keeping the focus
             renderModal();
             var again = $("#" + e.target.id);
