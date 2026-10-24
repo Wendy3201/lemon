@@ -56,6 +56,7 @@
         '<h2>Paused</h2>' +
         '<p class="pausebox__where"></p>' +
         '<div class="pausebox__build"></div>' +
+        '<div class="pausebox__chat" hidden></div>' +
         '<div class="pausebox__actions">' +
           '<button class="btn" type="button" data-hud="dev" hidden>DEV</button>' +
           '<button class="btn" type="button" data-hud="quit">Give up</button>' +
@@ -253,6 +254,7 @@
       el.pause = root.querySelector('[data-panel="pause"]');
       el.pauseWhere = root.querySelector(".pausebox__where");
       el.pauseBuild = root.querySelector(".pausebox__build");
+      el.pauseChat = root.querySelector(".pausebox__chat");
       el.quit = root.querySelector('[data-hud="quit"]');
       el.dash = root.querySelector(".hud__dash");
       el.mate = root.querySelector(".hud__mate");
@@ -457,6 +459,8 @@
 
     paused: function (R) {
       el.pause.hidden = !R.paused;
+      // the public chat, in the pause menu (ui.js draws it)
+      if (PS.chatPanel) PS.chatPanel.show(el.pauseChat, Boolean(R.paused));
       if (!R.paused) return;
       quitArmed = false;
       el.quit.textContent = "Give up";
@@ -469,6 +473,7 @@
       el.hud.hidden = true;
       el.choose.hidden = true;
       el.pause.hidden = true;
+      if (PS.chatPanel) PS.chatPanel.show(el.pauseChat, false);
     }
   };
 })();

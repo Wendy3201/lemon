@@ -3794,7 +3794,7 @@
       var who = PS.cloud.me();
       res.rows.forEach(function (m) {
         if (chat.lastId === null || m.id > chat.lastId) chat.lastId = m.id;
-        if (first || chatOpen() || !who || m.player === who.id) return; // seen in the window, or my own
+        if (first || chatOpen() || panelOn() || !who || m.player === who.id) return; // seen in the chat, or my own
         var kind = mentionOf(m);
         if (kind) showPing(m, kind);
       });
@@ -3852,12 +3852,72 @@
 
   /** Redraw just the list, keeping the scroll at the bottom if it was there. */
   function paintChat() {
-    var box = $("#chat-list");
-    if (!box) return;
-    var atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
-    box.innerHTML = chatListHtml();
-    if (atEnd) box.scrollTop = box.scrollHeight;
+    ["#chat-list", "#pchat-list"].forEach(function (sel) {
+      var box = $(sel);
+      if (!box) return;
+      var atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+      box.innerHTML = chatListHtml();
+      if (atEnd) box.scrollTop = box.scrollHeight;
+    });
   }
+
+  /* The same chat in the pause menu of a battle: the newest messages and a box
+     to write in, refreshed while the battle is paused. */
+  var panel = { node: null, timer: 0 };
+
+  function panelOn() {
+    return Boolean(panel.node && !panel.node.hidden);
+  }
+
+  function loadPanel() {
+    if (!panelOn()) {
+      clearInterval(panel.timer);
+      panel.timer = 0;
+      return Promise.resolve();
+    }
+    return PS.cloud.chatList().then(function (res) {
+      if (!panelOn()) return;
+      if (res.error) {
+        chat.error = res.error;
+      } else {
+        chat.error = "";
+        chat.rows = res.rows;
+        res.rows.forEach(function (m) { if (chat.lastId === null || m.id > chat.lastId) chat.lastId = m.id; });
+      }
+      paintChat();
+    });
+  }
+
+  PS.chatPanel = {
+    show: function (node, on) {
+      var allowed = Boolean(on && node && PS.cloud.me() && !PS.cloud.offline());
+      if (!allowed) {
+        if (node) node.hidden = true;
+        panel.node = null;
+        clearInterval(panel.timer);
+        panel.timer = 0;
+        return;
+      }
+      if (panelOn() && panel.node === node) return;
+      panel.node = node;
+      node.hidden = false;
+      node.innerHTML =
+        '<p class="pausebox__label">Chat</p>' +
+        '<div class="chat__list chat__list--mini" id="pchat-list" aria-live="polite">' + chatListHtml() + "</div>" +
+        '<form class="chat__form" data-form="chat" novalidate>' +
+          '<input id="pchat-input" type="text" maxlength="200" autocomplete="off" placeholder="Say something..." aria-label="Your message" />' +
+          '<button class="btn btn--primary btn--sm" type="submit">Send</button></form>' +
+        '<p class="board__formerr" role="alert"></p>';
+      var list = $("#pchat-list");
+      if (list) list.scrollTop = list.scrollHeight;
+      loadPanel().then(function () {
+        var l = $("#pchat-list");
+        if (l) l.scrollTop = l.scrollHeight;
+      });
+      clearInterval(panel.timer);
+      panel.timer = setInterval(loadPanel, CHAT_EVERY);
+    }
+  };
 
   function loadChat() {
     if (!chatOpen()) {
@@ -3881,19 +3941,22 @@
 
   function chatSubmit(e) {
     e.preventDefault();
-    var box = $("#chat-input");
+    var form = e.target;
+    var box = form.querySelector("input");
+    var err = form.parentNode.querySelector(".board__formerr");
     var text = box ? box.value.trim() : "";
     if (!text || chat.sending) return;
     chat.sending = true;
     PS.cloud.say(text).then(function (res) {
       chat.sending = false;
-      var err = $("#chat-error");
       if (err) err.textContent = res.error || "";
       if (res.error) return;
       if (box) box.value = "";
-      loadChat().then(function () {
-        var list = $("#chat-list");
-        if (list) list.scrollTop = list.scrollHeight;
+      Promise.all([loadChat(), loadPanel()]).then(function () {
+        ["#chat-list", "#pchat-list"].forEach(function (sel) {
+          var list = $(sel);
+          if (list) list.scrollTop = list.scrollHeight;
+        });
       });
     });
   }
@@ -4679,7 +4742,7 @@
       });
     },
     "chat-at": function (node) {
-      var box = $("#chat-input");
+      var box = $("#chat-input") || $("#pchat-input");
       if (!box) return;
       var tag = "@" + node.getAttribute("data-name") + " ";
       if (box.value.indexOf(tag) !== 0) box.value = tag + box.value;
@@ -4690,6 +4753,7 @@
       PS.cloud.chatDelete(Number(node.getAttribute("data-id"))).then(function (res) {
         if (res.error) toast(res.error);
         loadChat();
+        loadPanel();
       });
     },
     endless: function () {

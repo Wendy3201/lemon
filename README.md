@@ -558,6 +558,10 @@ banned or timed-out players can't post. Messages show as plain text. Admins
 can delete any message (the x on it), and admins' messages carry an "admin"
 tag.
 
+- **In a battle**, the **pause menu** shows the same chat: the newest messages
+  and a box to write in, refreshing while you are paused (and not at all while
+  you play). Typing in the box never steers the lemon or un-pauses the battle;
+  Escape still does. Playing offline, it isn't shown.
 - **@name** sends a message to one person (not case sensitive): a box pops up
   at the top right of their screen for a few seconds, in the menus **or in the
   middle of a battle**, and the message is lit up for them in the chat. The

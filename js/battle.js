@@ -3601,6 +3601,9 @@
   function bindInput() {
     window.addEventListener("keydown", function (e) {
       if (!R || R.done) return;
+      // typing in a box (the chat in the pause menu, the dev menu's fields) is not steering
+      var typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+      if (typing && e.key !== "Escape") return;
       // the backtick key opens and closes the DEV panel (when it is unlocked;
       // playing together, only with the admin password)
       if (e.key === "`" && PS.dev.unlocked && B.devPanel && (!R.mp || PS.dev.admin)) {

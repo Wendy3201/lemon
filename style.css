@@ -9113,3 +9113,31 @@ html.chaos-wobble.chaos-disco body {
     transform: translateX(40px);
   }
 }
+
+/* the chat in a battle's pause menu */
+.pausebox__chat {
+  margin-bottom: 14px;
+  text-align: left;
+}
+
+.pausebox__label {
+  margin-bottom: 4px;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.chat__list--mini {
+  height: 170px;
+}
+
+.pausebox__chat .chat__name,
+.pausebox__chat .chat__who b {
+  font-size: 13px;
+}
+
+.pausebox {
+  max-height: 94vh;
+  max-height: 94dvh;
+  overflow-y: auto;
+}
