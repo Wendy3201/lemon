@@ -9148,3 +9148,128 @@ html.chaos-wobble.chaos-disco body {
   color: var(--charcoal);
   box-shadow: 0 0 0 1px var(--rind);
 }
+
+/* a livelier chat: coloured names, messages that pop in, emoji, actions */
+.chat__msg .chat__who b,
+.chat__msg .chat__name {
+  color: hsl(var(--hue, 40) 55% 32%);
+}
+
+:root[data-theme="dark"] .chat__msg .chat__who b,
+:root[data-theme="dark"] .chat__msg .chat__name {
+  color: hsl(var(--hue, 40) 70% 72%);
+}
+
+.chat__msg.is-new {
+  animation: chat-pop 0.45s ease-out both;
+}
+
+@keyframes chat-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
+
+.chat__msg.is-action p {
+  font-style: italic;
+  color: var(--ink-soft);
+}
+
+.chat__msg.is-all {
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--lemon-bright), var(--lemon-pale));
+  border-left: 4px solid var(--bad);
+}
+
+.chat__emoji {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.chat__emoji button {
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  font-size: 18px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.chat__emoji button:hover {
+  border-color: var(--rind);
+  background: var(--lemon-pale);
+}
+
+.chat__tip {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+/* an admin's @everyone: big, pulsing, and it stays */
+.chatnote.is-all {
+  padding: 16px 18px;
+  border-width: 4px;
+  animation: chat-slide 0.35s ease-out both, chat-pulse 1s ease-in-out 0.35s infinite;
+}
+
+.chatnote.is-all small {
+  display: inline-block;
+  margin-bottom: 4px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: var(--bad);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.chatnote.is-all b {
+  font-size: 18px;
+}
+
+.chatnote.is-all p {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+@keyframes chat-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(229, 72, 77, 0.55), var(--shadow-lift);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(229, 72, 77, 0), var(--shadow-lift);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chatnote.is-all {
+    animation: none;
+  }
+}
+
+/* the pop-ups are a popover (top layer): drop the browser's own popover look */
+.chatnotes[popover] {
+  inset: auto;
+  top: 12px;
+  right: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  overflow: visible;
+  color: inherit;
+}
+
+/* the pop-ups live outside <body>, so they bring the game's own text style */
+.chatnotes {
+  font: 400 16px/1.4 var(--font);
+  color: var(--ink);
+}

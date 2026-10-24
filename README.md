@@ -567,12 +567,21 @@ tag.
   middle of a battle**, and the message is lit up for them in the chat. The
   message itself stays in the public chat. Pressing someone's name in the chat
   starts a message to them.
-- **@everyone** pops up for every player the same way, but only when an admin
-  writes it (anyone else's is just text).
-- A game checks for new mentions every 8 seconds while it is in front.
-  Messages older than when the game opened never pop up, and neither does
-  anything already on screen in the open chat or anything you wrote yourself.
-  Only the newest 300 messages are kept.
+- **@everyone** is an announcement: a big pulsing banner with a sound and the
+  words "ANNOUNCEMENT", at the top right, for 14 seconds (click it to
+  dismiss, except while a window is open). It shows on every screen, in
+  battles too, **above** an open chat or menu, even to the admin who wrote it,
+  and the tab title shouts if the game is in the background. It only works
+  when an admin writes it (anyone else's is just text), and it needs the
+  newer `supabase/setup.sql`: if it hasn't been run, the admin is told so
+  when they send one.
+- A game checks for new mentions every 4 seconds while it is in front.
+  Messages older than when the game opened never pop up, and a small @name
+  box isn't shown for what is already on screen in the open chat or for your
+  own messages. Only the newest 300 messages are kept.
+- **Fun**: each name gets its own colour; new messages pop in with a quiet
+  sound; emoji buttons under the list; and commands: `/roll` (or `/roll 20`),
+  `/flip` (a coin), `/shrug`, `/table`, and `/me waves` (an action line).
 
 Server side: the `chat` table (with an `admin` mark so @everyone can be
 trusted), `pip_say` and `pip_chat_delete` in `supabase/setup.sql`.

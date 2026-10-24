@@ -1285,6 +1285,7 @@
     view.modal = modal;
     renderModal();
     if (!el.modal.open) el.modal.showModal();
+    bumpNotes(); // a pop-up still showing stays above the window just opened
   }
 
   function closeModal() {
@@ -3182,6 +3183,8 @@
     view.entering = true;
     renderAccount();
     render();
+    chat.lastId = null; // so the next look only notes where the chat is up to
+    setTimeout(checkMentions, 400);
     if (st.takeWipeNotice()) openModal({ type: "notice" });
     else if (welcome && who) toast("Welcome, " + who.name + "!");
     PS.cloud.sync();
@@ -3746,8 +3749,8 @@
      so what is being typed is never lost. */
 
   var CHAT_EVERY = 4000;
-  var chat = { rows: null, error: "", timer: 0, sending: false, lastId: null };
-  var MENTION_EVERY = 8000; // how often a game in front asks about new mentions
+  var chat = { rows: null, error: "", timer: 0, sending: false, lastId: null, fresh: {} };
+  var MENTION_EVERY = 4000; // how often a game in front asks about new mentions
   var noteBox = null;
 
   /** Does this message call for my attention? "me" (@myname), "all" (an admin's @everyone) or "". */
@@ -3761,27 +3764,58 @@
     return "";
   }
 
-  /** A box at the top right, wherever the player is (menus or a battle), for a few seconds. */
+  /** Put the pop-ups back on top of everything (a window opened after them would cover them). */
+  function bumpNotes() {
+    if (!noteBox || !noteBox.children.length || !noteBox.showPopover) return;
+    try {
+      if (noteBox.matches(":popover-open")) noteBox.hidePopover();
+      noteBox.showPopover();
+    } catch (err) {
+      /* an older browser: the z-index does the job except over a window */
+    }
+  }
+
+  /** A box at the top right, wherever the player is (menus or a battle). A mention is
+   *  a small box for a few seconds; an admin's @everyone is a big pulsing banner that
+   *  stays longer, with a sound, and has to be noticed. */
   function showPing(m, kind) {
     if (!noteBox) {
       noteBox = document.createElement("div");
       noteBox.className = "chatnotes";
-      noteBox.setAttribute("aria-live", "polite");
+      noteBox.setAttribute("aria-live", "assertive");
+      // a popover sits in the browser's top layer, so it shows above an open window (the chat, the menus)
+      noteBox.setAttribute("popover", "manual");
       document.documentElement.appendChild(noteBox);
     }
+    var all = kind === "all";
     var note = document.createElement("div");
-    note.className = "chatnote" + (kind === "all" ? " is-all" : "");
+    note.className = "chatnote" + (all ? " is-all" : "");
+    if (all) {
+      var tag = document.createElement("small");
+      tag.textContent = "ANNOUNCEMENT";
+      note.appendChild(tag);
+    }
     var head = document.createElement("b");
-    head.textContent = kind === "all" ? m.name + " to everyone" : m.name + " mentioned you";
+    head.textContent = all ? m.name + " says:" : m.name + " mentioned you";
     var body = document.createElement("p");
-    body.textContent = String(m.message || "").slice(0, 200);
+    body.textContent = String(m.message || "").replace(/(^|\s)@everyone\b/gi, "$1").trim().slice(0, 200) || String(m.message || "").slice(0, 200);
     note.appendChild(head);
     note.appendChild(body);
-    note.addEventListener("click", function () { if (note.parentNode) note.parentNode.removeChild(note); });
+    function close() { if (note.parentNode) note.parentNode.removeChild(note); }
+    note.addEventListener("click", close);
     noteBox.appendChild(note);
-    while (noteBox.children.length > 3) noteBox.removeChild(noteBox.firstChild);
-    PS.sfx.play("reveal", 1);
-    setTimeout(function () { if (note.parentNode) note.parentNode.removeChild(note); }, 9000);
+    while (noteBox.children.length > (all ? 4 : 3)) noteBox.removeChild(noteBox.firstChild);
+    bumpNotes();
+    PS.sfx.play(all ? "boss" : "reveal", all ? 2 : 1);
+    if (all) {
+      // when the tab is in the background, the title shouts too, until it is looked at
+      var old = document.title;
+      document.title = "(!) " + m.name + ": " + body.textContent.slice(0, 40);
+      var back = function () { document.title = old; document.removeEventListener("visibilitychange", back); };
+      document.addEventListener("visibilitychange", back);
+      setTimeout(back, 15000);
+    }
+    setTimeout(close, all ? 14000 : 9000);
   }
 
   /** Look for messages that call for me, whatever screen this game is on. The first
@@ -3794,9 +3828,13 @@
       var who = PS.cloud.me();
       res.rows.forEach(function (m) {
         if (chat.lastId === null || m.id > chat.lastId) chat.lastId = m.id;
-        if (first || chatOpen() || panelOn() || !who || m.player === who.id) return; // seen in the chat, or my own
+        if (first || !who) return;
         var kind = mentionOf(m);
-        if (kind) showPing(m, kind);
+        if (kind === "all") {
+          showPing(m, kind); // an announcement is shown to everyone, even its writer and whoever has the chat open
+        } else if (kind === "me" && m.player !== who.id && !chatOpen() && !panelOn()) {
+          showPing(m, kind); // (not for my own, nor what is already on the screen in front of me)
+        }
       });
       if (first && chat.lastId === null) chat.lastId = 0;
     });
@@ -3811,6 +3849,45 @@
     return isNaN(date.getTime()) ? "" : date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   }
 
+  /** Take the newest rows from the server: note which are new (they pop in, and a quiet sound plays). */
+  function chatTake(rows) {
+    var top = chat.rows && chat.rows.length ? chat.rows[chat.rows.length - 1].id : null;
+    var who = PS.cloud.me();
+    chat.fresh = {};
+    var others = 0;
+    if (top !== null) {
+      rows.forEach(function (m) {
+        if (m.id > top) {
+          chat.fresh[m.id] = true;
+          if (!who || m.player !== who.id) others++;
+        }
+      });
+    }
+    chat.rows = rows;
+    if (others) PS.sfx.play("coin", 0);
+  }
+
+  /** What a slash command turns into, or the text as it was. */
+  function chatCommand(text) {
+    var who = PS.cloud.me();
+    var name = who ? who.name : "someone";
+    var m = /^\/(\w+)\s*(.*)$/.exec(text);
+    if (!m) return text;
+    var cmd = m[1].toLowerCase();
+    var rest = m[2].trim();
+    if (cmd === "roll") {
+      var sides = Math.max(2, Math.min(1000000, Math.floor(Number(rest) || 100)));
+      return "\uD83C\uDFB2 rolled " + (1 + Math.floor(Math.random() * sides)) + " (1-" + sides + ")";
+    }
+    if (cmd === "flip" || cmd === "coin") return "\uD83E\uDE99 flipped a coin: " + (Math.random() < 0.5 ? "heads" : "tails");
+    if (cmd === "table") return "(\u256F\u00B0\u25A1\u00B0)\u256F\uFE35 \u253B\u2501\u253B";
+    if (cmd === "shrug") return (rest ? rest + " " : "") + "\u00AF\\_(\u30C4)_/\u00AF";
+    if (cmd === "me" && rest) return "* " + name + " " + rest;
+    return text;
+  }
+
+  var EMOJI = ["\uD83D\uDE00", "\uD83D\uDE02", "\uD83D\uDD25", "\uD83D\uDC80", "\uD83D\uDC4D", "\u2764\uFE0F", "\uD83C\uDF4B", "\uD83D\uDE0E", "\uD83E\uDD14", "\uD83D\uDE2D", "\uD83C\uDF89", "\u2694\uFE0F"];
+
   function chatListHtml() {
     if (chat.error && !chat.rows) return '<p class="chat__empty">' + esc(chat.error) + "</p>";
     if (!chat.rows) return '<p class="chat__empty">Loading...</p>';
@@ -3823,7 +3900,9 @@
       // pressing someone else's name starts a message to them
       var name = mine ? "<b>" + esc(m.name) + "</b>"
         : '<button class="chat__name" type="button" data-act="chat-at" data-name="' + esc(m.name) + '" title="Message ' + esc(m.name) + '">' + esc(m.name) + "</button>";
-      return '<div class="chat__msg' + (mine ? " is-mine" : "") + (ping ? " is-ping" : "") + '">' +
+      var action = /^\* /.test(m.message);
+      return '<div class="chat__msg' + (mine ? " is-mine" : "") + (ping ? " is-ping" : "") + (action ? " is-action" : "") + (chat.fresh[m.id] ? " is-new" : "") +
+        (/@everyone\b/i.test(m.message) && m.admin ? " is-all" : "") + '" style="--hue:' + (PS.hash(String(m.name).toLowerCase()) % 360) + '">' +
         '<span class="chat__who">' + avatar(m.name) + name + (m.admin ? '<em class="chat__admin' + (String(m.name).toLowerCase() === "owner" ? " is-owner" : "") + '">' + (String(m.name).toLowerCase() === "owner" ? "owner" : "admin") + "</em>" : "") + "<small>" + esc(chatTime(m.created_at)) + "</small>" +
         (mod ? '<button class="chat__del" type="button" data-act="chat-del" data-id="' + Number(m.id) + '" aria-label="Delete this message" title="Delete">&times;</button>' : "") + "</span>" +
         "<p>" + esc(m.message) + "</p></div>";
@@ -3841,7 +3920,10 @@
           (PS.cloud.isAdmin() ? " As an admin, @everyone pops up for everyone." : "") + "</p>" +
         '<div class="chat__list" id="chat-list" aria-live="polite">' + chatListHtml() + "</div>" +
         (can
-          ? '<form class="chat__form" data-form="chat" novalidate>' +
+          ? '<div class="chat__emoji" role="group" aria-label="Emoji and commands">' +
+              EMOJI.map(function (e) { return '<button type="button" data-act="chat-emoji" data-e="' + e + '">' + e + "</button>"; }).join("") +
+              '<span class="chat__tip">/roll /flip /shrug /table /me</span></div>' +
+            '<form class="chat__form" data-form="chat" novalidate>' +
               '<input id="chat-input" type="text" maxlength="200" autocomplete="off" placeholder="Say something..." aria-label="Your message" />' +
               '<button class="btn btn--primary btn--sm" type="submit">Send</button></form>' +
             '<p class="board__formerr" id="chat-error" role="alert"></p>'
@@ -3881,7 +3963,7 @@
         chat.error = res.error;
       } else {
         chat.error = "";
-        chat.rows = res.rows;
+        chatTake(res.rows);
         res.rows.forEach(function (m) { if (chat.lastId === null || m.id > chat.lastId) chat.lastId = m.id; });
       }
       paintChat();
@@ -3931,7 +4013,7 @@
         chat.error = res.error;
       } else {
         chat.error = "";
-        chat.rows = res.rows;
+        chatTake(res.rows);
         // what is on screen has been seen: no pop-up for it
         res.rows.forEach(function (m) { if (chat.lastId === null || m.id > chat.lastId) chat.lastId = m.id; });
       }
@@ -3944,7 +4026,7 @@
     var form = e.target;
     var box = form.querySelector("input");
     var err = form.parentNode.querySelector(".board__formerr");
-    var text = box ? box.value.trim() : "";
+    var text = box ? chatCommand(box.value.trim()) : "";
     if (!text || chat.sending) return;
     chat.sending = true;
     PS.cloud.say(text).then(function (res) {
@@ -3957,6 +4039,11 @@
           var list = $(sel);
           if (list) list.scrollTop = list.scrollHeight;
         });
+        // @everyone only works once the server marks admin messages: say so if it does not
+        var mineNow = chat.rows && chat.rows.filter(function (m) { return m.player === (PS.cloud.me() || {}).id; }).pop();
+        if (err && /@everyone/i.test(text) && PS.cloud.isAdmin() && mineNow && mineNow.admin === undefined) {
+          err.textContent = "The server needs an update before @everyone can work. (Run supabase/setup.sql again.)";
+        }
       });
     });
   }
@@ -4740,6 +4827,16 @@
         var box = $("#chat-input");
         if (box) box.focus();
       });
+    },
+    "chat-emoji": function (node) {
+      var box = $("#chat-input");
+      if (!box) return;
+      var start = box.selectionStart === null ? box.value.length : box.selectionStart;
+      var end = box.selectionEnd === null ? start : box.selectionEnd;
+      box.value = (box.value.slice(0, start) + node.getAttribute("data-e") + box.value.slice(end)).slice(0, 200);
+      box.focus();
+      var at = start + node.getAttribute("data-e").length;
+      try { box.setSelectionRange(at, at); } catch (err) { /* not every browser lets a text box move its cursor */ }
     },
     "chat-at": function (node) {
       var box = $("#chat-input") || $("#pchat-input");
