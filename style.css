@@ -9011,3 +9011,105 @@ html.chaos-wobble.chaos-disco body {
   background: linear-gradient(180deg, var(--lemon-bright), var(--lemon));
   color: var(--charcoal);
 }
+
+/* the chat fills the screen */
+.modal--chat {
+  display: flex;
+  flex-direction: column;
+  width: min(98vw, 1200px);
+  height: min(96vh, 1000px);
+  height: min(96dvh, 1000px);
+  max-height: none;
+}
+
+.modal--chat .chat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.modal--chat .chat__list {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+.chat__name {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.chat__name:hover {
+  text-decoration: underline;
+}
+
+.chat__admin {
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--charcoal);
+  color: var(--lemon-bright);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.chat__msg.is-ping {
+  border-radius: 10px;
+  background: var(--lemon-pale);
+}
+
+/* a mention pops up at the top right, in menus and in battle alike */
+.chatnotes {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 230;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(86vw, 320px);
+  pointer-events: none;
+}
+
+.chatnote {
+  padding: 10px 14px;
+  border: 2px solid var(--rind);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-lift);
+  pointer-events: auto;
+  cursor: pointer;
+  animation: chat-slide 0.35s ease-out both;
+}
+
+.chatnote.is-all {
+  border-color: var(--bad);
+  background: linear-gradient(180deg, var(--lemon-bright), var(--lemon));
+  color: var(--charcoal);
+}
+
+.chatnote b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+
+.chatnote p {
+  margin: 2px 0 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+@keyframes chat-slide {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+}

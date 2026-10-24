@@ -3746,7 +3746,61 @@
      so what is being typed is never lost. */
 
   var CHAT_EVERY = 4000;
-  var chat = { rows: null, error: "", timer: 0, sending: false };
+  var chat = { rows: null, error: "", timer: 0, sending: false, lastId: null };
+  var MENTION_EVERY = 8000; // how often a game in front asks about new mentions
+  var noteBox = null;
+
+  /** Does this message call for my attention? "me" (@myname), "all" (an admin's @everyone) or "". */
+  function mentionOf(m) {
+    var who = PS.cloud.me();
+    if (!who || !m) return "";
+    var text = String(m.message || "").toLowerCase();
+    var mine = String(who.name || "").toLowerCase();
+    if (mine && new RegExp("(^|[^a-z0-9_])@" + mine + "(?![a-z0-9_])").test(text)) return "me";
+    if (m.admin && /(^|[^a-z0-9_])@everyone(?![a-z0-9_])/.test(text)) return "all";
+    return "";
+  }
+
+  /** A box at the top right, wherever the player is (menus or a battle), for a few seconds. */
+  function showPing(m, kind) {
+    if (!noteBox) {
+      noteBox = document.createElement("div");
+      noteBox.className = "chatnotes";
+      noteBox.setAttribute("aria-live", "polite");
+      document.documentElement.appendChild(noteBox);
+    }
+    var note = document.createElement("div");
+    note.className = "chatnote" + (kind === "all" ? " is-all" : "");
+    var head = document.createElement("b");
+    head.textContent = kind === "all" ? m.name + " to everyone" : m.name + " mentioned you";
+    var body = document.createElement("p");
+    body.textContent = String(m.message || "").slice(0, 200);
+    note.appendChild(head);
+    note.appendChild(body);
+    note.addEventListener("click", function () { if (note.parentNode) note.parentNode.removeChild(note); });
+    noteBox.appendChild(note);
+    while (noteBox.children.length > 3) noteBox.removeChild(noteBox.firstChild);
+    PS.sfx.play("reveal", 1);
+    setTimeout(function () { if (note.parentNode) note.parentNode.removeChild(note); }, 9000);
+  }
+
+  /** Look for messages that call for me, whatever screen this game is on. The first
+   *  look only notes where the chat is up to, so old messages are not shown. */
+  function checkMentions() {
+    if (!PS.cloud.me() || PS.cloud.offline() || document.visibilityState !== "visible") return Promise.resolve();
+    var first = chat.lastId === null;
+    return PS.cloud.chatSince(first ? null : chat.lastId).then(function (res) {
+      if (res.error) return;
+      var who = PS.cloud.me();
+      res.rows.forEach(function (m) {
+        if (chat.lastId === null || m.id > chat.lastId) chat.lastId = m.id;
+        if (first || chatOpen() || !who || m.player === who.id) return; // seen in the window, or my own
+        var kind = mentionOf(m);
+        if (kind) showPing(m, kind);
+      });
+      if (first && chat.lastId === null) chat.lastId = 0;
+    });
+  }
 
   function chatOpen() {
     return Boolean(view.modal && view.modal.type === "chat");
@@ -3765,8 +3819,12 @@
     var mod = PS.cloud.isAdmin();
     return chat.rows.map(function (m) {
       var mine = Boolean(who && m.player === who.id);
-      return '<div class="chat__msg' + (mine ? " is-mine" : "") + '">' +
-        '<span class="chat__who">' + avatar(m.name) + "<b>" + esc(m.name) + "</b><small>" + esc(chatTime(m.created_at)) + "</small>" +
+      var ping = !mine && mentionOf(m);
+      // pressing someone else's name starts a message to them
+      var name = mine ? "<b>" + esc(m.name) + "</b>"
+        : '<button class="chat__name" type="button" data-act="chat-at" data-name="' + esc(m.name) + '" title="Message ' + esc(m.name) + '">' + esc(m.name) + "</button>";
+      return '<div class="chat__msg' + (mine ? " is-mine" : "") + (ping ? " is-ping" : "") + '">' +
+        '<span class="chat__who">' + avatar(m.name) + name + (m.admin ? '<em class="chat__admin">admin</em>' : "") + "<small>" + esc(chatTime(m.created_at)) + "</small>" +
         (mod ? '<button class="chat__del" type="button" data-act="chat-del" data-id="' + Number(m.id) + '" aria-label="Delete this message" title="Delete">&times;</button>' : "") + "</span>" +
         "<p>" + esc(m.message) + "</p></div>";
     }).join("");
@@ -3779,7 +3837,8 @@
       '<div class="chat">' +
         '<button class="modal__close" type="button" data-act="close" aria-label="Close">' + PS.icon("close") + "</button>" +
         '<h2 id="modal-title">Chat</h2>' +
-        '<p class="hint">Everyone playing can read this. Be kind: admins can delete messages and ban.</p>' +
+        '<p class="hint">Everyone playing can read this. Type @name to send a message to one person: they get a pop-up even in a battle. Press a name to start one.' +
+          (PS.cloud.isAdmin() ? " As an admin, @everyone pops up for everyone." : "") + "</p>" +
         '<div class="chat__list" id="chat-list" aria-live="polite">' + chatListHtml() + "</div>" +
         (can
           ? '<form class="chat__form" data-form="chat" novalidate>' +
@@ -3813,6 +3872,8 @@
       } else {
         chat.error = "";
         chat.rows = res.rows;
+        // what is on screen has been seen: no pop-up for it
+        res.rows.forEach(function (m) { if (chat.lastId === null || m.id > chat.lastId) chat.lastId = m.id; });
       }
       paintChat();
     });
@@ -4616,6 +4677,13 @@
         var box = $("#chat-input");
         if (box) box.focus();
       });
+    },
+    "chat-at": function (node) {
+      var box = $("#chat-input");
+      if (!box) return;
+      var tag = "@" + node.getAttribute("data-name") + " ";
+      if (box.value.indexOf(tag) !== 0) box.value = tag + box.value;
+      box.focus();
     },
     "chat-del": function (node) {
       node.disabled = true;
@@ -5902,6 +5970,8 @@
       document.addEventListener("visibilitychange", function () {
         if (document.visibilityState === "visible") watch();
       });
+      // @mentions in the chat reach a player on any screen (a small question every few seconds, only while the game is in front)
+      setInterval(function () { if (el.gate.hidden) checkMentions(); }, MENTION_EVERY);
       // events are quick (a small question every 10 seconds, only while the game is in front)
       setInterval(function () {
         if (document.visibilityState === "visible" && el.gate.hidden && !PS.cloud.offline()) checkEvent();

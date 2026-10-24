@@ -248,6 +248,9 @@ create table if not exists public.chat (
   created_at timestamptz not null default now()
 );
 
+-- whether an admin said it: only an admin's @everyone pings every player
+alter table public.chat add column if not exists admin boolean not null default false;
+
 create index if not exists chat_player_recent on public.chat (player, created_at desc);
 alter table public.chat enable row level security;
 
@@ -650,7 +653,7 @@ begin
   if exists (select 1 from public.chat c where c.player = me and c.created_at > now() - interval '2 seconds') then
     raise exception 'Slow down a little.';
   end if;
-  insert into public.chat (player, name, message) values (me, my_name, left(clean, 200));
+  insert into public.chat (player, name, message, admin) values (me, my_name, left(clean, 200), public.pip_is_admin());
   delete from public.chat where id <= (select max(id) from public.chat) - 300;
 end;
 $$;

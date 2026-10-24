@@ -549,6 +549,30 @@ battle), and theirs first asks the server whether you really are on an admin
 account (`pip_dev_token` and `pip_dev_check` in setup.sql). Until it says yes,
 nothing you press does anything.
 
+## Chat
+
+**Chat** (under Battle, next to Trade) is a public chat for everyone signed in.
+The window fills the screen and shows the last 50 messages, refreshing every
+few seconds while it is open. 200 characters, one message every 2 seconds, and
+banned or timed-out players can't post. Messages show as plain text. Admins
+can delete any message (the x on it), and admins' messages carry an "admin"
+tag.
+
+- **@name** sends a message to one person (not case sensitive): a box pops up
+  at the top right of their screen for a few seconds, in the menus **or in the
+  middle of a battle**, and the message is lit up for them in the chat. The
+  message itself stays in the public chat. Pressing someone's name in the chat
+  starts a message to them.
+- **@everyone** pops up for every player the same way, but only when an admin
+  writes it (anyone else's is just text).
+- A game checks for new mentions every 8 seconds while it is in front.
+  Messages older than when the game opened never pop up, and neither does
+  anything already on screen in the open chat or anything you wrote yourself.
+  Only the newest 300 messages are kept.
+
+Server side: the `chat` table (with an `admin` mark so @everyone can be
+trusted), `pip_say` and `pip_chat_delete` in `supabase/setup.sql`.
+
 ## Trading
 
 **Trade** (under Battle, next to Play with a friend) swaps gear, pets, gold

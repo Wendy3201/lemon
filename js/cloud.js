@@ -685,11 +685,35 @@
       }, failed);
     },
     /* Public chat. */
-    /** The newest messages, oldest first: { rows: [{ id, name, message, created_at, player }] } or { error }. */
+    /** The newest messages, oldest first: { rows: [{ id, name, message, created_at, player, admin }] } or { error }. */
     chatList: function () {
       if (!client || !me || offline) return Promise.resolve({ error: "Chat needs an account and the internet.", down: true });
-      return client.from("chat").select("id, player, name, message, created_at").order("id", { ascending: false }).limit(50).then(function (res) {
+      function ask(columns) {
+        return client.from("chat").select(columns).order("id", { ascending: false }).limit(50);
+      }
+      return ask("id, player, name, message, created_at, admin").then(function (res) {
+        // a server from before @everyone: ask without the admin mark
+        if (res.error && (res.error.code === "42703" || res.error.code === "PGRST204")) return ask("id, player, name, message, created_at");
+        return res;
+      }).then(function (res) {
         return res.error ? failed(res.error) : { rows: (res.data || []).slice().reverse() };
+      }, failed);
+    },
+    /** Messages newer than `after` (oldest first), for noticing mentions; with no `after`, just the newest id.
+     *  Resolves with { rows } or { error }. */
+    chatSince: function (after) {
+      if (!client || !me || offline) return Promise.resolve({ error: "offline", down: true });
+      function ask(columns) {
+        var q = client.from("chat").select(columns);
+        return after === null || after === undefined
+          ? q.order("id", { ascending: false }).limit(1)
+          : q.gt("id", after).order("id", { ascending: true }).limit(40);
+      }
+      return ask("id, player, name, message, created_at, admin").then(function (res) {
+        if (res.error && (res.error.code === "42703" || res.error.code === "PGRST204")) return ask("id, player, name, message, created_at");
+        return res;
+      }).then(function (res) {
+        return res.error ? failed(res.error) : { rows: res.data || [] };
       }, failed);
     },
     say: function (text) {
