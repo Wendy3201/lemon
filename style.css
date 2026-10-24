@@ -9141,3 +9141,10 @@ html.chaos-wobble.chaos-disco body {
   max-height: 94dvh;
   overflow-y: auto;
 }
+
+/* the owner's tag in the chat is gold */
+.chat__admin.is-owner {
+  background: linear-gradient(180deg, var(--lemon-bright), var(--lemon));
+  color: var(--charcoal);
+  box-shadow: 0 0 0 1px var(--rind);
+}

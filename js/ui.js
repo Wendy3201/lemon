@@ -3824,7 +3824,7 @@
       var name = mine ? "<b>" + esc(m.name) + "</b>"
         : '<button class="chat__name" type="button" data-act="chat-at" data-name="' + esc(m.name) + '" title="Message ' + esc(m.name) + '">' + esc(m.name) + "</button>";
       return '<div class="chat__msg' + (mine ? " is-mine" : "") + (ping ? " is-ping" : "") + '">' +
-        '<span class="chat__who">' + avatar(m.name) + name + (m.admin ? '<em class="chat__admin">admin</em>' : "") + "<small>" + esc(chatTime(m.created_at)) + "</small>" +
+        '<span class="chat__who">' + avatar(m.name) + name + (m.admin ? '<em class="chat__admin' + (String(m.name).toLowerCase() === "owner" ? " is-owner" : "") + '">' + (String(m.name).toLowerCase() === "owner" ? "owner" : "admin") + "</em>" : "") + "<small>" + esc(chatTime(m.created_at)) + "</small>" +
         (mod ? '<button class="chat__del" type="button" data-act="chat-del" data-id="' + Number(m.id) + '" aria-label="Delete this message" title="Delete">&times;</button>' : "") + "</span>" +
         "<p>" + esc(m.message) + "</p></div>";
     }).join("");
