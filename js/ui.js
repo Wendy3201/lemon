@@ -3968,7 +3968,7 @@
   }
 
   /** The admin menu's card: free stuff for the players, and events. Each button asks twice. */
-  var abuse = { who: "all", what: "gold", amount: 500, item: "", rarity: 0, message: "", confirm: "", note: "" };
+  var abuse = { who: "all", withEvent: "", what: "gold", amount: 500, item: "", rarity: 0, message: "", confirm: "", note: "" };
 
   var ABUSE_WHO = [["all", "Everyone"], ["online", "Everyone online right now"], ["random", "One random player (lucky dip)"]];
   var ABUSE_EVENTS = [
@@ -3996,6 +3996,7 @@
       '<p class="devbox__label">Free stuff</p>' +
       '<div class="dev__give">' +
         devSelect("abuse-who", "Who gets it", ABUSE_WHO, abuse.who) +
+        devSelect("abuse-with", "Plus an event, at the same time", [["", "No event"]].concat(ABUSE_EVENTS), abuse.withEvent) +
         devSelect("abuse-what", "What", [["gold", "Gold"], ["gems", "Gems"], ["item", "A weapon or gear"]], abuse.what) +
         (item ? "" : '<label>Amount<input id="abuse-amount" type="number" min="1" max="1000000000" step="1" value="' + abuse.amount + '" /></label>') +
       "</div>" +
@@ -4005,7 +4006,7 @@
               return [id, PS.ITEMS[id].name + (PS.ITEMS[id].grade !== "A" ? " (" + PS.ITEMS[id].grade + ")" : "")];
             }), abuse.item) + devSelect("abuse-rarity", "Rarity", rarityOptions(PS.RARITY.length), abuse.rarity) + "</div></div>"
         : "") +
-      devRow(button("give", "Send " + stuff + " to " + who, "btn--primary")) +
+      devRow(button("give", "Send " + stuff + " to " + who + (abuse.withEvent ? " + " + abuse.withEvent : ""), "btn--primary")) +
       '<p class="devbox__label">Events</p>' +
       devRow(ABUSE_EVENTS.map(function (e) { return button(e[0], e[1]); }).join("")) +
       (abuse.note ? '<p class="hint devbanner__note" role="status">' + esc(abuse.note) + "</p>" : "")
@@ -5137,8 +5138,13 @@
       if (what === "give") {
         var gift = { kind: abuse.what, item: abuse.item, rarity: abuse.rarity, amount: abuse.amount, message: message, who: abuse.who };
         var label = abuse.what === "item" ? PS.RARITY[abuse.rarity].name + " " + PS.ITEMS[abuse.item].name : fmt(abuse.amount) + " " + abuse.what;
-        job = PS.cloud.giveMany(gift).then(function (res) {
+        // the event goes at the same moment, so the gift pops up in the middle of it
+        var also = abuse.withEvent && EVENTS[abuse.withEvent] ? PS.cloud.fireEvent(abuse.withEvent, message) : Promise.resolve({});
+        job = Promise.all([also, PS.cloud.giveMany(gift)]).then(function (both) {
+          if (both[0].error) return both[0];
+          var res = both[1];
           if (res.error) return res;
+          if (abuse.withEvent) label += " with " + abuse.withEvent;
           if (abuse.who === "random") return { done: res.n ? res.name + " won " + label + "!" : "Nobody to give it to" };
           return { done: "Sent " + label + " to " + fmt(res.n) + " player" + (res.n === 1 ? "" : "s") + (message ? " (with your message)" : "") };
         });
@@ -5154,8 +5160,12 @@
         if (view.modal && view.modal.type === "secret") renderModal();
         // see it here at once: an event plays now, and a gift to yourself is picked up now
         if (!res.error) {
-          if (what === "give") watch();
-          else checkEvent();
+          if (what === "give") {
+            if (abuse.withEvent) checkEvent();
+            watch();
+          } else {
+            checkEvent();
+          }
         }
       });
     },
@@ -5531,6 +5541,7 @@
           if (key === "amount") abuse.amount = Math.max(1, Math.min(1e9, Math.floor(Number(e.target.value) || 1)));
           else if (key === "msg") abuse.message = e.target.value;
           else if (key === "rarity") abuse.rarity = Number(e.target.value) || 0;
+          else if (key === "with") abuse.withEvent = e.target.value;
           else abuse[key] = e.target.value; // who, what, item
           abuse.confirm = "";
           if (key !== "amount" && key !== "msg") {
