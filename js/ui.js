@@ -3893,6 +3893,7 @@
     blackout: { text: "Lights out...", seconds: 5 },
     shout: { text: "", seconds: 8 }
   };
+  var EVENT_EVERY = 10000; // how often an open game asks whether an event was fired
   var eventSeen = null; // when the last event we know of was fired (null: not looked yet)
   var eventTimer = 0;
   var eventClean = null; // puts back whatever the event now playing changed
@@ -3990,7 +3991,7 @@
       : fmt(abuse.amount) + " " + abuse.what;
     return devCard("Admin abuse",
       '<p class="hint">It cannot be called back. Gifts reach players who are offline too (not the banned), the next time they open the game. ' +
-        "Events play in every open game within about a minute and last a few seconds. Each button asks \"Sure?\" first.</p>" +
+        "Events play in every open game within about 10 seconds (yours at once) and last a few seconds. Each button asks \"Sure?\" first.</p>" +
       '<label class="devabuse__msg">Message (optional)<input id="abuse-msg" type="text" maxlength="100" value="' + esc(abuse.message) + '" placeholder="Shown with the gift or the event" /></label>' +
       '<p class="devbox__label">Free stuff</p>' +
       '<div class="dev__give">' +
@@ -5143,7 +5144,7 @@
         });
       } else {
         job = PS.cloud.fireEvent(what, message).then(function (res) {
-          return res.error ? res : { done: "Fired: " + what + ". Open games play it within about a minute." };
+          return res.error ? res : { done: "Fired: " + what + ". Open games play it within about 10 seconds." };
         });
       }
       abuse.note = "Sending...";
@@ -5151,6 +5152,11 @@
       job.then(function (res) {
         abuse.note = res.error || res.done;
         if (view.modal && view.modal.type === "secret") renderModal();
+        // see it here at once: an event plays now, and a gift to yourself is picked up now
+        if (!res.error) {
+          if (what === "give") watch();
+          else checkEvent();
+        }
       });
     },
     "dev-banner-save": function () {
@@ -5733,6 +5739,10 @@
       document.addEventListener("visibilitychange", function () {
         if (document.visibilityState === "visible") watch();
       });
+      // events are quick (a small question every 10 seconds, only while the game is in front)
+      setInterval(function () {
+        if (document.visibilityState === "visible" && el.gate.hidden && !PS.cloud.offline()) checkEvent();
+      }, EVENT_EVERY);
       el.app.hidden = true; // until someone has logged in (or chosen to play offline)
       boot();
       startUpdateWatch();

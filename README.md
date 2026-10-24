@@ -434,7 +434,8 @@ ticked (Supabase → Table Editor → players). `setup.sql` ticks `test`,
     rain**, **Earthquake**, **Disco** (the colours cycle), **Shrink
     everything**, **Mirror world**, **Lights out** and **Shout a message**
     (just the words). A new event ends the one still playing.
-  - Games notice within about a minute; one that has only just opened doesn't
+  - Open games check every 10 seconds (yours plays it at once, and a gift to
+    yourself is picked up at once); one that has only just opened doesn't
     replay an old event, and nothing in anyone's save changes. Players with
     reduced motion on see just the message. Server side: `pip_give_many`,
     `pip_set_event` and the `events` table in setup.sql.
