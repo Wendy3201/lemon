@@ -281,6 +281,73 @@
     }
   };
 
+  /* An admin's event reaching into a battle (ui.js plays the rest). Only the
+     game that runs the battle acts (a friend's game shows what it does), and
+     not in duels. Returns true if it did something. */
+  B.ADMIN_EVENTS = ["heal", "nuke", "star", "surge", "horde", "golden", "coins", "gems"];
+  B.adminEvent = function (kind) {
+    var R = B.run;
+    if (!R || R.mirror || R.duel || R.done || (R.phase !== "swarm" && R.phase !== "boss")) return false;
+    var p = R.p;
+    var lemons = (R.players || [p]).filter(function (q) { return !q.gone; });
+    var i;
+    if (kind === "heal") {
+      lemons.forEach(function (q) {
+        if (q.down) return;
+        q.hp = q.maxHp;
+        q.barrier = q.barrierMax;
+        B.sparks(q.x, q.y, "#7BE495", 18, 140);
+      });
+      PS.sfx.play("heal");
+    } else if (kind === "nuke") {
+      // like a crate's bomb, but the whole field (bosses only feel the shake)
+      B.as("cratebomb", function () {
+        R.enemies.slice().forEach(function (e) {
+          if (!e.dead && !e.boss && !e.prop && !e.proxyOf) B.hit(e, e.hp + 1, { dot: true });
+        });
+      });
+      R.ebullets.length = 0;
+      R.fx.push({ type: "ring", x: p.x, y: p.y, r0: 20, r1: Math.max(B.view.w, B.view.h), color: "#FFE66D", width: 16, t: 0, dur: 0.7 });
+      R.fx.push({ type: "blast", x: p.x, y: p.y, r: 160, color: "#FFF4B8", t: 0, dur: 0.45 });
+      R.shake = Math.max(R.shake, 16);
+      PS.sfx.play("boom", null, 0);
+    } else if (kind === "star" || kind === "surge") {
+      // "star": nothing can hurt you; "surge": every power-up at once
+      var keys = kind === "star" ? ["star"] : POWER_KEYS;
+      lemons.forEach(function (q) {
+        keys.forEach(function (k) { q.buffs[k] = Math.max(q.buffs[k] || 0, 10); });
+        if (keys.indexOf("star") !== -1) q.invuln = Math.max(q.invuln, 10);
+        B.text(q.x, q.y - 30, kind === "star" ? "Star!" : "Power surge!", kind === "star" ? "#C49BFF" : "#F2A31B", 16);
+      });
+      PS.sfx.play("power");
+    } else if (kind === "horde") {
+      // a ring of pests closing in from the edge of the screen
+      var base = Math.random() * TAU;
+      var kinds = ["grunt", "dart", "grunt", "brute"];
+      for (i = 0; i < 40 && R.enemies.length < 600; i++) {
+        var a = base + (i / 40) * TAU;
+        B.spawn(kinds[i % kinds.length], p.x + Math.cos(a) * B.view.ring, p.y + Math.sin(a) * B.view.ring);
+      }
+      PS.sfx.play("boss");
+    } else if (kind === "golden") {
+      spawnGolden(R);
+    } else if (kind === "coins" || kind === "gems") {
+      // coins, or experience gems, scattered round every lemon
+      lemons.forEach(function (q) {
+        for (var j = 0; j < 30; j++) {
+          var ang = Math.random() * TAU;
+          var dist = PS.rand(30, 150);
+          B.drop(kind === "coins" ? "coin" : "xp", q.x + Math.cos(ang) * dist, q.y + Math.sin(ang) * dist,
+            kind === "coins" ? R.coinValue : Math.max(1, Math.round(p.need * 0.03)));
+        }
+      });
+      PS.sfx.play(kind === "coins" ? "coin" : "gem");
+    } else {
+      return false;
+    }
+    return true;
+  };
+
   /* ------------------------------------------------------------- drawing */
 
   function circle(ctx, x, y, r) {

@@ -855,6 +855,30 @@
     return true;
   }
 
+  /* A money rush an admin started: battles pay `gold` and `gems` times as much
+     until `until` (this game's clock). Not saved; the game asks the server. */
+  var rush = null;
+
+  function setRush(r) {
+    var x = function (n) { return Math.max(1, Math.min(10, Number(n) || 1)); };
+    rush = r && r.until > Date.now() && (x(r.gold) > 1 || x(r.gems) > 1)
+      ? { gold: x(r.gold), gems: x(r.gems), until: r.until, message: String(r.message || "") }
+      : null;
+  }
+
+  /** The rush going on now, or null. */
+  function rushNow() {
+    if (rush && rush.until <= Date.now()) rush = null;
+    return rush;
+  }
+
+  /** What a battle paid, with the rush on top: { gold, gems, rush: { gold, gems } or null }. */
+  function withRush(gold, gems) {
+    var r = rushNow();
+    if (!r) return { gold: gold, gems: gems, rush: null };
+    return { gold: Math.round(gold * r.gold), gems: Math.round(gems * r.gems), rush: { gold: r.gold, gems: r.gems } };
+  }
+
   /** Bank the result of a battle and return what was won, for the results
    *  screen. result: { chapter, won, time, kills, level, coins, boss }. */
   function finishRun(result) {
@@ -866,8 +890,9 @@
     var progress = result.won ? 1 : PS.clamp(result.time / ch.duration, 0, 1);
 
     var base = result.won ? ch.gold * (first ? 3 : 1) : ch.gold * 0.6 * progress;
-    var gold = Math.round((base + (result.coins || 0)) * (1 + stats.gold));
-    var gems = result.won ? (first ? PS.BAL.gemsFirst(ch.n) : PS.BAL.gemsRepeat) : 0;
+    var paid = withRush(Math.round((base + (result.coins || 0)) * (1 + stats.gold)), result.won ? (first ? PS.BAL.gemsFirst(ch.n) : PS.BAL.gemsRepeat) : 0);
+    var gold = paid.gold;
+    var gems = paid.gems;
 
     var mu = PS.BAL.lootMu(ch.n);
     var grade = {
@@ -928,22 +953,23 @@
       chapter: ch.n, won: Boolean(result.won), first: first, gold: gold, gems: gems, items: items,
       unlocked: unlocked, progress: progress, time: result.time || 0, kills: result.kills || 0,
       level: result.level || 1, finished: result.won && ch.n === PS.BAL.CHAPTERS && first,
-      twist: result.twist || null, challenge: challenge
+      twist: result.twist || null, challenge: challenge, rush: paid.rush
     };
   }
 
   /** A duel with a friend is over: a win pays a chapter's gold and some gems,
    *  a loss a little gold. Wins count for the leaderboard. */
   function finishDuel(won) {
-    var gold = Math.round(PS.BAL.gold(frontier()) * (won ? 1 : 0.3));
-    var gems = won ? 5 : 0;
+    var paid = withRush(Math.round(PS.BAL.gold(frontier()) * (won ? 1 : 0.3)), won ? 5 : 0);
+    var gold = paid.gold;
+    var gems = paid.gems;
     S.gold += gold;
     S.gems += gems;
     S.stats.earned += gold;
     S.stats.duelsPlayed++;
     if (won) S.stats.duels++;
     commit();
-    return { duel: true, won: Boolean(won), gold: gold, gems: gems, duels: S.stats.duels };
+    return { duel: true, won: Boolean(won), gold: gold, gems: gems, duels: S.stats.duels, rush: paid.rush };
   }
 
   /** The days since 1970 of a "2026-10-17" date, so each day has its own twist. */
@@ -1027,7 +1053,7 @@
     extra = extra || {};
     var ch = PS.chapter(chapter);
     var base = ch.gold * Math.max(0, time) / ch.duration + (coins || 0);
-    var gold = Math.round(base * SWARM_PAY * (1 + calc().gold));
+    var gold = withRush(Math.round(base * SWARM_PAY * (1 + calc().gold)), 0).gold;
     S.gold += gold;
     S.stats.earned += gold;
     if ((extra.combo || 0) > S.stats.bestCombo) S.stats.bestCombo = extra.combo;
@@ -1602,6 +1628,8 @@
     finishRun: finishRun,
     finishDuel: finishDuel,
     frontier: frontier,
+    setRush: setRush,
+    rushNow: rushNow,
     // shop
     chestCost: chestCost,
     openChest: openChest,

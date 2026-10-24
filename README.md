@@ -421,29 +421,59 @@ ticked (Supabase → Table Editor → players). `setup.sql` ticks `test`,
 - **Give** sends any weapon or piece of gear at any rarity, or gold, or gems,
   with an optional message. It arrives the next time the player's game checks
   in (within a minute while they play) and pops up as a gift.
-- **Admin abuse** (admin menu, Settings): mischief for the players, each
-  button asking "Sure?" first, none of it able to be called back.
+- **Admin abuse** (its own tab in the admin menu, for admin accounts):
+  mischief for the players. Each button that sends something asks "Sure?"
+  first, and none of it can be called back. One **Message** box at the top
+  goes with the events, the gift or the rush.
+  - **Events** play in every open game, with your message (or the event's
+    own words) in a big announcement with the events' icons and a bar
+    running down the time left. Tick **as many as you like** and they all
+    play together:
+    - *The screen*: Flip, Mirror, Shrink, Zoom, Spin, Earthquake, Jelly,
+      Dizzy (blurry and swaying), Disco, Negative, Old film (black and
+      white), Lights out and Shout (just your words).
+    - *Falling and flying*: Confetti, Fireworks, Lemon rain, Gold rain, Gem
+      rain, Snow, Hearts (floating up), a lemon Parade along the bottom, and
+      a Jump scare.
+    - *In battles*: Heal all, Nuke (clears every pest; bosses only shake),
+      Untouchable (10 seconds of Star), Power surge (every power-up for 10
+      seconds), Horde (40 pests close in) and Golden pest. They act on a
+      battle that is on; anywhere else only the announcement shows. Gold
+      rain and Gem rain also drop coins and experience gems in a battle.
+      Duels are left alone, and in co-op the game running the battle does
+      it for both lemons.
+    - **Quick packs** tick a few that go well together (Party, Make it rain,
+      Apocalypse, Troll, Blessing, Winter, Spooky).
+    - **Seconds** (1 to 120) sets how long they last; left empty, they last as
+      long as the longest one ticked. **Try it on my screen** plays them for
+      you alone (the admin menu steps aside and comes back after). **Stop
+      events for everyone** ends what is playing.
+  - **Money rush**: battles pay more gold and gems for a while: pick ×1 to ×10
+    for gold and for gems and how long (10 minutes up to a week, or any
+    number of minutes). Chapter runs, endless (gold only) and duels all pay
+    it; the results say "Money rush: ×2 gold · ×2 gems". Every open game gets a
+    "MONEY RUSH!" announcement with gold and gems raining down, and a strip in
+    the top bar (under the HUD in a battle) with the time left. A game opened
+    during a rush shows the strip without the fanfare. **Stop the rush** ends
+    it early for everyone.
   - **Free stuff**: pick **who** (everyone who isn't banned; everyone with the
     game open right now; or one random player, a lucky dip that tells you the
-    winner) and **what** (an amount of gold or gems, or any weapon or gear at
-    any rarity, with its picture). Your message, if any, goes with it. It
+    winner) and **what** (an amount of gold or gems, with quick amounts from
+    100 to 1M, or any weapon or gear at any rarity, with its picture). It
     arrives as a gift, so players who are offline get theirs the next time
-    they open the game.
-  - **Events** play in every open game, with your message (or a default) over
-    the top. Tick **as many as you like** and they all play together:
-    **Confetti**, **Flip every screen**, **Lemon rain**, **Earthquake**,
-    **Disco** (the colours cycle), **Shrink everything**, **Mirror world**,
-    **Lights out** and **Shout a message** (just the words). **How long, in
-    seconds** (1 to 120) sets how long they last; leave it empty and they last
-    as long as the longest of the ones ticked. A new event ends the ones still
-    playing. **Fire the ticked events at the same moment** next to Free stuff
-    sends a gift and the events together, so the gift pops up in the middle of
+    they open the game. **Fire the ticked events at the same moment** sends
+    the gift and the events together, so the gift pops up in the middle of
     them.
-  - Open games check every 10 seconds (yours plays it at once, and a gift to
+  - Open games check every 10 seconds (yours plays at once, and a gift to
     yourself is picked up at once); one that has only just opened doesn't
-    replay an old event, and nothing in anyone's save changes. Players with
-    reduced motion on see just the message. Server side: `pip_give_many`,
-    `pip_set_event` and the `events` table in setup.sql.
+    replay an old event, but a game opened or refreshed in the middle of one
+    plays the rest of it (`pip_event` says how long ago it was fired, by the
+    server's clock). Nothing in anyone's save changes, except what a
+    battle event or a rush pays. Players with reduced motion on see just the
+    announcement. The pictures sit above any open window. Server side:
+    `pip_give_many`, `pip_set_event`, `pip_set_rush`, `pip_rush` and the
+    `events` and `rush` tables in setup.sql. Event names are any short
+    lowercase words, so a new event needs no change to setup.sql.
 - **Show as...** makes the leaderboard show any number or text (up to 24
   characters, "noob" say) in place of one of a player's figures, for
   everyone. The real figure still decides the order; leaving the box empty

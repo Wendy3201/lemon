@@ -8716,130 +8716,6 @@ button.inv__cell:focus-visible {
   margin: 6px 0 8px;
 }
 
-/* admin abuse: events every open game plays for a few seconds */
-.chaos__note {
-  position: fixed;
-  top: 18%;
-  left: 50%;
-  z-index: 200;
-  max-width: 90vw;
-  padding: 14px 26px;
-  border: 3px solid var(--charcoal);
-  border-radius: 18px;
-  background: linear-gradient(180deg, var(--lemon-bright), var(--lemon));
-  color: var(--charcoal);
-  font-family: var(--font-display);
-  font-size: clamp(22px, 6vw, 40px);
-  text-align: center;
-  overflow-wrap: anywhere;
-  pointer-events: none;
-  transform: translateX(-50%);
-  animation: chaos-pop 0.5s ease-out both;
-}
-
-@keyframes chaos-pop {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) scale(0.4);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) scale(1);
-  }
-}
-
-.chaos__bit {
-  position: fixed;
-  top: -60px;
-  z-index: 190;
-  width: 38px;
-  height: 38px;
-  pointer-events: none;
-  animation: chaos-fall linear both;
-}
-
-.chaos__bit.is-confetti {
-  width: 10px;
-  height: 16px;
-  border-radius: 2px;
-}
-
-@keyframes chaos-fall {
-  to {
-    transform: translateY(115vh) rotate(540deg);
-  }
-}
-
-html.chaos-flip body {
-  transform: rotate(180deg);
-  transition: transform 0.6s;
-}
-
-html.chaos-wobble body {
-  animation: chaos-shake 0.18s linear infinite;
-}
-
-@keyframes chaos-shake {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  25% {
-    transform: translate(-7px, 4px) rotate(-0.6deg);
-  }
-  75% {
-    transform: translate(7px, -4px) rotate(0.6deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .chaos__note {
-    animation: none;
-  }
-}
-
-/* more events */
-html.chaos-tiny body {
-  transform: scale(0.45);
-  transition: transform 0.6s;
-}
-
-html.chaos-mirror body {
-  transform: scaleX(-1);
-  transition: transform 0.6s;
-}
-
-html.chaos-disco body {
-  animation: chaos-disco 1.1s linear infinite;
-}
-
-@keyframes chaos-disco {
-  from {
-    filter: hue-rotate(0deg) saturate(1.8);
-  }
-  to {
-    filter: hue-rotate(360deg) saturate(1.8);
-  }
-}
-
-.chaos__dark {
-  position: fixed;
-  inset: 0;
-  z-index: 150;
-  background: rgba(0, 0, 0, 0.93);
-  pointer-events: none;
-  animation: chaos-dark 0.4s ease-out both;
-}
-
-@keyframes chaos-dark {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 .devabuse__msg {
   display: flex;
   flex-direction: column;
@@ -8942,74 +8818,6 @@ html.chaos-disco body {
   background: var(--bg-soft);
   color: var(--ink);
   font: inherit;
-}
-
-/* several events at once: flip, shrink and mirror share one transform;
-   earthquake and disco share one animation */
-html[class*="chaos-flip"] body,
-html[class*="chaos-tiny"] body,
-html[class*="chaos-mirror"] body {
-  transform: rotate(var(--chaos-r, 0deg)) scale(var(--chaos-s, 1)) scaleX(var(--chaos-x, 1));
-  transition: transform 0.6s;
-}
-
-html.chaos-flip {
-  --chaos-r: 180deg;
-}
-
-html.chaos-tiny {
-  --chaos-s: 0.45;
-}
-
-html.chaos-mirror {
-  --chaos-x: -1;
-}
-
-html.chaos-wobble body {
-  animation: chaos-shake 0.18s linear infinite;
-}
-
-html.chaos-wobble.chaos-disco body {
-  animation: chaos-shake 0.18s linear infinite, chaos-disco 1.1s linear infinite;
-}
-
-/* the shake moves with `translate`, so it does not fight the flip's transform */
-@keyframes chaos-shake {
-  0%,
-  100% {
-    translate: 0 0;
-  }
-  25% {
-    translate: -7px 4px;
-  }
-  75% {
-    translate: 7px -4px;
-  }
-}
-
-.devabuse__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 6px 0 4px;
-}
-
-.devabuse__chip {
-  padding: 6px 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 99px;
-  background: var(--surface);
-  color: var(--ink-soft);
-  font: inherit;
-  font-weight: 800;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.devabuse__chip.is-on {
-  border-color: var(--rind);
-  background: linear-gradient(180deg, var(--lemon-bright), var(--lemon));
-  color: var(--charcoal);
 }
 
 /* the chat fills the screen */
@@ -9272,4 +9080,852 @@ html.chaos-wobble.chaos-disco body {
 .chatnotes {
   font: 400 16px/1.4 var(--font);
   color: var(--ink);
+}
+
+/* ------------------------------------------------------------ admin abuse events */
+/* What an event shows goes in .chaos, a popover in the browser's top layer, so
+   it shows above an open window too. Nothing in it can be clicked. */
+.chaos[popover] {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--ink);
+  font: 400 16px/1.4 var(--font);
+}
+
+.chaos__note {
+  position: fixed;
+  top: 16%;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  max-width: min(90vw, 640px);
+  padding: 14px 28px 12px;
+  border: 3px solid var(--charcoal);
+  border-radius: 22px;
+  background: linear-gradient(180deg, #fff6c2, var(--lemon-bright) 40%, var(--lemon));
+  box-shadow: 0 0 0 6px rgba(255, 230, 109, 0.35), 0 18px 50px rgba(0, 0, 0, 0.35);
+  color: var(--charcoal);
+  text-align: center;
+  translate: -50% 0;
+  animation: chaos-pop 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) both, chaos-float 2.4s ease-in-out 0.6s infinite;
+}
+
+.chaos__icons {
+  font-size: clamp(26px, 6vw, 44px);
+  line-height: 1.1;
+  letter-spacing: 4px;
+}
+
+.chaos__text {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 6vw, 40px);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.6);
+}
+
+.chaos__text:empty {
+  display: none;
+}
+
+/* the time left, running down */
+.chaos__time {
+  display: block;
+  width: 100%;
+  min-width: 160px;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.chaos__time i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--rind), #e5484d);
+  transform-origin: left;
+  animation: chaos-time linear both;
+}
+
+@keyframes chaos-time {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes chaos-pop {
+  from {
+    opacity: 0;
+    scale: 0.3;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes chaos-float {
+  0%,
+  100% {
+    rotate: -1.5deg;
+  }
+  50% {
+    rotate: 1.5deg;
+  }
+}
+
+/* falling things: lemons, coins, gems, confetti, snow; hearts rise */
+.chaos__bit {
+  position: fixed;
+  top: -60px;
+  width: 38px;
+  height: 38px;
+  animation: chaos-fall linear both;
+}
+
+.chaos__bit > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.chaos__bit.is-small {
+  width: 28px;
+  height: 28px;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.25));
+}
+
+.chaos__bit.is-confetti {
+  width: 10px;
+  height: 16px;
+  border-radius: 2px;
+}
+
+.chaos__bit.is-snow {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.9), 0 0 1px rgba(60, 100, 150, 0.9);
+  animation-name: chaos-snow;
+}
+
+.chaos__bit.is-up {
+  top: auto;
+  bottom: -60px;
+  width: auto;
+  height: auto;
+  font-size: 32px;
+  animation-name: chaos-rise;
+}
+
+@keyframes chaos-fall {
+  to {
+    transform: translateY(115vh) rotate(540deg);
+  }
+}
+
+@keyframes chaos-snow {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(24px, 30vh);
+  }
+  50% {
+    transform: translate(-18px, 60vh);
+  }
+  75% {
+    transform: translate(20px, 90vh);
+  }
+  100% {
+    transform: translate(0, 118vh);
+  }
+}
+
+@keyframes chaos-rise {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.7);
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-20px, -55vh) scale(1);
+  }
+  100% {
+    opacity: 0.2;
+    transform: translate(15px, -118vh) scale(1.1);
+  }
+}
+
+/* the lemon parade along the bottom */
+.chaos__walker {
+  position: fixed;
+  bottom: 6px;
+  left: 0;
+  width: 64px;
+  height: 64px;
+  animation: chaos-walk 6.3s linear infinite both, chaos-bob 0.4s ease-in-out infinite alternate;
+}
+
+.chaos__walker > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes chaos-walk {
+  from {
+    translate: -80px 0;
+  }
+  to {
+    translate: calc(100vw + 80px) 0;
+  }
+}
+
+@keyframes chaos-bob {
+  from {
+    transform: translateY(0) rotate(-8deg);
+  }
+  to {
+    transform: translateY(-14px) rotate(8deg);
+  }
+}
+
+/* fireworks: a ring of sparks flying out from a point */
+.chaos__burst {
+  position: fixed;
+  width: 0;
+  height: 0;
+}
+
+.chaos__burst i {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 12px 3px currentColor;
+  animation: chaos-burst 1.2s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes chaos-burst {
+  from {
+    opacity: 1;
+    transform: rotate(var(--a)) translateX(0) scale(1.4);
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: rotate(var(--a)) translateX(160px) scale(0.6);
+  }
+}
+
+.chaos__dark {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: rgba(0, 0, 0, 0.93);
+  animation: chaos-dark 0.4s ease-out both;
+}
+
+@keyframes chaos-dark {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.chaos__boo {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  font-size: min(60vw, 60vh);
+  line-height: 1;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.8));
+  animation: chaos-boo 0.45s cubic-bezier(0.2, 2, 0.4, 1) both, chaos-shake 0.12s linear infinite;
+}
+
+@keyframes chaos-boo {
+  from {
+    opacity: 0;
+    scale: 0.1;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+/* The page events. Each one moves its own part of the page's look (the
+   transform, translate, rotate, scale, or one filter), so any of them can
+   play at once. */
+@property --chaos-hue {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+html[class*="chaos-"] body {
+  animation: var(--chaos-a1, none), var(--chaos-a2, none), var(--chaos-a3, none), var(--chaos-a4, none);
+}
+
+html[class*="chaos-flip"] body,
+html[class*="chaos-tiny"] body,
+html[class*="chaos-mirror"] body,
+html[class*="chaos-giant"] body {
+  transform: rotate(var(--chaos-r, 0deg)) scale(calc(var(--chaos-s, 1) * var(--chaos-z, 1))) scaleX(var(--chaos-x, 1));
+  transition: transform 0.6s;
+}
+
+html.chaos-flip {
+  --chaos-r: 180deg;
+}
+
+html.chaos-tiny {
+  --chaos-s: 0.45;
+}
+
+html.chaos-giant {
+  --chaos-z: 1.45;
+}
+
+html.chaos-mirror {
+  --chaos-x: -1;
+}
+
+html.chaos-wobble {
+  --chaos-a1: chaos-shake 0.18s linear infinite;
+}
+
+html.chaos-disco {
+  --chaos-a2: chaos-disco 1.1s linear infinite;
+  --chaos-sat: 1.8;
+}
+
+html.chaos-drunk {
+  --chaos-a3: chaos-sway 2.2s ease-in-out infinite alternate;
+  --chaos-blur: 1.8px;
+}
+
+html.chaos-spin {
+  --chaos-a3: chaos-spin 4s linear infinite;
+}
+
+html.chaos-jelly {
+  --chaos-a4: chaos-jelly 0.8s ease-in-out infinite;
+}
+
+html.chaos-invert {
+  --chaos-inv: 1;
+}
+
+html.chaos-oldfilm {
+  --chaos-gray: 1;
+  --chaos-sepia: 0.4;
+  --chaos-con: 1.15;
+}
+
+html.chaos-disco body,
+html.chaos-drunk body,
+html.chaos-invert body,
+html.chaos-oldfilm body {
+  filter: hue-rotate(var(--chaos-hue)) saturate(var(--chaos-sat, 1)) invert(var(--chaos-inv, 0)) blur(var(--chaos-blur, 0px))
+    grayscale(var(--chaos-gray, 0)) sepia(var(--chaos-sepia, 0)) contrast(var(--chaos-con, 1));
+}
+
+/* the shake moves with `translate`, so it does not fight the flip's transform */
+@keyframes chaos-shake {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  25% {
+    translate: -7px 4px;
+  }
+  75% {
+    translate: 7px -4px;
+  }
+}
+
+@keyframes chaos-disco {
+  to {
+    --chaos-hue: 360deg;
+  }
+}
+
+@keyframes chaos-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes chaos-sway {
+  from {
+    rotate: -4deg;
+  }
+  to {
+    rotate: 4deg;
+  }
+}
+
+@keyframes chaos-jelly {
+  0%,
+  100% {
+    scale: 1 1;
+  }
+  30% {
+    scale: 1.08 0.92;
+  }
+  60% {
+    scale: 0.94 1.06;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chaos__note {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------ the Admin abuse tab */
+.devnav__item[data-tab-name="abuse"] {
+  color: #d9480f;
+}
+
+.devnav__item[data-tab-name="abuse"].is-active {
+  background: linear-gradient(135deg, #ffb347, #ff5f6d);
+  color: #fff;
+}
+
+.abuse__hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: linear-gradient(120deg, #ff5f6d, #ffb347 55%, #ffe66d);
+  box-shadow: 0 8px 24px rgba(255, 95, 109, 0.3);
+  color: #2b1600;
+}
+
+.abuse__hero > div {
+  flex: 1;
+  min-width: 200px;
+}
+
+.abuse__hero h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.abuse__hero p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.abuse__flame {
+  font-size: 42px;
+  animation: abuse-flicker 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes abuse-flicker {
+  from {
+    rotate: -6deg;
+    scale: 1;
+  }
+  to {
+    rotate: 6deg;
+    scale: 1.15;
+  }
+}
+
+.abuse__live {
+  padding: 6px 12px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.abuse .devabuse__msg {
+  margin: 12px 0 4px;
+}
+
+.abuse .devcard h3 {
+  font-size: 18px;
+}
+
+.abuse__packs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 4px;
+}
+
+.abuse__pack {
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 99px;
+  background: linear-gradient(135deg, var(--h1, #ffb347), var(--h2, #ff5f6d));
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.18);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+
+.abuse__pack:hover {
+  transform: translateY(-2px) scale(1.04);
+}
+
+.abuse__pack:active {
+  transform: translateY(1px);
+}
+
+.abuse__pack:nth-child(1) {
+  --h1: #ff6fd8;
+  --h2: #845ec2;
+}
+
+.abuse__pack:nth-child(2) {
+  --h1: #f9b423;
+  --h2: #e65c00;
+}
+
+.abuse__pack:nth-child(3) {
+  --h1: #ff512f;
+  --h2: #8e0e00;
+}
+
+.abuse__pack:nth-child(4) {
+  --h1: #43cea2;
+  --h2: #185a9d;
+}
+
+.abuse__pack:nth-child(5) {
+  --h1: #f6b365;
+  --h2: #e8638f;
+}
+
+.abuse__pack:nth-child(6) {
+  --h1: #6fd6ff;
+  --h2: #4f6fe6;
+}
+
+.abuse__pack:nth-child(7) {
+  --h1: #5b5b6e;
+  --h2: #111;
+}
+
+.abuse__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+  margin: 6px 0 4px;
+}
+
+.abuse__tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px 8px;
+  border: 2px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+
+.abuse__tile:hover {
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.abuse__emoji {
+  font-size: 28px;
+  line-height: 1.15;
+  transition: transform 0.2s;
+}
+
+.abuse__tile:hover .abuse__emoji {
+  transform: scale(1.2) rotate(-8deg);
+}
+
+.abuse__tile b {
+  font-size: 13px;
+}
+
+.abuse__tile small {
+  color: var(--ink-faint);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.abuse__tile.is-on {
+  border-color: var(--rind);
+  background: linear-gradient(180deg, var(--lemon-bright), var(--lemon));
+  box-shadow: 0 0 0 3px rgba(242, 185, 59, 0.35);
+  color: var(--charcoal);
+}
+
+.abuse__tile--sky.is-on {
+  border-color: #3f8fe4;
+  background: linear-gradient(180deg, #e3f2ff, #a9d4ff);
+  box-shadow: 0 0 0 3px rgba(63, 143, 228, 0.3);
+}
+
+.abuse__tile--battle.is-on {
+  border-color: #e5484d;
+  background: linear-gradient(180deg, #ffe0e0, #ffa3a3);
+  box-shadow: 0 0 0 3px rgba(229, 72, 77, 0.3);
+}
+
+.abuse__tile.is-on small {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.abuse__tile.is-on::after {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  content: "\2713";
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.abuse__go {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.abuse__go--small {
+  align-items: center;
+  margin-top: 8px;
+}
+
+.abuse__secs,
+.abuse__mins {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.abuse__secs input,
+.abuse__mins input {
+  width: 96px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm, 10px);
+  background: var(--bg-soft);
+  color: var(--ink);
+  font: inherit;
+}
+
+.abuse__count {
+  color: var(--ink-faint);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.abuse__note {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.abuse__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+.abuse__chip {
+  padding: 6px 12px;
+  border: 2px solid var(--line-strong);
+  border-radius: 99px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.abuse__chip.is-on {
+  border-color: #c98a1b;
+  background: linear-gradient(180deg, #ffe08a, #f2b93b);
+  color: #3b2500;
+}
+
+.abuse__rushpick {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 4px 16px;
+}
+
+.abuse .devbox__label .ico {
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+}
+
+.abuse__rushon {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 8px 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(120deg, #fff1b8, #ffd166);
+  color: #3b2500;
+  font-weight: 800;
+  animation: rush-glow 1.6s ease-in-out infinite alternate;
+}
+
+.abuse__rushwhat {
+  font-size: 18px;
+}
+
+.abuse__rushon .ico,
+.rushstrip .ico,
+.results__rush .ico {
+  width: 1.1em;
+  height: 1.1em;
+  margin-right: 2px;
+  vertical-align: -0.2em;
+}
+
+.btn.btn--gold {
+  border-color: #c98a1b;
+  background: linear-gradient(180deg, #ffe08a, #f2b93b);
+  color: #3b2500;
+}
+
+@keyframes rush-glow {
+  from {
+    box-shadow: 0 0 0 0 rgba(242, 185, 59, 0.45);
+  }
+  to {
+    box-shadow: 0 0 18px 4px rgba(242, 185, 59, 0.6);
+  }
+}
+
+/* the money rush strip at the top of every screen, battles too */
+.rushstrip {
+  position: fixed;
+  top: 6px;
+  left: 50%;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 2px solid #c98a1b;
+  border-radius: 99px;
+  background: linear-gradient(180deg, #fff3c4, #ffd166);
+  color: #3b2500;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+  translate: -50% 0;
+  animation: rush-glow 1.6s ease-in-out infinite alternate;
+}
+
+.rushstrip[hidden] {
+  display: none;
+}
+
+.rushstrip.is-battle {
+  top: 74px;
+}
+
+.chaos__sub {
+  font-size: clamp(15px, 3.6vw, 20px);
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.rushstrip__tag {
+  padding: 2px 10px;
+  border-radius: 99px;
+  background: #3b2500;
+  color: #ffe08a;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.rushstrip__left {
+  padding-right: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.results__rush {
+  margin: 4px 0 0;
+  color: #b7791f;
+  font-weight: 800;
+  text-align: center;
+}
+
+.rushstrip.is-compact .rushstrip__tag {
+  display: none;
+}
+
+.rushstrip.is-compact .rushstrip__what {
+  padding-left: 6px;
 }

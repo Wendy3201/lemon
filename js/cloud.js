@@ -463,6 +463,19 @@
     }, failed);
   }
 
+  /** The latest event read straight from the table, for a server from before pip_event (no `age`). */
+  function oldEvent() {
+    return client.from("events").select("kind, message, at, seconds").limit(1).maybeSingle().then(function (res) {
+      if (res.error && (res.error.code === "42703" || res.error.code === "PGRST204" || res.error.code === "PGRST200")) {
+        // a server from before durations: ask without them
+        return client.from("events").select("kind, message, at").limit(1).maybeSingle().then(function (r2) {
+          return r2.error ? failed(r2.error) : { event: r2.data || null };
+        }, failed);
+      }
+      return res.error ? failed(res.error) : { event: res.data || null };
+    }, failed);
+  }
+
   /** A server function for a signed-in player. Resolves with { data } or { error, down }. */
   function ask(name, args) {
     if (!client || !me || offline) return Promise.resolve({ error: "Trading needs an account and the internet.", down: true });
@@ -723,7 +736,30 @@
       return moderate("pip_chat_delete", { msg_id: id });
     },
 
-    /** Admin abuse: fire an event (confetti, flip, rain, wobble, disco, tiny, mirror, blackout, shout) for every open game. */
+    /** Admin abuse: a money rush, `gold` and `gems` times the battle rewards (1 to 10) for `minutes` (0 stops it). */
+    setRush: function (gold, gems, minutes, message) {
+      return moderate("pip_set_rush", {
+        rush_gold: gold,
+        rush_gems: gems,
+        rush_minutes: Math.max(0, Math.floor(minutes || 0)),
+        rush_message: message || ""
+      });
+    },
+    /** The money rush going on now, for any game: { rush: { gold, gems, left (seconds), message } or null } or { error }. */
+    rush: function () {
+      if (!client) return Promise.resolve({ error: DOWN, down: true });
+      return client.rpc("pip_rush").then(function (res) {
+        if (res.error) return failed(res.error);
+        var d = res.data && typeof res.data === "object" ? res.data : null;
+        return {
+          rush: d && Number(d.left) > 0
+            ? { gold: Number(d.gold) || 1, gems: Number(d.gems) || 1, left: Number(d.left), message: d.message ? String(d.message) : "" }
+            : null
+        };
+      }, failed);
+    },
+
+    /** Admin abuse: fire one or more events (names the game knows, see EVENTS in ui.js) for every open game. */
     fireEvent: function (kinds, message, seconds) {
       return moderate("pip_set_event", {
         event_kind: Array.isArray(kinds) ? kinds.join(",") : String(kinds || ""),
@@ -732,18 +768,17 @@
       });
     },
     /** The latest event, for any game (no account needed): { kind (maybe several, with commas),
-     *  message, at, seconds } or { event: null }. */
+     *  message, at, seconds, age } or { event: null }. */
     event: function () {
       if (!client) return Promise.resolve({ error: DOWN, down: true });
-      return client.from("events").select("kind, message, at, seconds").limit(1).maybeSingle().then(function (res) {
-        if (res.error && (res.error.code === "42703" || res.error.code === "PGRST204" || res.error.code === "PGRST200")) {
-          // a server from before durations: ask without them
-          return client.from("events").select("kind, message, at").limit(1).maybeSingle().then(function (r2) {
-            return r2.error ? failed(r2.error) : { event: r2.data || null };
-          }, failed);
+      // with `age` (seconds since it was fired, by the server's clock), so a refreshed game can play the rest
+      return client.rpc("pip_event").then(function (res) {
+        if (!res.error) {
+          var d = res.data && typeof res.data === "object" ? res.data : null;
+          return { event: d ? { kind: d.kind, message: d.message, at: d.at, seconds: Number(d.seconds) || 0, age: Number(d.age) } : null };
         }
-        return res.error ? failed(res.error) : { event: res.data || null };
-      }, failed);
+        return oldEvent(); // a server from before pip_event
+      }, oldEvent);
     },
 
     /** Make the leaderboard show any number or text for one of a player's figures ('' undoes it). */

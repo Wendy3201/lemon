@@ -1651,6 +1651,7 @@
 
   var DEV_TABS = [
     ["overview", "Overview", "info"],
+    ["abuse", "Admin abuse", "boom"],
     ["gear", "Gear", "tabGear"],
     ["owned", "Owned", "tabShop"],
     ["pets", "Pets", "tabPets"],
@@ -2255,7 +2256,6 @@
         }).join(""))
       ) +
       devBanner() +
-      devAbuse() +
       devCard("Messages",
         devRow(
           devButton("dev-notice", "Show the data-reset notice") +
@@ -2350,7 +2350,8 @@
     var tab = view.devTab;
     var calc = st.calc();
     var admin = PS.dev.admin;
-    var tabs = admin ? DEV_TABS : DEV_TABS.filter(function (t) { return t[0] === "battle"; });
+    // Admin abuse needs an admin account on the server too
+    var tabs = admin ? DEV_TABS.filter(function (t) { return t[0] !== "abuse" || PS.cloud.isAdmin(); }) : DEV_TABS.filter(function (t) { return t[0] === "battle"; });
     if (!tabs.some(function (t) { return t[0] === tab; })) tab = view.devTab = tabs[0][0];
     var body = tab === "gear" ? devGear(S, view.dev, calc)
       : tab === "money" ? devMoney(S)
@@ -2362,6 +2363,7 @@
       : tab === "owned" ? devOwned(S, view.dev)
       : tab === "pets" ? devPets(S, view.dev)
       : tab === "settings" ? devSettings()
+      : tab === "abuse" ? devAbuse()
       : tab === "save" ? devSave(modal, S)
       : devOverview(S, calc);
     var last = view.devHistory[view.devHistory.length - 1];
@@ -3766,6 +3768,14 @@
 
   /** Put the pop-ups back on top of everything (a window opened after them would cover them). */
   function bumpNotes() {
+    if (chaosBox && chaosBox.children.length && chaosBox.showPopover) {
+      try {
+        if (chaosBox.matches(":popover-open")) chaosBox.hidePopover();
+        chaosBox.showPopover();
+      } catch (err) {
+        /* an older browser */
+      }
+    }
     if (!noteBox || !noteBox.children.length || !noteBox.showPopover) return;
     try {
       if (noteBox.matches(":popover-open")) noteBox.hidePopover();
@@ -4188,84 +4198,221 @@
   }
 
   /* ------------------------------------------------ admin abuse (events) */
-  /* An admin fires an event and every open game plays it for a few seconds:
-     an announcement over the top, and a bit of mischief. Nothing in anyone's
-     save changes. A game that has only just opened does not play an old one. */
+  /* An admin fires events and every open game plays them for a few seconds:
+     an announcement over the top, and mischief on screen. The "in battles"
+     ones also do something in a battle that is running (B.adminEvent, in
+     events.js). Nothing in anyone's save changes. A game that has only just
+     opened does not play an old one. A money rush arrives the same way. */
 
+  // icon, name and what it does (the admin menu), the announcement, seconds, menu group
   var EVENTS = {
-    confetti: { text: "PARTY TIME!", seconds: 6 },
-    flip: { text: "Everything is upside down!", seconds: 7 },
-    rain: { text: "It's raining lemons!", seconds: 7 },
-    wobble: { text: "Earthquake!", seconds: 6 },
-    disco: { text: "DISCO!", seconds: 8 },
-    tiny: { text: "Everything shrank!", seconds: 7 },
-    mirror: { text: "Mirror world!", seconds: 7 },
-    blackout: { text: "Lights out...", seconds: 5 },
-    shout: { text: "", seconds: 8 }
+    flip: { icon: "🙃", name: "Flip", about: "Upside down", text: "Everything is upside down!", seconds: 7, group: "screen" },
+    mirror: { icon: "🪞", name: "Mirror", about: "Left is right", text: "Mirror world!", seconds: 7, group: "screen" },
+    tiny: { icon: "🐜", name: "Shrink", about: "Everything tiny", text: "Everything shrank!", seconds: 7, group: "screen" },
+    giant: { icon: "🔍", name: "Zoom", about: "Everything huge", text: "ZOOM!", seconds: 7, group: "screen" },
+    spin: { icon: "🌀", name: "Spin", about: "Round and round", text: "Round and round!", seconds: 8, group: "screen" },
+    wobble: { icon: "🌋", name: "Earthquake", about: "Shakes it all", text: "Earthquake!", seconds: 6, group: "screen" },
+    jelly: { icon: "🍮", name: "Jelly", about: "Wobbly squish", text: "Everything went wobbly!", seconds: 7, group: "screen" },
+    drunk: { icon: "🥴", name: "Dizzy", about: "Blurry, swaying", text: "Woozy...", seconds: 8, group: "screen" },
+    disco: { icon: "🪩", name: "Disco", about: "Flashing colours", text: "DISCO!", seconds: 8, group: "screen" },
+    invert: { icon: "🌗", name: "Negative", about: "Colours flipped", text: "Opposite day!", seconds: 7, group: "screen" },
+    oldfilm: { icon: "🎞️", name: "Old film", about: "Black and white", text: "Back in the old days...", seconds: 8, group: "screen" },
+    blackout: { icon: "🌑", name: "Lights out", about: "A dark screen", text: "Lights out...", seconds: 5, group: "screen" },
+    shout: { icon: "📣", name: "Shout", about: "Just your message", text: "", seconds: 8, group: "screen" },
+    confetti: { icon: "🎉", name: "Confetti", about: "Party bits", text: "PARTY TIME!", seconds: 6, group: "sky" },
+    fireworks: { icon: "🎆", name: "Fireworks", about: "Bang bang", text: "Fireworks!", seconds: 8, group: "sky" },
+    rain: { icon: "🍋", name: "Lemon rain", about: "Lemons falling", text: "It's raining lemons!", seconds: 7, group: "sky" },
+    coins: { icon: "🪙", name: "Gold rain", about: "Battles: coins drop", text: "It's raining gold!", seconds: 7, group: "sky" },
+    gems: { icon: "💎", name: "Gem rain", about: "Battles: XP gems drop", text: "It's raining gems!", seconds: 7, group: "sky" },
+    snow: { icon: "❄️", name: "Snow", about: "Soft and slow", text: "Let it snow!", seconds: 9, group: "sky" },
+    hearts: { icon: "💖", name: "Hearts", about: "Floating up", text: "Sending love!", seconds: 7, group: "sky" },
+    parade: { icon: "🎺", name: "Parade", about: "Lemons march by", text: "Lemon parade!", seconds: 9, group: "sky" },
+    boo: { icon: "👻", name: "Jump scare", about: "BOO!", text: "BOO!", seconds: 3, group: "sky" },
+    heal: { icon: "❤️", name: "Heal all", about: "Full health", text: "Healed up!", seconds: 4, group: "battle" },
+    nuke: { icon: "💣", name: "Nuke", about: "Clears the pests", text: "BOOM!", seconds: 4, group: "battle" },
+    star: { icon: "⭐", name: "Untouchable", about: "10 s of Star", text: "Nothing can hurt you!", seconds: 5, group: "battle" },
+    surge: { icon: "⚡", name: "Power surge", about: "Every power-up", text: "POWER SURGE!", seconds: 5, group: "battle" },
+    horde: { icon: "🐝", name: "Horde", about: "40 pests rush in", text: "HERE THEY COME!", seconds: 5, group: "battle" },
+    golden: { icon: "🌟", name: "Golden pest", about: "Catch it for loot", text: "A golden pest!", seconds: 5, group: "battle" },
+    // not in the menu: a money rush starting and ending
+    rush: { icon: "💰", text: "MONEY RUSH!", seconds: 9 },
+    rushend: { icon: "⌛", text: "The money rush is over", seconds: 5 }
   };
+  var EVENT_GROUPS = [
+    ["screen", "The screen", ""],
+    ["sky", "Falling and flying", ""],
+    ["battle", "In battles", "(does it in a battle that is on; elsewhere just the announcement)"]
+  ];
+  // one-press packs of events
+  var PACKS = [
+    ["party", "🎉 Party", ["confetti", "disco", "fireworks"]],
+    ["rich", "💸 Make it rain", ["coins", "gems", "confetti"]],
+    ["doom", "🌋 Apocalypse", ["wobble", "spin", "horde"]],
+    ["troll", "🤪 Troll", ["mirror", "drunk", "jelly"]],
+    ["bless", "😇 Blessing", ["heal", "star", "surge", "hearts"]],
+    ["winter", "❄️ Winter", ["snow", "oldfilm"]],
+    ["spooky", "👻 Spooky", ["blackout", "boo"]]
+  ];
+  // the ones that change the whole page (a class on <html>, see style.css)
+  var PAGE_EVENTS = ["flip", "mirror", "tiny", "giant", "spin", "wobble", "jelly", "drunk", "disco", "invert", "oldfilm"];
+
   var EVENT_EVERY = 10000; // how often an open game asks whether an event was fired
   var eventSeen = null; // when the last event we know of was fired (null: not looked yet)
   var eventTimer = 0;
   var eventClean = null; // puts back whatever the event now playing changed
+  var chaosBox = null; // where an event's pictures go: the top layer, above any open window
 
-  /** Play one or more events together (`kinds`, or one name, or "a,b"), for `seconds`
-   *  (empty or 0: the longest of their own times). */
-  function playEvent(kinds, message, seconds) {
+  /** The menu's events, in the menu's order. */
+  function menuEvents(group) {
+    return Object.keys(EVENTS).filter(function (k) { return group ? EVENTS[k].group === group : EVENTS[k].group; });
+  }
+
+  /** How long a set of events lasts: `seconds` (1 to 120), or the longest of their own. */
+  function eventLength(kinds, seconds) {
+    var n = Math.floor(Number(seconds));
+    if (n > 0) return Math.min(120, n);
+    return Math.max.apply(null, kinds.map(function (k) { return EVENTS[k] ? EVENTS[k].seconds : 0; }).concat([3]));
+  }
+
+  function chaosLayer() {
+    if (!chaosBox) {
+      chaosBox = document.createElement("div");
+      chaosBox.className = "chaos";
+      chaosBox.setAttribute("popover", "manual");
+      document.documentElement.appendChild(chaosBox);
+    }
+    try {
+      if (chaosBox.showPopover && !chaosBox.matches(":popover-open")) chaosBox.showPopover();
+    } catch (err) {
+      /* an older browser: it sits under open windows instead */
+    }
+    return chaosBox;
+  }
+
+  /** End whatever event is playing, now. */
+  function stopEvent() {
+    clearTimeout(eventTimer);
+    if (eventClean) eventClean();
+  }
+
+  /** Play one or more events together (`kinds`: a list, one name, or "a,b"), for
+   *  `seconds` (empty or 0: the longest of their own times). Unknown names are skipped.
+   *  `lines`: smaller text under the announcement. */
+  function playEvent(kinds, message, seconds, lines) {
     kinds = (Array.isArray(kinds) ? kinds : String(kinds || "").split(",")).filter(function (k, i, all) {
       return EVENTS[k] && all.indexOf(k) === i;
     });
     if (!kinds.length) return;
     // a new event ends the ones still playing, so nothing of them is left behind
-    clearTimeout(eventTimer);
-    if (eventClean) eventClean();
+    stopEvent();
     var root = document.documentElement;
+    var box = chaosLayer();
     var calm = PS.reducedMotion();
-    var bits = [];
-    function add(node) {
-      // on <html>, not <body>, so a flipped or darkened page does not take them along
-      root.appendChild(node);
-      bits.push(node);
-    }
-    // the announcement, as text only
-    var note = document.createElement("div");
-    note.className = "chaos__note";
-    note.setAttribute("role", "status");
-    note.textContent = message || EVENTS[kinds[0]].text;
-    add(note);
+    var length = eventLength(kinds, seconds);
     var classes = [];
+    var timers = [];
+    function add(cls, html) {
+      var node = document.createElement("div");
+      node.className = cls;
+      if (html) node.innerHTML = html;
+      box.appendChild(node);
+      return node;
+    }
+    function has(k) { return kinds.indexOf(k) !== -1; }
+
+    // the announcement (as text only), with the events' icons and a bar for the time left
+    var note = add("chaos__note");
+    note.setAttribute("role", "status");
+    var icons = document.createElement("span");
+    icons.className = "chaos__icons";
+    icons.textContent = kinds.map(function (k) { return EVENTS[k].icon; }).join(" ");
+    var words = document.createElement("span");
+    words.className = "chaos__text";
+    words.textContent = message || EVENTS[kinds[0]].text;
+    var bar = document.createElement("span");
+    bar.className = "chaos__time";
+    bar.innerHTML = '<i style="animation-duration:' + length + 's"></i>';
+    note.appendChild(icons);
+    note.appendChild(words);
+    (lines || []).forEach(function (line) {
+      if (!line) return;
+      var sub = document.createElement("span");
+      sub.className = "chaos__sub";
+      sub.textContent = line;
+      note.appendChild(sub);
+    });
+    note.appendChild(bar);
+
+    /** `count` things falling (or, with "is-up", rising) all the while, spread over the width. */
+    function fall(count, cls, html, colour) {
+      for (var i = 0; i < count; i++) {
+        var bit = add("chaos__bit" + (cls ? " " + cls : ""), typeof html === "function" ? html(i) : html);
+        bit.style.left = Math.random() * 100 + "vw";
+        var slow = cls === "is-snow" ? 2.5 : 1;
+        bit.style.animationDelay = Math.random() * 2.2 * slow + "s";
+        bit.style.animationDuration = (2.4 + Math.random() * 2) * slow + "s";
+        bit.style.animationIterationCount = "infinite"; // keeps going for as long as the event lasts
+        if (colour) bit.style.background = colour();
+      }
+    }
+    function burst() {
+      var b = add("chaos__burst");
+      b.style.left = 8 + Math.random() * 84 + "vw";
+      b.style.top = 8 + Math.random() * 50 + "vh";
+      var hue = Math.floor(Math.random() * 360);
+      var html = "";
+      for (var i = 0; i < 18; i++) html += '<i style="--a:' + i * 20 + "deg;color:hsl(" + (hue + i * 7) + ',95%,62%)"></i>';
+      b.innerHTML = html;
+      setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 1300);
+    }
+
     if (!calm) {
       kinds.forEach(function (kind) {
-        if (kind === "flip" || kind === "wobble" || kind === "disco" || kind === "tiny" || kind === "mirror") {
+        if (PAGE_EVENTS.indexOf(kind) !== -1) {
           root.classList.add("chaos-" + kind);
           classes.push("chaos-" + kind);
         }
-        if (kind === "blackout") {
-          var dark = document.createElement("div");
-          dark.className = "chaos__dark";
-          add(dark);
-        }
-        var count = kind === "rain" ? 36 : kind === "confetti" ? 60 : 0;
-        for (var i = 0; i < count; i++) {
-          var bit = document.createElement("div");
-          bit.className = "chaos__bit" + (kind === "confetti" ? " is-confetti" : "");
-          bit.style.left = Math.random() * 100 + "vw";
-          bit.style.animationDelay = Math.random() * 2.2 + "s";
-          bit.style.animationDuration = 2.4 + Math.random() * 2 + "s";
-          bit.style.animationIterationCount = "infinite"; // keeps falling for as long as the event lasts
-          if (kind === "confetti") bit.style.background = "hsl(" + Math.floor(Math.random() * 360) + ",85%,60%)";
-          else bit.innerHTML = PS.art("lemon");
-          add(bit);
-        }
       });
+      if (has("blackout")) add("chaos__dark");
+      if (has("confetti") || has("rush")) fall(60, "is-confetti", "", function () { return "hsl(" + Math.floor(Math.random() * 360) + ",85%,60%)"; });
+      if (has("rain")) fall(36, "", PS.art("lemon"));
+      if (has("coins") || has("rush")) fall(40, "is-small", PS.icon("coin"));
+      if (has("gems") || has("rush")) fall(28, "is-small", PS.icon("gem"));
+      if (has("snow")) fall(70, "is-snow", "");
+      if (has("hearts")) fall(30, "is-up", function (i) { return ["💖", "💛", "💕", "🧡"][i % 4]; });
+      if (has("parade")) {
+        for (var w = 0; w < 9; w++) {
+          var walker = add("chaos__walker", PS.art("lemon"));
+          walker.style.animationDelay = w * 0.7 + "s, " + (w % 2) * 0.2 + "s";
+        }
+      }
+      if (has("fireworks")) {
+        burst();
+        timers.push(setInterval(burst, 420));
+      }
+      if (has("boo")) add("chaos__boo", "👻");
     }
-    PS.sfx.play(kinds.indexOf("wobble") !== -1 || kinds.indexOf("blackout") !== -1 ? "boss" : "reveal", 2);
-    var length = Math.floor(Number(seconds)) > 0 ? Math.min(120, Math.floor(Number(seconds))) : Math.max.apply(null, kinds.map(function (k) { return EVENTS[k].seconds; }));
+    // in a battle that is on, the battle ones do their thing too
+    if (PS.B && PS.B.adminEvent) {
+      kinds.forEach(function (k) { if (PS.B.ADMIN_EVENTS.indexOf(k) !== -1) PS.B.adminEvent(k); });
+    }
+    var loud = has("wobble") || has("blackout") || has("horde") || has("boo") || has("nuke");
+    PS.sfx.play(loud ? "boss" : has("rush") || has("coins") ? "coin" : "reveal", 2);
+    if (has("rush")) PS.sfx.play("reveal", 4);
+    bumpNotes(); // a chat pop-up stays on top of the pictures
+
     eventClean = function () {
       classes.forEach(function (c) { root.classList.remove(c); });
-      bits.forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
+      timers.forEach(clearInterval);
+      while (box.firstChild) box.removeChild(box.firstChild);
+      try {
+        if (box.hidePopover && box.matches(":popover-open")) box.hidePopover();
+      } catch (err) {
+        /* nothing to hide */
+      }
       eventClean = null;
     };
-    eventTimer = setTimeout(function () { if (eventClean) eventClean(); }, length * 1000);
+    eventTimer = setTimeout(stopEvent, length * 1000);
   }
 
   /** Is there a new event? The first look only notes what is there. */
@@ -4274,55 +4421,235 @@
       if (res.error) return;
       var ev = res.event;
       var at = ev ? ev.at : "";
+      var kinds = ev ? String(ev.kind || "").split(",") : [];
+      var message = ev && ev.message ? String(ev.message).slice(0, 100) : "";
       if (eventSeen === null) {
+        // the first look: an old event is not played again, but one still going
+        // (the page was opened or refreshed in the middle of it) plays what is left
         eventSeen = at;
+        var age = ev ? Number(ev.age) : NaN;
+        if (isFinite(age) && kinds.indexOf("stop") === -1 && kinds[0] !== "rush" && kinds[0] !== "rushend") {
+          var known = kinds.filter(function (k) { return EVENTS[k]; });
+          var left = known.length ? Math.ceil(eventLength(known, ev.seconds) - age) : 0;
+          if (left >= 1) playEvent(known, message, left);
+        }
         return;
       }
       if (ev && at !== eventSeen) {
         eventSeen = at;
-        playEvent(String(ev.kind || "").split(","), ev.message ? String(ev.message).slice(0, 100) : "", ev.seconds);
+        if (kinds.indexOf("stop") !== -1) stopEvent();
+        else if (kinds[0] === "rush" || kinds[0] === "rushend") refreshRush(kinds[0], message);
+        else playEvent(kinds, message, ev.seconds);
       }
     });
   }
 
-  /** The admin menu's card: free stuff for the players, and events. Each button asks twice. */
-  var abuse = { who: "all", withEvent: false, events: [], seconds: "", what: "gold", amount: 500, item: "", rarity: 0, message: "", confirm: "", note: "" };
+  /* ------------------------------------------------- the money rush */
+  /* While an admin's rush lasts, battles pay more gold and gems (state.js does
+     the sums). A strip at the top of every screen says so, with the time left. */
+
+  var rushStrip = null;
+
+  /** "×2" or "×1.5". */
+  function times(n) {
+    return "×" + String(Math.round(n * 10) / 10);
+  }
+
+  /** "×2 gold · ×3 gems", leaving out a ×1. */
+  function rushText(r, html) {
+    var parts = [];
+    if (r.gold > 1) parts.push((html ? PS.icon("coin") : "") + times(r.gold) + " gold");
+    if (r.gems > 1) parts.push((html ? PS.icon("gem") : "") + times(r.gems) + " gems");
+    return parts.join(" · ") || "nothing extra";
+  }
+
+  /** How long, in words: "2 days 3 hours", "1 hour", "30 minutes", "45 seconds". */
+  function longTime(seconds) {
+    var s = Math.max(0, Math.round(seconds));
+    function n(x, word) { return x + " " + word + (x === 1 ? "" : "s"); }
+    if (s >= 86400) return n(Math.floor(s / 86400), "day") + (s % 86400 >= 3600 ? " " + n(Math.floor((s % 86400) / 3600), "hour") : "");
+    if (s >= 3600) return n(Math.floor(s / 3600), "hour") + (s % 3600 >= 60 ? " " + n(Math.floor((s % 3600) / 60), "minute") : "");
+    if (s >= 60) return n(Math.round(s / 60), "minute");
+    return n(s, "second");
+  }
+
+  /** The time left, short: "2d 03h", "1h 05m", "4m 09s". */
+  function rushLeft(r) {
+    var ms = r.until - Date.now();
+    var minutes = Math.ceil(ms / 60000);
+    if (minutes > 1440) return Math.floor(minutes / 1440) + "d " + String(Math.floor((minutes % 1440) / 60)).padStart(2, "0") + "h";
+    return PS.countdown(ms);
+  }
+
+  /** Show, update or take away the strip at the top (and the admin menu's clock). */
+  function paintRush() {
+    var r = el.gate.hidden ? st.rushNow() : null;
+    if (!r) {
+      if (rushStrip) rushStrip.hidden = true;
+    } else {
+      if (!rushStrip) {
+        rushStrip = document.createElement("div");
+        rushStrip.className = "rushstrip";
+        rushStrip.setAttribute("role", "status");
+        document.body.appendChild(rushStrip);
+      }
+      var key = r.gold + "/" + r.gems + "/" + r.message;
+      if (rushStrip.getAttribute("data-key") !== key) {
+        rushStrip.setAttribute("data-key", key);
+        rushStrip.innerHTML =
+          '<span class="rushstrip__tag">💰 Rush</span>' +
+          '<span class="rushstrip__what">' + rushText(r, true) + "</span>" +
+          '<span class="rushstrip__left" data-rushleft></span>';
+        rushStrip.title = (r.message ? r.message + " · " : "") + "Battles pay " + rushText(r) + " while it lasts";
+      }
+      rushStrip.hidden = false;
+      placeRush();
+    }
+    var clocks = document.querySelectorAll("[data-rushleft]");
+    for (var i = 0; i < clocks.length; i++) clocks[i].textContent = r ? rushLeft(r) : "";
+  }
+
+  /** In a battle: under the HUD's top row. In the menus: in the top bar's empty
+   *  middle, or just under the bar when there is no room. */
+  function placeRush() {
+    var strip = rushStrip;
+    var fighting = !el.battle.hidden;
+    strip.classList.toggle("is-battle", fighting);
+    strip.style.left = "";
+    strip.style.top = "";
+    var bar = fighting ? null : document.querySelector(".topbar");
+    if (!bar) return;
+    var box = bar.getBoundingClientRect();
+    var brand = bar.querySelector(".brand").getBoundingClientRect();
+    var stats = bar.querySelector(".topbar__stats").getBoundingClientRect();
+    var gap = stats.left - brand.right - 16;
+    strip.classList.remove("is-compact");
+    if (strip.getBoundingClientRect().width > gap) strip.classList.add("is-compact"); // without its tag
+    var size = strip.getBoundingClientRect();
+    var room = size.width <= gap;
+    strip.style.left = (room ? (brand.right + stats.left) / 2 : window.innerWidth / 2) + "px";
+    strip.style.top = Math.round(room ? box.top + (box.height - size.height) / 2 : box.bottom + 4) + "px";
+  }
+
+  /** Ask the server about the rush. `news`: "rush" (one just started: show it off) or "rushend". */
+  function refreshRush(news, message) {
+    return PS.cloud.rush().then(function (res) {
+      if (res.error) return;
+      var r = res.rush;
+      var had = Boolean(st.rushNow());
+      st.setRush(r ? { gold: r.gold, gems: r.gems, until: Date.now() + r.left * 1000, message: r.message } : null);
+      paintRush();
+      var now = st.rushNow();
+      if (news === "rush" && now) playEvent(["rush"], "MONEY RUSH!", 0, [rushText(now) + " for " + longTime(r.left), message]);
+      else if (news === "rushend" && had) playEvent(["rushend"], message || "", 0);
+      if ((news || had !== Boolean(now)) && view.modal && view.modal.type === "secret" && view.devTab === "abuse") renderModal();
+    });
+  }
+
+  /* ------------------------------------------------- the admin menu's Admin abuse tab */
+
+  /** Each button that sends something asks "Sure?" first. */
+  var abuse = {
+    who: "all", withEvent: false, events: [], seconds: "", what: "gold", amount: 500, item: "", rarity: 0, message: "",
+    confirm: "", note: "", noteAt: "", rushGold: 2, rushGems: 2, rushMinutes: 30
+  };
 
   var ABUSE_WHO = [["all", "Everyone"], ["online", "Everyone online right now"], ["random", "One random player (lucky dip)"]];
-  var ABUSE_EVENTS = [
-    ["confetti", "Confetti"], ["flip", "Flip every screen"], ["rain", "Lemon rain"], ["wobble", "Earthquake"],
-    ["disco", "Disco"], ["tiny", "Shrink everything"], ["mirror", "Mirror world"], ["blackout", "Lights out"],
-    ["shout", "Shout a message"]
-  ];
+  var RUSH_X = [1, 1.5, 2, 3, 5, 10];
+  var RUSH_TIMES = [[10, "10 min"], [30, "30 min"], [60, "1 hour"], [180, "3 hours"], [1440, "1 day"], [10080, "1 week"]];
+  var AMOUNTS = [100, 1000, 10000, 100000, 1000000];
+
+  /** The ticked events, in the menu's order. */
+  function pickedEvents() {
+    return menuEvents().filter(function (k) { return abuse.events.indexOf(k) !== -1; });
+  }
 
   function devAbuse() {
     if (!PS.dev.admin || !PS.cloud.isAdmin()) return "";
     if (!abuse.item) abuse.item = firstItem("weapon");
     function button(key, label, cls, off) {
       var sure = abuse.confirm === key;
-      return '<button class="btn btn--sm' + (sure ? " btn--danger" : cls ? " " + cls : "") + '" type="button" data-act="abuse" data-what="' + key + '"' + (off ? " disabled" : "") + ">" + (sure ? "Sure? " : "") + label + "</button>";
+      return '<button class="btn' + (sure ? " btn--danger" : cls ? " " + cls : "") + '" type="button" data-act="abuse" data-what="' + key + '"' + (off ? " disabled" : "") + ">" + (sure ? "Sure? " : "") + label + "</button>";
     }
+    function noteFor(at) {
+      return abuse.note && abuse.noteAt === at ? '<p class="abuse__note" role="status">' + esc(abuse.note) + "</p>" : "";
+    }
+    function tile(k) {
+      var e = EVENTS[k];
+      var on = abuse.events.indexOf(k) !== -1;
+      return '<button class="abuse__tile abuse__tile--' + e.group + (on ? " is-on" : "") + '" type="button" data-act="abuse-pick" data-ev="' + k + '" aria-pressed="' + on + '">' +
+        '<span class="abuse__emoji" aria-hidden="true">' + e.icon + "</span><b>" + esc(e.name) + "</b><small>" + esc(e.about) + "</small></button>";
+    }
+    function chip(act, attrs, label, on) {
+      return '<button class="abuse__chip' + (on ? " is-on" : "") + '" type="button" data-act="' + act + '"' + attrs + ' aria-pressed="' + Boolean(on) + '">' + label + "</button>";
+    }
+    var picked = pickedEvents();
+    var pickedNames = picked.map(function (k) { return EVENTS[k].name; }).join(" + ");
     var item = abuse.what === "item";
     var who = abuse.who === "all" ? "everyone" : abuse.who === "online" ? "everyone online" : "one random player";
-    var stuff = item
-      ? PS.RARITY[abuse.rarity].name + " " + PS.ITEMS[abuse.item].name
-      : fmt(abuse.amount) + " " + abuse.what;
-    var picked = ABUSE_EVENTS.filter(function (e) { return abuse.events.indexOf(e[0]) !== -1; });
-    var pickedNames = picked.map(function (e) { return e[1]; }).join(" + ");
-    return devCard("Admin abuse",
-      '<p class="hint">It cannot be called back. Gifts reach players who are offline too (not the banned), the next time they open the game. ' +
-        "Events play in every open game within about 10 seconds (yours at once). Each button asks \"Sure?\" first.</p>" +
-      '<label class="devabuse__msg">Message (optional)<input id="abuse-msg" type="text" maxlength="100" value="' + esc(abuse.message) + '" placeholder="Shown with the gift or the events" /></label>' +
-      '<p class="devbox__label">Events <small>(tick as many as you like)</small></p>' +
-      '<div class="devabuse__chips" role="group" aria-label="Events">' + ABUSE_EVENTS.map(function (e) {
-        var on = abuse.events.indexOf(e[0]) !== -1;
-        return '<button class="devabuse__chip' + (on ? " is-on" : "") + '" type="button" data-act="abuse-pick" data-ev="' + e[0] + '" aria-pressed="' + on + '">' + esc(e[1]) + "</button>";
-      }).join("") + "</div>" +
-      '<div class="dev__give">' +
-        '<label>How long, in seconds<input id="abuse-seconds" type="number" min="1" max="120" step="1" value="' + esc(String(abuse.seconds)) + '" placeholder="automatic" /></label>' +
+    var stuff = item ? PS.RARITY[abuse.rarity].name + " " + PS.ITEMS[abuse.item].name : fmt(abuse.amount) + " " + abuse.what;
+    var rush = st.rushNow();
+    var want = { gold: abuse.rushGold, gems: abuse.rushGems };
+    var nothing = want.gold === 1 && want.gems === 1;
+
+    var hero =
+      '<div class="abuse__hero">' +
+        '<span class="abuse__flame" aria-hidden="true">🔥</span>' +
+        "<div><h3>Admin abuse</h3><p>It hits every player at once and cannot be called back. Events play in every open game within about 10 seconds (yours at once).</p></div>" +
+        (rush ? '<span class="abuse__live">💰 Rush on · <b data-rushleft>' + rushLeft(rush) + "</b></span>" : "") +
       "</div>" +
-      devRow(button("fire", picked.length ? "Fire " + pickedNames : "Fire the events (tick some first)", "btn--primary", !picked.length)) +
-      '<p class="devbox__label">Free stuff</p>' +
+      '<label class="devabuse__msg">Message (optional)<input id="abuse-msg" type="text" maxlength="100" value="' + esc(abuse.message) + '" placeholder="Shown with the events, the gift or the rush" /></label>';
+
+    var events = devCard("🎆 Events",
+      '<p class="devbox__label">Quick packs <small>(ticks a few that go well together)</small></p>' +
+      '<div class="abuse__packs">' + PACKS.map(function (p) {
+        return '<button class="abuse__pack" type="button" data-act="abuse-pack" data-pack="' + p[0] + '" title="' + esc(p[2].map(function (k) { return EVENTS[k].name; }).join(" + ")) + '">' + p[1] + "</button>";
+      }).join("") + "</div>" +
+      EVENT_GROUPS.map(function (g) {
+        return '<p class="devbox__label">' + g[1] + (g[2] ? " <small>" + g[2] + "</small>" : "") + "</p>" +
+          '<div class="abuse__tiles" role="group" aria-label="' + g[1] + '">' + menuEvents(g[0]).map(tile).join("") + "</div>";
+      }).join("") +
+      '<div class="abuse__go">' +
+        '<label class="abuse__secs">Seconds<input id="abuse-seconds" type="number" min="1" max="120" step="1" value="' + esc(String(abuse.seconds)) + '" placeholder="auto" /></label>' +
+        '<button class="btn" type="button" data-act="abuse-try"' + (picked.length ? "" : " disabled") + ">▶ Try it on my screen</button>" +
+        button("fire", picked.length ? "🔥 Fire " + esc(pickedNames) : "Fire the events (tick some first)", "btn--primary", !picked.length) +
+      "</div>" +
+      '<div class="abuse__go abuse__go--small">' +
+        '<button class="btn btn--sm" type="button" data-act="abuse-stop">⏹ Stop events for everyone</button>' +
+        '<button class="btn btn--sm" type="button" data-act="abuse-clear"' + (abuse.events.length ? "" : " disabled") + ">Untick all</button>" +
+        (picked.length ? '<span class="abuse__count">' + picked.length + " ticked · " + eventLength(picked, abuse.seconds) + " seconds</span>" : "") +
+      "</div>" +
+      noteFor("events")
+    );
+
+    var rushCard = devCard("💰 Money rush",
+      '<p class="hint">Battles pay more while it lasts: chapters, endless and duels. Every open game shows a strip at the top with the time left, and gold rains down when it starts.</p>' +
+      (rush
+        ? '<div class="abuse__rushon"><span class="abuse__rushwhat">' + rushText(rush, true) + '</span><span><b data-rushleft>' + rushLeft(rush) + "</b> left</span>" +
+            button("rush-stop", "Stop the rush", "btn--danger") + "</div>"
+        : "") +
+      '<div class="abuse__rushpick">' +
+        '<div><p class="devbox__label">' + PS.icon("coin") + " Gold</p>" + '<div class="abuse__chips">' + RUSH_X.map(function (x) {
+          return chip("abuse-x", ' data-which="gold" data-value="' + x + '"', times(x), abuse.rushGold === x);
+        }).join("") + "</div></div>" +
+        '<div><p class="devbox__label">' + PS.icon("gem") + " Gems</p>" + '<div class="abuse__chips">' + RUSH_X.map(function (x) {
+          return chip("abuse-x", ' data-which="gems" data-value="' + x + '"', times(x), abuse.rushGems === x);
+        }).join("") + "</div></div>" +
+      "</div>" +
+      '<p class="devbox__label">How long</p>' +
+      '<div class="abuse__chips">' + RUSH_TIMES.map(function (t) {
+        return chip("abuse-time", ' data-value="' + t[0] + '"', t[1], abuse.rushMinutes === t[0]);
+      }).join("") +
+        '<label class="abuse__mins">or minutes<input id="abuse-minutes" type="number" min="1" max="10080" step="1" value="' + abuse.rushMinutes + '" /></label>' +
+      "</div>" +
+      '<div class="abuse__go">' +
+        button("rush", nothing ? "Pick more than ×1 first" : "💰 Start " + rushText(want) + " for " + longTime(abuse.rushMinutes * 60), "btn--primary btn--gold", nothing) +
+      "</div>" +
+      noteFor("rush")
+    );
+
+    var free = devCard("🎁 Free stuff",
+      '<p class="hint">Gifts reach players who are offline too (not the banned), the next time they open the game.</p>' +
       '<div class="dev__give">' +
         devSelect("abuse-who", "Who gets it", ABUSE_WHO, abuse.who) +
         devSelect("abuse-what", "What", [["gold", "Gold"], ["gems", "Gems"], ["item", "A weapon or gear"]], abuse.what) +
@@ -4333,12 +4660,16 @@
             '<div class="board__pair">' + devSelect("abuse-item", "Item", PS.ITEM_ORDER.map(function (id) {
               return [id, PS.ITEMS[id].name + (PS.ITEMS[id].grade !== "A" ? " (" + PS.ITEMS[id].grade + ")" : "")];
             }), abuse.item) + devSelect("abuse-rarity", "Rarity", rarityOptions(PS.RARITY.length), abuse.rarity) + "</div></div>"
-        : "") +
+        : '<div class="abuse__chips">' + AMOUNTS.map(function (n) {
+            return chip("abuse-amount", ' data-value="' + n + '"', fmt(n), abuse.amount === n);
+          }).join("") + "</div>") +
       '<label class="inv__all"><input id="abuse-with" type="checkbox"' + (abuse.withEvent ? " checked" : "") + (picked.length ? "" : " disabled") + " /> Fire the ticked events at the same moment" +
         (picked.length ? "" : " (tick some above)") + "</label>" +
-      devRow(button("give", "Send " + stuff + " to " + who + (abuse.withEvent && picked.length ? " + " + pickedNames : ""), "btn--primary")) +
-      (abuse.note ? '<p class="hint devbanner__note" role="status">' + esc(abuse.note) + "</p>" : "")
+      '<div class="abuse__go">' + button("give", "🎁 Send " + stuff + " to " + who + (abuse.withEvent && picked.length ? " + " + esc(pickedNames) : ""), "btn--primary") + "</div>" +
+      noteFor("give")
     );
+
+    return '<div class="abuse">' + hero + events + rushCard + free + "</div>";
   }
 
   /** Every so often (and on coming back to the tab): a new banner? banned since? any gifts? */
@@ -4346,6 +4677,7 @@
     if (el.gate.hidden) {
       refreshBanner();
       checkEvent();
+      refreshRush();
     }
     if (!PS.cloud.me() || PS.cloud.offline() || !el.gate.hidden) return;
     heartbeat();
@@ -4417,6 +4749,11 @@
     heartbeat();
   }
 
+  /** "Money rush: ×2 gold · ×2 gems" under a battle's pay, when a rush paid into it. */
+  function rushLine(result) {
+    return result.rush ? '<p class="results__rush">💰 Money rush: ' + rushText(result.rush, true) + "</p>" : "";
+  }
+
   function showSwarmResults(result) {
     var ch = PS.chapter(result.chapter);
     el.results.innerHTML =
@@ -4431,7 +4768,7 @@
           "<div><dt>Damage</dt><dd>" + fmt(result.dealt || 0) + "</dd></div>" +
           "<div><dt>Best combo</dt><dd>×" + fmt(result.combo || 0) + "</dd></div>" +
         "</dl>" +
-        '<p class="loot__money">' + price("gold", result.gold) + "</p>" +
+        '<p class="loot__money">' + price("gold", result.gold) + "</p>" + rushLine(result) +
         '<div class="modal__actions">' +
           '<button class="btn" type="button" data-act="again" data-key="again">Go again</button>' +
           '<button class="btn btn--primary" type="button" data-act="home" data-key="home">Back to camp</button>' +
@@ -4452,7 +4789,7 @@
         '<p class="results__sub">' + (result.forfeit
           ? (result.won ? foe + " left before the end, so the duel is yours." : "You left the duel early.")
           : "Rounds: you " + wins[0] + " – " + wins[1] + " " + foe + ".") + "</p>" +
-        '<p class="loot__money">' + price("gold", result.gold) + (result.gems ? price("gems", result.gems) : "") + "</p>" +
+        '<p class="loot__money">' + price("gold", result.gold) + (result.gems ? price("gems", result.gems) : "") + "</p>" + rushLine(result) +
         (result.won ? '<p class="results__unlock">' + PS.icon("check") + "Duels won: " + fmt(result.duels || 0) + "</p>" : "") +
         '<div class="modal__actions">' +
           '<button class="btn btn--primary" type="button" data-act="home" data-key="home">Back to camp</button>' +
@@ -4491,7 +4828,7 @@
           "<div><dt>Damage</dt><dd>" + fmt(result.dealt || 0) + "</dd></div>" +
           "<div><dt>Best combo</dt><dd>×" + fmt(result.combo || 0) + "</dd></div>" +
         "</dl>" +
-        '<p class="loot__money">' + price("gold", result.gold) + (result.gems ? price("gems", result.gems) : "") + "</p>" +
+        '<p class="loot__money">' + price("gold", result.gold) + (result.gems ? price("gems", result.gems) : "") + "</p>" + rushLine(result) +
         (bonus ? '<p class="results__unlock results__challenge">' + PS.icon("gift") + "Challenge won! " + price("gems", bonus.gems) + " and a " + esc(PS.CHESTS[PS.CHALLENGE.chest].name) + "</p>" : "") +
         (twist && result.won && !bonus ? '<p class="hint">You already won the challenge today, so this win paid like a normal clear.</p>' : "") +
         (items.length
@@ -5490,6 +5827,60 @@
       abuse.confirm = "";
       renderModal();
     },
+    "abuse-pack": function (node) {
+      var pack = PACKS.filter(function (p) { return p[0] === node.getAttribute("data-pack"); })[0];
+      if (!pack) return;
+      abuse.events = pack[2].slice();
+      abuse.confirm = "";
+      renderModal();
+    },
+    "abuse-clear": function () {
+      abuse.events = [];
+      abuse.withEvent = false;
+      abuse.confirm = "";
+      renderModal();
+    },
+    "abuse-x": function (node) {
+      var x = Number(node.getAttribute("data-value"));
+      if (node.getAttribute("data-which") === "gems") abuse.rushGems = x;
+      else abuse.rushGold = x;
+      abuse.confirm = "";
+      renderModal();
+    },
+    "abuse-time": function (node) {
+      abuse.rushMinutes = Number(node.getAttribute("data-value"));
+      abuse.confirm = "";
+      renderModal();
+    },
+    "abuse-amount": function (node) {
+      abuse.amount = Number(node.getAttribute("data-value"));
+      abuse.confirm = "";
+      renderModal();
+    },
+    "abuse-try": function () {
+      // only on this screen, with the admin menu out of the way until it is over
+      var events = pickedEvents();
+      if (!events.length) return;
+      var msgBox = $("#abuse-msg");
+      if (msgBox) abuse.message = msgBox.value;
+      var back = view.modal;
+      closeModal();
+      playEvent(events, abuse.message.trim(), abuse.seconds);
+      setTimeout(function () {
+        if (!view.modal && el.gate.hidden) openModal(back);
+      }, eventLength(events, abuse.seconds) * 1000 + 400);
+    },
+    "abuse-stop": function () {
+      abuse.note = "Stopping...";
+      abuse.noteAt = "events";
+      renderModal();
+      stopEvent();
+      PS.cloud.fireEvent(["stop"], "", 0).then(function (res) {
+        abuse.note = res.error || "Stopped: open games end what is playing within about 10 seconds.";
+        if (!res.error) checkEvent();
+        if (view.modal && view.modal.type === "secret") renderModal();
+      });
+    },
     abuse: function (node) {
       var what = node.getAttribute("data-what");
       var msgBox = $("#abuse-msg");
@@ -5511,7 +5902,8 @@
       var message = abuse.message.trim();
       var seconds = Math.max(0, Math.min(120, Math.floor(Number(abuse.seconds) || 0)));
       // in the menu's order, the same as the button says
-      var events = ABUSE_EVENTS.map(function (e) { return e[0]; }).filter(function (k) { return abuse.events.indexOf(k) !== -1; });
+      var events = pickedEvents();
+      var names = events.map(function (k) { return EVENTS[k].name; }).join(" + ");
       var together = what === "give" && abuse.withEvent && events.length;
       var job;
       if (what === "give") {
@@ -5523,24 +5915,33 @@
           if (both[0].error) return both[0];
           var res = both[1];
           if (res.error) return res;
-          if (together) label += " with " + events.join(" + ");
+          if (together) label += " with " + names;
           if (abuse.who === "random") return { done: res.n ? res.name + " won " + label + "!" : "Nobody to give it to" };
           return { done: "Sent " + label + " to " + fmt(res.n) + " player" + (res.n === 1 ? "" : "s") + (message ? " (with your message)" : "") };
+        });
+      } else if (what === "rush" || what === "rush-stop") {
+        var stop = what === "rush-stop";
+        var want = { gold: abuse.rushGold, gems: abuse.rushGems };
+        var minutes = stop ? 0 : Math.max(1, Math.min(10080, Math.floor(abuse.rushMinutes) || 30));
+        job = PS.cloud.setRush(want.gold, want.gems, minutes, stop ? "" : message).then(function (res) {
+          if (res.error) return res;
+          return { done: stop ? "The money rush is over, for everyone." : "Money rush on: " + rushText(want) + " for " + longTime(minutes * 60) + ". Every open game shows it within about 10 seconds." };
         });
       } else {
         if (!events.length) return;
         job = PS.cloud.fireEvent(events, message, seconds).then(function (res) {
-          return res.error ? res : { done: "Fired " + events.join(" + ") + (seconds ? " for " + seconds + " seconds" : "") + ". Open games play it within about 10 seconds." };
+          return res.error ? res : { done: "Fired " + names + (seconds ? " for " + seconds + " seconds" : "") + ". Open games play it within about 10 seconds." };
         });
       }
       abuse.note = "Sending...";
+      abuse.noteAt = what === "give" ? "give" : what === "fire" ? "events" : "rush";
       renderModal();
       job.then(function (res) {
         abuse.note = res.error || res.done;
         if (view.modal && view.modal.type === "secret") renderModal();
         // see it here at once: events play now, and a gift to yourself is picked up now
         if (!res.error) {
-          if (together || what === "fire") checkEvent();
+          if (what !== "give" || together) checkEvent();
           if (what === "give") watch();
         }
       });
@@ -5688,6 +6089,7 @@
 
   /** Once a second: keep the countdowns moving and notice a gift coming due. */
   function tick() {
+    paintRush(); // in battles too
     if (el.app.hidden) return;
     // an admin with the leaderboard open sees who comes and goes
     if (view.modal && view.modal.type === "account" && view.board.presence && Date.now() - view.board.presenceAt > PRESENCE_EVERY) loadPresence();
@@ -5923,9 +6325,10 @@
           else if (key === "rarity") abuse.rarity = Number(e.target.value) || 0;
           else if (key === "with") abuse.withEvent = e.target.checked;
           else if (key === "seconds") abuse.seconds = e.target.value;
+          else if (key === "minutes") abuse.rushMinutes = Math.max(1, Math.min(10080, Math.floor(Number(e.target.value) || 1)));
           else abuse[key] = e.target.value; // who, what, item
           abuse.confirm = "";
-          if (key !== "amount" && key !== "msg" && key !== "seconds") {
+          if (key !== "amount" && key !== "msg" && key !== "seconds" && key !== "minutes") {
             // what is shown depends on these: draw it again, keeping the focus
             renderModal();
             var again = $("#" + e.target.id);

@@ -220,11 +220,12 @@ create table if not exists public.events (
 );
 
 -- several events can go at once ("disco,rain"), for a set number of seconds
--- (0: each event's own time). The list can grow, so these are refreshed on every run.
+-- (0: each event's own time). Any short lowercase names: a game ignores the
+-- ones it does not know, so a new event needs no change here.
 alter table public.events add column if not exists seconds integer not null default 0;
 alter table public.events drop constraint if exists events_kind_check;
 alter table public.events add constraint events_kind_check
-  check (char_length(kind) <= 100 and string_to_array(kind, ',') <@ array['confetti', 'flip', 'rain', 'wobble', 'disco', 'tiny', 'mirror', 'blackout', 'shout']);
+  check (kind ~ '^[a-z]{1,16}(,[a-z]{1,16}){0,29}$');
 alter table public.events drop constraint if exists events_seconds_check;
 alter table public.events add constraint events_seconds_check check (seconds between 0 and 120);
 
@@ -238,6 +239,21 @@ create policy "Everyone can read the event"
 
 revoke all on public.events from anon, authenticated;
 grant select (id, kind, message, at, seconds) on public.events to anon, authenticated;
+
+-- Admin abuse: a money rush. Until `until`, battles pay gold_x times the gold
+-- and gems_x times the gems (each game multiplies its own rewards). One row;
+-- only pip_set_rush changes it and pip_rush reads it, so the table stays shut.
+create table if not exists public.rush (
+  id integer primary key default 1 check (id = 1),
+  gold_x numeric(4, 1) not null default 1 check (gold_x between 1 and 10),
+  gems_x numeric(4, 1) not null default 1 check (gems_x between 1 and 10),
+  until timestamptz not null default now(),
+  message text check (char_length(message) <= 100),
+  fired_by uuid references auth.users (id) on delete set null
+);
+
+alter table public.rush enable row level security;
+revoke all on public.rush from anon, authenticated;
 
 -- Public chat: everyone signed in can read it; messages only go in through pip_say.
 create table if not exists public.chat (
@@ -601,9 +617,9 @@ begin
 end;
 $$;
 
-/* Admin abuse, part two: fire one or more events (a comma-separated list, at
-   most nine) for every open game, for a set number of seconds (0: each
-   event's own time, up to 120). */
+/* Admin abuse, part two: fire one or more events (a comma-separated list of
+   short lowercase names, at most 30) for every open game, for a set number of
+   seconds (0: each event's own time, up to 120). "stop" ends what is playing. */
 drop function if exists public.pip_set_event(text, text);
 create or replace function public.pip_set_event(event_kind text, event_message text, event_seconds integer default 0)
 returns void
@@ -617,8 +633,8 @@ begin
   if not public.pip_is_admin() then
     raise exception 'Only admins can do that.';
   end if;
-  if cardinality(kinds) < 1 or kinds = array['']
-     or not (kinds <@ array['confetti', 'flip', 'rain', 'wobble', 'disco', 'tiny', 'mirror', 'blackout', 'shout']) then
+  if coalesce(cardinality(kinds), 0) < 1 or cardinality(kinds) > 30
+     or exists (select 1 from unnest(kinds) k where k !~ '^[a-z]{1,16}$') then
     raise exception 'Pick an event.';
   end if;
   if coalesce(event_seconds, 0) < 0 or coalesce(event_seconds, 0) > 120 then
@@ -629,6 +645,80 @@ begin
   on conflict (id) do update
     set kind = excluded.kind, message = excluded.message, at = excluded.at, seconds = excluded.seconds, fired_by = excluded.fired_by;
 end;
+$$;
+
+/* The latest event with how long ago it was fired, by the server's clock (no
+   account needed), so a game opened or refreshed in the middle of one can
+   play the rest of it. Null when none has been fired yet. */
+create or replace function public.pip_event()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+      'kind', e.kind, 'message', e.message, 'at', e.at, 'seconds', e.seconds,
+      'age', greatest(0, extract(epoch from now() - e.at)))
+  from public.events e
+  where e.id = 1;
+$$;
+
+/* Admin abuse, part three: a money rush. Battles pay rush_gold times the gold
+   and rush_gems times the gems (1 to 10) for rush_minutes (up to a week; 0
+   stops it). Open games hear of it with their next event check. */
+create or replace function public.pip_set_rush(rush_gold numeric, rush_gems numeric, rush_minutes integer, rush_message text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  g numeric := round(coalesce(rush_gold, 1), 1);
+  m numeric := round(coalesce(rush_gems, 1), 1);
+  mins integer := coalesce(rush_minutes, 0);
+  note text := nullif(left(btrim(coalesce(rush_message, '')), 100), '');
+begin
+  if not public.pip_is_admin() then
+    raise exception 'Only admins can do that.';
+  end if;
+  if mins < 0 or mins > 10080 then
+    raise exception 'Pick between 1 minute and 7 days (0 stops it).';
+  end if;
+  if g < 1 or g > 10 or m < 1 or m > 10 then
+    raise exception 'Pick from x1 to x10.';
+  end if;
+  if mins > 0 and g = 1 and m = 1 then
+    raise exception 'Pick more than x1 for the gold or the gems.';
+  end if;
+  insert into public.rush (id, gold_x, gems_x, until, message, fired_by)
+  values (1, g, m, now() + make_interval(mins => mins), note, (select auth.uid()))
+  on conflict (id) do update
+    set gold_x = excluded.gold_x, gems_x = excluded.gems_x, until = excluded.until,
+        message = excluded.message, fired_by = excluded.fired_by;
+  insert into public.events (id, kind, message, at, seconds, fired_by)
+  values (1, case when mins > 0 then 'rush' else 'rushend' end, note, now(), 0, (select auth.uid()))
+  on conflict (id) do update
+    set kind = excluded.kind, message = excluded.message, at = excluded.at, seconds = excluded.seconds, fired_by = excluded.fired_by;
+end;
+$$;
+
+/* The money rush going on now (no account needed): { gold, gems, left (seconds),
+   message }, or null when there is none. The server's clock, not the player's. */
+create or replace function public.pip_rush()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when r.until > now() then jsonb_build_object(
+      'gold', r.gold_x, 'gems', r.gems_x,
+      'left', ceil(extract(epoch from r.until - now()))::integer,
+      'message', r.message)
+    end
+  from public.rush r
+  where r.id = 1;
 $$;
 
 /* Public chat: say something (200 characters, one message every 2 seconds,
@@ -1284,6 +1374,12 @@ revoke execute on function public.pip_give_many(text, text, integer, bigint, tex
 revoke execute on function public.pip_set_event(text, text, integer) from public, anon;
 grant execute on function public.pip_give_many(text, text, integer, bigint, text, text) to authenticated;
 grant execute on function public.pip_set_event(text, text, integer) to authenticated;
+revoke execute on function public.pip_set_rush(numeric, numeric, integer, text) from public, anon;
+grant execute on function public.pip_set_rush(numeric, numeric, integer, text) to authenticated;
+revoke execute on function public.pip_event() from public;
+grant execute on function public.pip_event() to anon, authenticated;
+revoke execute on function public.pip_rush() from public;
+grant execute on function public.pip_rush() to anon, authenticated;
 grant execute on function public.pip_take(uuid, text, text, integer, bigint, text) to authenticated;
 grant execute on function public.pip_claim_takes() to authenticated;
 grant execute on function public.pip_takes_waiting(uuid) to authenticated;

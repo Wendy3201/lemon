@@ -963,7 +963,9 @@
     if (R.mode === "swarm") {
       // endless: gold and the endless record only, no gear or progress
       var before = PS.state.get().endless.best;
+      var rush = PS.state.rushNow();
       result = {
+        rush: rush && rush.gold > 1 ? { gold: rush.gold, gems: 1 } : null, // endless pays gold only
         swarm: true, chapter: R.ch.n, won: false, time: R.t, kills: R.kills, level: R.p.level, items: [], gems: 0, unlocked: 0,
         gold: PS.state.paySwarm(R.ch.n, R.t, R.coins, { kills: R.kills, combo: R.bestCombo }),
         best: Math.max(before, R.t), newBest: R.t > before && R.t >= 10
