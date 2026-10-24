@@ -366,6 +366,13 @@ letters, numbers or `_`) and a password, then **log in** with the same two.
 There is no email, so a forgotten password cannot be reset; the owner can
 delete the account in Supabase and the player signs up again.
 
+**Change name** in the account window renames the player. The name is also
+the login, so the game changes both (`pip_rename` in setup.sql, then the
+account's address): they log in with the new name from then on, with the
+same password. If the login cannot follow, the name goes back. Taken names,
+and the names setup.sql makes admins (test, owner, test2, plus admin and
+moderator), cannot be picked.
+
 Once in, the **account button** at the top right opens the player's account
 and the **leaderboard**. It ranks everyone by furthest chapter, Power, longest
 endless swarm, pests squashed, daily challenges won, collection size or arena

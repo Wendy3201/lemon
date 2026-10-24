@@ -8599,3 +8599,119 @@ button.inv__cell:focus-visible {
   color: var(--lemon-bright);
   font-size: 10.5px;
 }
+
+/* the Give form's item list, with a picture for every item */
+.itempick__btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm, 10px);
+  background: var(--bg-soft);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.itempick__btn .tile {
+  width: 36px;
+  height: 36px;
+  flex: none;
+}
+
+.itempick__btn b {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.itempick__list {
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.itempick__list input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm, 10px);
+  background: var(--bg-soft);
+  color: var(--ink);
+  font: inherit;
+}
+
+.itempick__scroll {
+  max-height: 320px;
+  margin-top: 6px;
+  overflow-y: auto;
+}
+
+.itempick__slot {
+  margin: 8px 0 4px;
+  font-weight: 800;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.itempick__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: 4px;
+}
+
+.itempick__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 3px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.itempick__item[hidden] {
+  display: none;
+}
+
+.itempick__item:hover,
+.itempick__item.is-on {
+  border-color: var(--rind);
+  background: var(--lemon-pale);
+}
+
+.itempick__item .tile {
+  width: 46px;
+  height: 46px;
+}
+
+.itempick__item small {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.board__giveitem .board__pair {
+  align-items: end;
+}
+
+/* changing your name, in the account window */
+.acct__btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.acct__rename {
+  margin: 6px 0 8px;
+}

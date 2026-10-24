@@ -707,6 +707,36 @@
       }, failed);
     },
 
+    /** Change this player's name, and the login with it (same password).
+     *  If the login cannot follow, the name goes back. Resolves with {} or { error }. */
+    rename: function (name) {
+      name = String(name || "").trim();
+      var problem = nameProblem(name);
+      if (problem) return Promise.resolve({ error: problem });
+      if (!client || !me || offline) return Promise.resolve({ error: DOWN, down: true });
+      var old = me.name;
+      if (name === old) return Promise.resolve({});
+      return client.rpc("pip_rename", { new_name: name }).then(function (res) {
+        if (res.error) return failed(res.error);
+        return client.auth.updateUser({ email: emailFor(name), data: { name: name } }).then(function (u) {
+          var email = u && u.data && u.data.user ? String(u.data.user.email || "").toLowerCase() : "";
+          if (u.error || email !== emailFor(name)) {
+            // the login stayed as it was: so does the name
+            return client.rpc("pip_rename", { new_name: old }).then(function () {
+              return { error: "Your login could not be changed, so your name is still " + old + ". Try again later." };
+            }, function () {
+              return { error: "Your login could not be changed. Log in with your old name, " + old + "." };
+            });
+          }
+          me.name = name;
+          PS.store.set(KEY_LAST, { id: me.id, name: me.name, joined: me.joined, admin: me.admin });
+          cache = {};
+          PS.emit("cloud");
+          return {};
+        }, failed);
+      }, failed);
+    },
+
     signIn: function (name, password) {
       name = String(name || "").trim();
       if (!name || !password) return Promise.resolve({ error: "Type your name and your password." });

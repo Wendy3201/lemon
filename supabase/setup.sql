@@ -487,6 +487,36 @@ begin
 end;
 $$;
 
+/* A player changes their name (the game then changes the login to match).
+   The names this script makes admins can never be taken this way. */
+create or replace function public.pip_rename(new_name text)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  me uuid := (select auth.uid());
+  clean text := btrim(coalesce(new_name, ''));
+begin
+  if me is null then
+    raise exception 'Log in first.';
+  end if;
+  if clean !~ '^[A-Za-z0-9_]{3,16}$' then
+    raise exception 'Names are 3 to 16 letters, numbers or _.';
+  end if;
+  if lower(clean) in ('test', 'owner', 'test2', 'admin', 'moderator', 'mod')
+     and not exists (select 1 from public.players p where p.id = me and lower(p.name) = lower(clean)) then
+    raise exception 'That name is kept for the game. Pick another one.';
+  end if;
+  if exists (select 1 from public.players p where lower(p.name) = lower(clean) and p.id <> me) then
+    raise exception 'That name is taken. Pick another one.';
+  end if;
+  update public.players set name = clean where id = me;
+  return clean;
+end;
+$$;
+
 /* new_text: what the banner says ('' hides it); null goes back to the text in index.html */
 create or replace function public.pip_set_banner(new_text text)
 returns void
@@ -1058,6 +1088,8 @@ grant execute on function public.pip_dev_token() to authenticated;
 grant execute on function public.pip_dev_check(uuid) to authenticated;
 grant execute on function public.pip_seen(boolean, text) to authenticated;
 grant execute on function public.pip_set_shown(uuid, text, text) to authenticated;
+revoke execute on function public.pip_rename(text) from public, anon;
+grant execute on function public.pip_rename(text) to authenticated;
 grant execute on function public.pip_take(uuid, text, text, integer, bigint, text) to authenticated;
 grant execute on function public.pip_claim_takes() to authenticated;
 grant execute on function public.pip_takes_waiting(uuid) to authenticated;

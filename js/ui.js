@@ -2910,6 +2910,50 @@
     return html + bannedPart(board, who, find);
   }
 
+  /** Changing your name: it is your login too, so you log in with the new one afterwards. */
+  function renameForm() {
+    var r = view.rename;
+    return (
+      '<form class="acct__rename" data-form="rename" novalidate>' +
+        '<label class="board__field"><span>New name</span>' +
+          '<input id="rename-name" type="text" maxlength="16" autocomplete="off" spellcheck="false" value="' + esc(r.value) + '" /></label>' +
+        '<p class="hint">3 to 16 letters, numbers or _. You log in with the new name from now on, with the same password.</p>' +
+        '<p class="board__formerr" role="alert">' + esc(r.error || "") + "</p>" +
+        '<div class="board__formbtns">' +
+          '<button class="btn btn--sm" type="button" data-act="rename-cancel">Cancel</button>' +
+          '<button class="btn btn--sm btn--primary" type="submit"' + (r.busy ? " disabled" : "") + ">" + (r.busy ? "Changing..." : "Change it") + "</button>" +
+        "</div>" +
+      "</form>"
+    );
+  }
+
+  function renameSubmit(e) {
+    e.preventDefault();
+    var r = view.rename;
+    if (!r || r.busy) return;
+    var box = $("#rename-name");
+    r.value = box ? box.value.trim() : r.value;
+    r.busy = true;
+    r.error = "";
+    renderModal();
+    PS.cloud.rename(r.value).then(function (res) {
+      if (view.rename !== r) return;
+      r.busy = false;
+      if (res.error) {
+        r.error = res.error;
+        renderModal();
+        return;
+      }
+      view.rename = null;
+      renderAccount();
+      toast("You are " + PS.cloud.me().name + " now. Log in with that name next time.");
+      if (view.modal && view.modal.type === "account") {
+        renderModal();
+        loadBoard(true);
+      }
+    });
+  }
+
   function accountModal() {
     var who = PS.cloud.me();
     var online = Boolean(who && !PS.cloud.offline());
@@ -2923,8 +2967,11 @@
           '<div class="acct__who">' +
             '<h2 id="modal-title">' + esc(who ? who.name : "Not logged in") + "</h2>" +
             '<p id="account-sub">' + accountSub() + "</p>" +
+            (online && view.rename ? renameForm() : "") +
             (online
-              ? '<button class="btn btn--sm" type="button" data-act="logout">Log out</button>'
+              ? '<span class="acct__btns">' +
+                  (view.rename ? "" : '<button class="btn btn--sm" type="button" data-act="rename-open">Change name</button>') +
+                  '<button class="btn btn--sm" type="button" data-act="logout">Log out</button></span>'
               : '<button class="btn btn--sm btn--primary" type="button" data-act="login">Log in</button>') +
           "</div>" +
         "</div>" +
@@ -3484,9 +3531,9 @@
       if (m.kind === "item") {
         fields += '<div class="board__giveitem"><span class="board__preview" id="mod-preview">' + givePreview(m) + "</span>" +
           '<div class="board__pair">' +
-          '<label class="board__field"><span>Item</span><select id="mod-item">' + itemOptions(m.item) + "</select></label>" +
+          '<div class="board__field"><span>Item</span>' + itemPicker(m) + "</div>" +
           '<label class="board__field"><span>Rarity</span><select id="mod-rarity">' + options(rarityOptions(PS.RARITY.length), m.rarity) + "</select></label>" +
-        "</div></div>";
+        "</div></div>" + itemPickList(m);
       } else {
         fields += '<label class="board__field"><span>How much?</span><input id="mod-amount" type="number" min="1" max="1000000000" step="1" value="' + esc(String(m.amount)) + '" /></label>';
       }
@@ -3532,6 +3579,36 @@
         "</div>" +
       "</form>"
     );
+  }
+
+  /** A drop-down for the Give form where every item shows its picture (a plain
+   *  <select> cannot): grouped by slot, with a search box. Drawn only when open. */
+  function itemPicker(m) {
+    var def = PS.ITEMS[m.item];
+    var r = Number(m.rarity) || 0;
+    var head =
+      '<button class="itempick__btn" type="button" data-act="mod-pick-open" aria-expanded="' + Boolean(m.pickOpen) + '">' +
+        (def ? tile({ id: m.item, r: r }, { plain: true }) + "<b>" + esc(def.name) + (def.grade !== "A" ? " (" + def.grade + ")" : "") + "</b>" : "<b>Pick an item</b>") +
+        '<i aria-hidden="true">▾</i></button>';
+    return head;
+  }
+
+  /** The open list of every item, under the pickers at full width. */
+  function itemPickList(m) {
+    if (!m.pickOpen) return "";
+    var r = Number(m.rarity) || 0;
+    var groups = PS.SLOTS.map(function (slot) {
+      var cells = PS.ITEM_ORDER.filter(function (id) { return PS.ITEMS[id].slot === slot.key; }).map(function (id) {
+        var d = PS.ITEMS[id];
+        return '<button class="itempick__item' + (id === m.item ? " is-on" : "") + '" type="button" data-act="mod-pick" data-item="' + id + '" data-name="' + esc((d.name + " " + slot.plural).toLowerCase()) + '" data-grade="' + d.grade.toLowerCase() + '">' +
+          tile({ id: id, r: r }, { plain: true }) + "<small>" + esc(d.name) + "</small></button>";
+      }).join("");
+      return '<p class="itempick__slot">' + esc(slot.plural) + '</p><div class="itempick__grid">' + cells + "</div>";
+    }).join("");
+    return '<div class="itempick__list">' +
+        '<input id="mod-pick-q" type="search" placeholder="Find an item (try S or SS)" autocomplete="off" />' +
+        '<div class="itempick__scroll">' + groups + "</div>" +
+      "</div>";
   }
 
   /** The item about to be given, as it will look: its picture on the rarity's colour, with its S or SS mark. */
@@ -3981,7 +4058,22 @@
     tab: function (node) { go(node.getAttribute("data-tab")); },
     close: function () { closeModal(); },
     settings: function () { openModal({ type: "settings", armed: false }); },
+    "rename-open": function () {
+      var who = PS.cloud.me();
+      view.rename = { value: who ? who.name : "", busy: false, error: "" };
+      renderModal();
+      var box = $("#rename-name");
+      if (box) {
+        box.focus();
+        box.select();
+      }
+    },
+    "rename-cancel": function () {
+      view.rename = null;
+      renderModal();
+    },
     account: function () {
+      view.rename = null;
       view.board.mod = null;
       openModal({ type: "account" });
       if (!PS.cloud.me() || PS.cloud.offline()) return;
@@ -4054,6 +4146,24 @@
     },
     "board-banned": function () {
       view.board.showBanned = !view.board.showBanned;
+      paintBoard();
+    },
+    "mod-pick-open": function () {
+      var m = view.board.mod;
+      if (!m) return;
+      m.pickOpen = !m.pickOpen;
+      paintBoard();
+      var q = $("#mod-pick-q");
+      if (q) q.focus();
+      var on = $(".itempick__item.is-on");
+      if (on) on.scrollIntoView({ block: "nearest" });
+    },
+    "mod-pick": function (node) {
+      var m = view.board.mod;
+      var id = node.getAttribute("data-item");
+      if (!m || !PS.ITEMS[id]) return;
+      m.item = id;
+      m.pickOpen = false;
       paintBoard();
     },
     "mod-cancel": function () {
@@ -4975,6 +5085,10 @@
       modSubmit(e);
       return;
     }
+    if (e.target.getAttribute("data-form") === "rename") {
+      renameSubmit(e);
+      return;
+    }
     if (e.target.getAttribute("data-form") !== "secret") return;
     e.preventDefault();
     if (!view.modal) return;
@@ -5225,6 +5339,20 @@
         }
         if (/^take-/.test(e.target.id) && isInv(view.board.mod)) {
           view.board.mod.inputs[e.target.id] = e.target.value;
+          return;
+        }
+        if (e.target.id === "mod-pick-q") {
+          // the item list filters in place, so typing keeps its focus
+          var want = e.target.value.trim().toLowerCase();
+          var picks = el.modal.querySelectorAll(".itempick__item");
+          for (var pi = 0; pi < picks.length; pi++) {
+            var words = picks[pi].getAttribute("data-name");
+            var grade = picks[pi].getAttribute("data-grade");
+            // "s" and "ss" find that grade; anything else looks in the names
+            picks[pi].hidden = Boolean(want) && want.split(/\s+/).some(function (w) {
+              return w === "s" || w === "ss" ? grade !== w : words.indexOf(w) === -1;
+            });
+          }
           return;
         }
         if (/^mod-/.test(e.target.id) && view.board.mod) {
