@@ -421,6 +421,23 @@ ticked (Supabase → Table Editor → players). `setup.sql` ticks `test`,
 - **Give** sends any weapon or piece of gear at any rarity, or gold, or gems,
   with an optional message. It arrives the next time the player's game checks
   in (within a minute while they play) and pops up as a gift.
+- **Admin abuse** (admin menu, Settings): mischief for the players, each
+  button asking "Sure?" first, none of it able to be called back.
+  - **Free stuff**: pick **who** (everyone who isn't banned; everyone with the
+    game open right now; or one random player, a lucky dip that tells you the
+    winner) and **what** (an amount of gold or gems, or any weapon or gear at
+    any rarity, with its picture). Your message, if any, goes with it. It
+    arrives as a gift, so players who are offline get theirs the next time
+    they open the game.
+  - **Events** play in every open game for a few seconds, with your message (or
+    a default) over the top: **Confetti**, **Flip every screen**, **Lemon
+    rain**, **Earthquake**, **Disco** (the colours cycle), **Shrink
+    everything**, **Mirror world**, **Lights out** and **Shout a message**
+    (just the words). A new event ends the one still playing.
+  - Games notice within about a minute; one that has only just opened doesn't
+    replay an old event, and nothing in anyone's save changes. Players with
+    reduced motion on see just the message. Server side: `pip_give_many`,
+    `pip_set_event` and the `events` table in setup.sql.
 - **Show as...** makes the leaderboard show any number or text (up to 24
   characters, "noob" say) in place of one of a player's figures, for
   everyone. The real figure still decides the order; leaving the box empty

@@ -668,6 +668,34 @@
         return res.error ? failed(res.error) : { rows: Array.isArray(res.data) ? res.data : [] };
       }, failed);
     },
+    /** Admin abuse: gold, gems or an item as gifts. who: "all" (not banned), "online" (game open
+     *  now) or "random" (one player). Resolves with { n, name } (name: the winner) or { error }. */
+    giveMany: function (g) {
+      if (!client || !me || offline) return Promise.resolve({ error: DOWN, down: true });
+      return client.rpc("pip_give_many", {
+        kind: g.kind,
+        item: g.kind === "item" ? g.item : null,
+        rarity: g.kind === "item" ? g.rarity || 0 : 0,
+        amount: g.kind === "item" ? 0 : Math.floor(g.amount || 0),
+        message: g.message || "",
+        who: g.who || "all"
+      }).then(function (res) {
+        var d = res.data && typeof res.data === "object" ? res.data : {};
+        return res.error ? failed(res.error) : { n: Number(d.n) || 0, name: d.name ? String(d.name) : "" };
+      }, failed);
+    },
+    /** Admin abuse: fire an event (confetti, flip, rain, wobble, disco, tiny, mirror, blackout, shout) for every open game. */
+    fireEvent: function (kind, message) {
+      return moderate("pip_set_event", { event_kind: kind, event_message: message || "" });
+    },
+    /** The latest event, for any game (no account needed): { kind, message, at } or { event: null }. */
+    event: function () {
+      if (!client) return Promise.resolve({ error: DOWN, down: true });
+      return client.from("events").select("kind, message, at").limit(1).maybeSingle().then(function (res) {
+        return res.error ? failed(res.error) : { event: res.data || null };
+      }, failed);
+    },
+
     /** Make the leaderboard show any number or text for one of a player's figures ('' undoes it). */
     setShown: function (target, figure, text) {
       return moderate("pip_set_shown", { target: target, figure: figure, shown_as: String(text || "") });

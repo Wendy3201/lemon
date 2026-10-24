@@ -208,6 +208,33 @@ grant usage on schema public to anon;
 revoke all on public.banner from anon, authenticated;
 grant select (id, message, updated_at) on public.banner to anon, authenticated;
 
+-- Admin abuse: a one-row broadcast an admin fires for every open game to play
+-- for a few seconds (confetti, a flipped screen...). Games read it with the
+-- banner; only pip_set_event changes it. Nothing in anyone's save changes.
+create table if not exists public.events (
+  id integer primary key default 1 check (id = 1),
+  kind text not null,
+  message text check (char_length(message) <= 100),
+  at timestamptz not null default now(),
+  fired_by uuid references auth.users (id) on delete set null
+);
+
+-- the list of events can grow, so it is refreshed on every run
+alter table public.events drop constraint if exists events_kind_check;
+alter table public.events add constraint events_kind_check
+  check (kind in ('confetti', 'flip', 'rain', 'wobble', 'disco', 'tiny', 'mirror', 'blackout', 'shout'));
+
+alter table public.events enable row level security;
+
+drop policy if exists "Everyone can read the event" on public.events;
+create policy "Everyone can read the event"
+  on public.events for select
+  to anon, authenticated
+  using (true);
+
+revoke all on public.events from anon, authenticated;
+grant select (id, kind, message, at) on public.events to anon, authenticated;
+
 -- What each player owns (gear, pets, gold, gems), as their game last sent it,
 -- so an admin can look. A player can read their own; admins can read anyone's.
 -- The size limit keeps a giant made-up inventory from ever being stored.
@@ -484,6 +511,86 @@ begin
   if not found then
     raise exception 'That player has gone.';
   end if;
+end;
+$$;
+
+/* Admin abuse, part one: gold, gems or a piece of gear as gifts (so offline
+   players get theirs the next time they open the game), for every player who
+   is not banned ('all'), only those with the game open right now ('online'),
+   or one of them picked by chance ('random'). Returns { n: how many, name:
+   who, when it was one player }. */
+drop function if exists public.pip_give_all(text, bigint, text);
+create or replace function public.pip_give_many(kind text, item text, rarity integer, amount bigint, message text, who text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  n integer;
+  winner text;
+  note text := nullif(left(coalesce(message, ''), 200), '');
+begin
+  if not public.pip_is_admin() then
+    raise exception 'Only admins can do that.';
+  end if;
+  if kind is null or kind not in ('gold', 'gems', 'item') then
+    raise exception 'Pick gold, gems or an item.';
+  end if;
+  if who is null or who not in ('all', 'online', 'random') then
+    raise exception 'Pick who gets it.';
+  end if;
+  if kind = 'item' then
+    if coalesce(item, '') !~ '^[a-z0-9_]{1,40}$' then
+      raise exception 'Pick an item.';
+    end if;
+  elsif coalesce(amount, 0) < 1 or amount > 1000000000 then
+    raise exception 'Pick an amount between 1 and 1,000,000,000.';
+  end if;
+
+  -- the winners are worked out once (the CTE is used twice, so it is kept), then each gets a gift
+  with winners as (
+    select p.id, p.name
+    from public.players p
+    where (p.banned_until is null or p.banned_until <= now())
+      and (who <> 'online' or exists (
+        select 1 from public.presence s
+        where s.player = p.id and s.open and s.seen_at > now() - interval '2 minutes'))
+    order by case when who = 'random' then random() else 0 end
+    limit case when who = 'random' then 1 else 1000000 end
+  ), sent as (
+    insert into public.gifts (player, kind, item, rarity, amount, message, sent_by)
+    select w.id, kind,
+           case when kind = 'item' then item end,
+           case when kind = 'item' then least(greatest(coalesce(rarity, 0), 0), 20) else 0 end,
+           case when kind = 'item' then 0 else amount end,
+           note, (select auth.uid())
+    from winners w
+    returning player
+  )
+  select (select count(*) from sent)::integer, (select w.name from winners w limit 1) into n, winner;
+  return jsonb_build_object('n', n, 'name', case when who = 'random' then winner end);
+end;
+$$;
+
+/* Admin abuse, part two: fire an event for every open game. */
+create or replace function public.pip_set_event(event_kind text, event_message text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.pip_is_admin() then
+    raise exception 'Only admins can do that.';
+  end if;
+  if event_kind is null or event_kind not in ('confetti', 'flip', 'rain', 'wobble', 'disco', 'tiny', 'mirror', 'blackout', 'shout') then
+    raise exception 'Pick an event.';
+  end if;
+  insert into public.events (id, kind, message, at, fired_by)
+  values (1, event_kind, nullif(left(btrim(coalesce(event_message, '')), 100), ''), now(), (select auth.uid()))
+  on conflict (id) do update
+    set kind = excluded.kind, message = excluded.message, at = excluded.at, fired_by = excluded.fired_by;
 end;
 $$;
 
@@ -1090,6 +1197,10 @@ grant execute on function public.pip_seen(boolean, text) to authenticated;
 grant execute on function public.pip_set_shown(uuid, text, text) to authenticated;
 revoke execute on function public.pip_rename(text) from public, anon;
 grant execute on function public.pip_rename(text) to authenticated;
+revoke execute on function public.pip_give_many(text, text, integer, bigint, text, text) from public, anon;
+revoke execute on function public.pip_set_event(text, text) from public, anon;
+grant execute on function public.pip_give_many(text, text, integer, bigint, text, text) to authenticated;
+grant execute on function public.pip_set_event(text, text) to authenticated;
 grant execute on function public.pip_take(uuid, text, text, integer, bigint, text) to authenticated;
 grant execute on function public.pip_claim_takes() to authenticated;
 grant execute on function public.pip_takes_waiting(uuid) to authenticated;

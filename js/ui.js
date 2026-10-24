@@ -2253,6 +2253,7 @@
         }).join(""))
       ) +
       devBanner() +
+      devAbuse() +
       devCard("Messages",
         devRow(
           devButton("dev-notice", "Show the data-reset notice") +
@@ -3876,9 +3877,146 @@
     });
   }
 
+  /* ------------------------------------------------ admin abuse (events) */
+  /* An admin fires an event and every open game plays it for a few seconds:
+     an announcement over the top, and a bit of mischief. Nothing in anyone's
+     save changes. A game that has only just opened does not play an old one. */
+
+  var EVENTS = {
+    confetti: { text: "PARTY TIME!", seconds: 6 },
+    flip: { text: "Everything is upside down!", seconds: 7 },
+    rain: { text: "It's raining lemons!", seconds: 7 },
+    wobble: { text: "Earthquake!", seconds: 6 },
+    disco: { text: "DISCO!", seconds: 8 },
+    tiny: { text: "Everything shrank!", seconds: 7 },
+    mirror: { text: "Mirror world!", seconds: 7 },
+    blackout: { text: "Lights out...", seconds: 5 },
+    shout: { text: "", seconds: 8 }
+  };
+  var eventSeen = null; // when the last event we know of was fired (null: not looked yet)
+  var eventTimer = 0;
+  var eventClean = null; // puts back whatever the event now playing changed
+
+  function playEvent(kind, message) {
+    var def = EVENTS[kind];
+    if (!def) return;
+    // a new event ends the one still playing, so nothing of it is left behind
+    clearTimeout(eventTimer);
+    if (eventClean) eventClean();
+    var root = document.documentElement;
+    var calm = PS.reducedMotion();
+    var bits = [];
+    function add(node) {
+      // on <html>, not <body>, so a flipped or darkened page does not take them along
+      root.appendChild(node);
+      bits.push(node);
+    }
+    // the announcement, as text only
+    var note = document.createElement("div");
+    note.className = "chaos__note";
+    note.setAttribute("role", "status");
+    note.textContent = message || def.text;
+    add(note);
+    var classes = [];
+    if (!calm) {
+      if (kind === "flip" || kind === "wobble" || kind === "disco" || kind === "tiny" || kind === "mirror") {
+        root.classList.add("chaos-" + kind);
+        classes.push("chaos-" + kind);
+      }
+      if (kind === "blackout") {
+        var dark = document.createElement("div");
+        dark.className = "chaos__dark";
+        add(dark);
+      }
+      var count = kind === "rain" ? 36 : kind === "confetti" ? 60 : 0;
+      for (var i = 0; i < count; i++) {
+        var bit = document.createElement("div");
+        bit.className = "chaos__bit" + (kind === "confetti" ? " is-confetti" : "");
+        bit.style.left = Math.random() * 100 + "vw";
+        bit.style.animationDelay = Math.random() * 2.2 + "s";
+        bit.style.animationDuration = 2.4 + Math.random() * 2 + "s";
+        if (kind === "confetti") bit.style.background = "hsl(" + Math.floor(Math.random() * 360) + ",85%,60%)";
+        else bit.innerHTML = PS.art("lemon");
+        add(bit);
+      }
+    }
+    PS.sfx.play(kind === "wobble" || kind === "blackout" ? "boss" : "reveal", 2);
+    eventClean = function () {
+      classes.forEach(function (c) { root.classList.remove(c); });
+      bits.forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
+      eventClean = null;
+    };
+    eventTimer = setTimeout(function () { if (eventClean) eventClean(); }, def.seconds * 1000);
+  }
+
+  /** Is there a new event? The first look only notes what is there. */
+  function checkEvent() {
+    return PS.cloud.event().then(function (res) {
+      if (res.error) return;
+      var ev = res.event;
+      var at = ev ? ev.at : "";
+      if (eventSeen === null) {
+        eventSeen = at;
+        return;
+      }
+      if (ev && at !== eventSeen) {
+        eventSeen = at;
+        playEvent(ev.kind, ev.message ? String(ev.message).slice(0, 100) : "");
+      }
+    });
+  }
+
+  /** The admin menu's card: free stuff for the players, and events. Each button asks twice. */
+  var abuse = { who: "all", what: "gold", amount: 500, item: "", rarity: 0, message: "", confirm: "", note: "" };
+
+  var ABUSE_WHO = [["all", "Everyone"], ["online", "Everyone online right now"], ["random", "One random player (lucky dip)"]];
+  var ABUSE_EVENTS = [
+    ["confetti", "Confetti"], ["flip", "Flip every screen"], ["rain", "Lemon rain"], ["wobble", "Earthquake"],
+    ["disco", "Disco"], ["tiny", "Shrink everything"], ["mirror", "Mirror world"], ["blackout", "Lights out"],
+    ["shout", "Shout a message"]
+  ];
+
+  function devAbuse() {
+    if (!PS.dev.admin || !PS.cloud.isAdmin()) return "";
+    if (!abuse.item) abuse.item = firstItem("weapon");
+    function button(key, label, cls) {
+      var sure = abuse.confirm === key;
+      return '<button class="btn btn--sm' + (sure ? " btn--danger" : cls ? " " + cls : "") + '" type="button" data-act="abuse" data-what="' + key + '">' + (sure ? "Sure? " : "") + label + "</button>";
+    }
+    var item = abuse.what === "item";
+    var who = abuse.who === "all" ? "everyone" : abuse.who === "online" ? "everyone online" : "one random player";
+    var stuff = item
+      ? PS.RARITY[abuse.rarity].name + " " + PS.ITEMS[abuse.item].name
+      : fmt(abuse.amount) + " " + abuse.what;
+    return devCard("Admin abuse",
+      '<p class="hint">It cannot be called back. Gifts reach players who are offline too (not the banned), the next time they open the game. ' +
+        "Events play in every open game within about a minute and last a few seconds. Each button asks \"Sure?\" first.</p>" +
+      '<label class="devabuse__msg">Message (optional)<input id="abuse-msg" type="text" maxlength="100" value="' + esc(abuse.message) + '" placeholder="Shown with the gift or the event" /></label>' +
+      '<p class="devbox__label">Free stuff</p>' +
+      '<div class="dev__give">' +
+        devSelect("abuse-who", "Who gets it", ABUSE_WHO, abuse.who) +
+        devSelect("abuse-what", "What", [["gold", "Gold"], ["gems", "Gems"], ["item", "A weapon or gear"]], abuse.what) +
+        (item ? "" : '<label>Amount<input id="abuse-amount" type="number" min="1" max="1000000000" step="1" value="' + abuse.amount + '" /></label>') +
+      "</div>" +
+      (item
+        ? '<div class="board__giveitem"><span class="board__preview">' + givePreview({ item: abuse.item, rarity: abuse.rarity }) + "</span>" +
+            '<div class="board__pair">' + devSelect("abuse-item", "Item", PS.ITEM_ORDER.map(function (id) {
+              return [id, PS.ITEMS[id].name + (PS.ITEMS[id].grade !== "A" ? " (" + PS.ITEMS[id].grade + ")" : "")];
+            }), abuse.item) + devSelect("abuse-rarity", "Rarity", rarityOptions(PS.RARITY.length), abuse.rarity) + "</div></div>"
+        : "") +
+      devRow(button("give", "Send " + stuff + " to " + who, "btn--primary")) +
+      '<p class="devbox__label">Events</p>' +
+      devRow(ABUSE_EVENTS.map(function (e) { return button(e[0], e[1]); }).join("")) +
+      (abuse.note ? '<p class="hint devbanner__note" role="status">' + esc(abuse.note) + "</p>" : "")
+    );
+  }
+
   /** Every so often (and on coming back to the tab): a new banner? banned since? any gifts? */
   function watch() {
-    if (el.gate.hidden) refreshBanner();
+    if (el.gate.hidden) {
+      refreshBanner();
+      checkEvent();
+    }
     if (!PS.cloud.me() || PS.cloud.offline() || !el.gate.hidden) return;
     heartbeat();
     PS.cloud.status().then(function (ban) {
@@ -4975,6 +5113,46 @@
       toast("Your power and stats are back to normal");
       renderModal();
     },
+    abuse: function (node) {
+      var what = node.getAttribute("data-what");
+      var msgBox = $("#abuse-msg");
+      if (msgBox) abuse.message = msgBox.value;
+      if (abuse.confirm !== what) {
+        // the first press only asks
+        abuse.confirm = what;
+        abuse.note = "";
+        renderModal();
+        setTimeout(function () {
+          if (abuse.confirm === what) {
+            abuse.confirm = "";
+            if (view.modal && view.modal.type === "secret") renderModal();
+          }
+        }, 4000);
+        return;
+      }
+      abuse.confirm = "";
+      var message = abuse.message.trim();
+      var job;
+      if (what === "give") {
+        var gift = { kind: abuse.what, item: abuse.item, rarity: abuse.rarity, amount: abuse.amount, message: message, who: abuse.who };
+        var label = abuse.what === "item" ? PS.RARITY[abuse.rarity].name + " " + PS.ITEMS[abuse.item].name : fmt(abuse.amount) + " " + abuse.what;
+        job = PS.cloud.giveMany(gift).then(function (res) {
+          if (res.error) return res;
+          if (abuse.who === "random") return { done: res.n ? res.name + " won " + label + "!" : "Nobody to give it to" };
+          return { done: "Sent " + label + " to " + fmt(res.n) + " player" + (res.n === 1 ? "" : "s") + (message ? " (with your message)" : "") };
+        });
+      } else {
+        job = PS.cloud.fireEvent(what, message).then(function (res) {
+          return res.error ? res : { done: "Fired: " + what + ". Open games play it within about a minute." };
+        });
+      }
+      abuse.note = "Sending...";
+      renderModal();
+      job.then(function (res) {
+        abuse.note = res.error || res.done;
+        if (view.modal && view.modal.type === "secret") renderModal();
+      });
+    },
     "dev-banner-save": function () {
       var box = $("#dev-banner");
       sendBanner((box ? box.value : "").replace(/\s+/g, " ").trim());
@@ -5256,6 +5434,7 @@
       el.status = $("#status");
 
       // the banner: what index.html says, unless the owner has set one since
+      checkEvent(); // notes the event already there, so only newer ones play
       builtInBanner = el.status ? el.status.textContent.trim() : "";
       var heldBanner = PS.store.get(KEY_BANNER, null);
       if (heldBanner && typeof heldBanner === "object") {
@@ -5339,6 +5518,21 @@
         }
         if (/^take-/.test(e.target.id) && isInv(view.board.mod)) {
           view.board.mod.inputs[e.target.id] = e.target.value;
+          return;
+        }
+        if (/^abuse-/.test(e.target.id)) {
+          var key = e.target.id.slice(6);
+          if (key === "amount") abuse.amount = Math.max(1, Math.min(1e9, Math.floor(Number(e.target.value) || 1)));
+          else if (key === "msg") abuse.message = e.target.value;
+          else if (key === "rarity") abuse.rarity = Number(e.target.value) || 0;
+          else abuse[key] = e.target.value; // who, what, item
+          abuse.confirm = "";
+          if (key !== "amount" && key !== "msg") {
+            // what is shown depends on these: draw it again, keeping the focus
+            renderModal();
+            var again = $("#" + e.target.id);
+            if (again) again.focus();
+          }
           return;
         }
         if (e.target.id === "mod-pick-q") {
