@@ -760,11 +760,19 @@
     },
 
     /** Admin abuse: fire one or more events (names the game knows, see EVENTS in ui.js) for every open game. */
-    fireEvent: function (kinds, message, seconds) {
-      return moderate("pip_set_event", {
+    fireEvent: function (kinds, message, seconds, ready) {
+      var args = {
         event_kind: Array.isArray(kinds) ? kinds.join(",") : String(kinds || ""),
         event_message: message || "",
         event_seconds: Math.max(0, Math.min(120, Math.floor(seconds || 0)))
+      };
+      // the countdown before they go off (0: none); left out, the server's own (3)
+      if (ready === undefined) return moderate("pip_set_event", args);
+      var plain = Object.assign({}, args);
+      args.event_ready = Math.max(0, Math.min(10, Math.floor(ready) || 0));
+      return moderate("pip_set_event", args).then(function (res) {
+        // a server from before the countdown setting: send it without
+        return res.error && !res.down ? moderate("pip_set_event", plain).then(function (again) { return again.error ? res : again; }) : res;
       });
     },
     /** The latest event, for any game (no account needed): { kind (maybe several, with commas),
@@ -775,7 +783,7 @@
       return client.rpc("pip_event").then(function (res) {
         if (!res.error) {
           var d = res.data && typeof res.data === "object" ? res.data : null;
-          return { event: d ? { kind: d.kind, message: d.message, at: d.at, seconds: Number(d.seconds) || 0, age: Number(d.age) } : null };
+          return { event: d ? { kind: d.kind, message: d.message, at: d.at, seconds: Number(d.seconds) || 0, age: Number(d.age), ready: d.ready } : null };
         }
         return oldEvent(); // a server from before pip_event
       }, oldEvent);

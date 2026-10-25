@@ -228,6 +228,10 @@ alter table public.events add constraint events_kind_check
   check (kind ~ '^[a-z]{1,16}(,[a-z]{1,16}){0,29}$');
 alter table public.events drop constraint if exists events_seconds_check;
 alter table public.events add constraint events_seconds_check check (seconds between 0 and 120);
+-- the "3, 2, 1" before the events go off, in seconds (0: none)
+alter table public.events add column if not exists ready integer not null default 3;
+alter table public.events drop constraint if exists events_ready_check;
+alter table public.events add constraint events_ready_check check (ready between 0 and 10);
 
 alter table public.events enable row level security;
 
@@ -238,7 +242,7 @@ create policy "Everyone can read the event"
   using (true);
 
 revoke all on public.events from anon, authenticated;
-grant select (id, kind, message, at, seconds) on public.events to anon, authenticated;
+grant select (id, kind, message, at, seconds, ready) on public.events to anon, authenticated;
 
 -- Admin abuse: a money rush. Until `until`, battles pay gold_x times the gold
 -- and gems_x times the gems (each game multiplies its own rewards). One row;
@@ -621,7 +625,8 @@ $$;
    short lowercase names, at most 30) for every open game, for a set number of
    seconds (0: each event's own time, up to 120). "stop" ends what is playing. */
 drop function if exists public.pip_set_event(text, text);
-create or replace function public.pip_set_event(event_kind text, event_message text, event_seconds integer default 0)
+drop function if exists public.pip_set_event(text, text, integer);
+create or replace function public.pip_set_event(event_kind text, event_message text, event_seconds integer default 0, event_ready integer default 3)
 returns void
 language plpgsql
 security definer
@@ -640,10 +645,13 @@ begin
   if coalesce(event_seconds, 0) < 0 or coalesce(event_seconds, 0) > 120 then
     raise exception 'Pick between 1 and 120 seconds (or leave it empty).';
   end if;
-  insert into public.events (id, kind, message, at, seconds, fired_by)
-  values (1, array_to_string(kinds, ','), nullif(left(btrim(coalesce(event_message, '')), 100), ''), now(), coalesce(event_seconds, 0), (select auth.uid()))
+  if coalesce(event_ready, 3) < 0 or coalesce(event_ready, 3) > 10 then
+    raise exception 'Pick a countdown from 0 to 10 seconds.';
+  end if;
+  insert into public.events (id, kind, message, at, seconds, ready, fired_by)
+  values (1, array_to_string(kinds, ','), nullif(left(btrim(coalesce(event_message, '')), 100), ''), now(), coalesce(event_seconds, 0), coalesce(event_ready, 3), (select auth.uid()))
   on conflict (id) do update
-    set kind = excluded.kind, message = excluded.message, at = excluded.at, seconds = excluded.seconds, fired_by = excluded.fired_by;
+    set kind = excluded.kind, message = excluded.message, at = excluded.at, seconds = excluded.seconds, ready = excluded.ready, fired_by = excluded.fired_by;
 end;
 $$;
 
@@ -658,7 +666,7 @@ security definer
 set search_path = ''
 as $$
   select jsonb_build_object(
-      'kind', e.kind, 'message', e.message, 'at', e.at, 'seconds', e.seconds,
+      'kind', e.kind, 'message', e.message, 'at', e.at, 'seconds', e.seconds, 'ready', e.ready,
       'age', greatest(0, extract(epoch from now() - e.at)))
   from public.events e
   where e.id = 1;
@@ -696,10 +704,10 @@ begin
   on conflict (id) do update
     set gold_x = excluded.gold_x, gems_x = excluded.gems_x, until = excluded.until,
         message = excluded.message, fired_by = excluded.fired_by;
-  insert into public.events (id, kind, message, at, seconds, fired_by)
-  values (1, case when mins > 0 then 'rush' else 'rushend' end, note, now(), 0, (select auth.uid()))
+  insert into public.events (id, kind, message, at, seconds, ready, fired_by)
+  values (1, case when mins > 0 then 'rush' else 'rushend' end, note, now(), 0, 0, (select auth.uid()))
   on conflict (id) do update
-    set kind = excluded.kind, message = excluded.message, at = excluded.at, seconds = excluded.seconds, fired_by = excluded.fired_by;
+    set kind = excluded.kind, message = excluded.message, at = excluded.at, seconds = excluded.seconds, ready = excluded.ready, fired_by = excluded.fired_by;
 end;
 $$;
 
@@ -1371,9 +1379,9 @@ grant execute on function public.pip_chat_delete(bigint) to authenticated;
 revoke execute on function public.pip_rename(text) from public, anon;
 grant execute on function public.pip_rename(text) to authenticated;
 revoke execute on function public.pip_give_many(text, text, integer, bigint, text, text) from public, anon;
-revoke execute on function public.pip_set_event(text, text, integer) from public, anon;
+revoke execute on function public.pip_set_event(text, text, integer, integer) from public, anon;
 grant execute on function public.pip_give_many(text, text, integer, bigint, text, text) to authenticated;
-grant execute on function public.pip_set_event(text, text, integer) to authenticated;
+grant execute on function public.pip_set_event(text, text, integer, integer) to authenticated;
 revoke execute on function public.pip_set_rush(numeric, numeric, integer, text) from public, anon;
 grant execute on function public.pip_set_rush(numeric, numeric, integer, text) to authenticated;
 revoke execute on function public.pip_event() from public;

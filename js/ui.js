@@ -4289,10 +4289,51 @@
     return chaosBox;
   }
 
-  /** End whatever event is playing, now. */
+  /** End whatever event is playing (or counting down), now. */
   function stopEvent() {
     clearTimeout(eventTimer);
+    clearInterval(readyTimer);
+    if (readyNode && readyNode.parentNode) readyNode.parentNode.removeChild(readyNode);
+    readyNode = null;
     if (eventClean) eventClean();
+  }
+
+  var READY = 3; // seconds of "3, 2, 1" before new events go off
+  var readyTimer = 0;
+  var readyNode = null;
+
+  /** A big 3, 2, 1 in the middle of the screen, then the events. */
+  function countIn(kinds, message, seconds, lines, ready) {
+    var known = (Array.isArray(kinds) ? kinds : String(kinds || "").split(",")).filter(function (k) { return EVENTS[k]; });
+    if (!known.length) return;
+    stopEvent();
+    var box = chaosLayer();
+    readyNode = document.createElement("div");
+    readyNode.className = "chaos__ready";
+    readyNode.setAttribute("role", "status");
+    box.appendChild(readyNode);
+    bumpNotes();
+    var n = ready === undefined || ready === null || !isFinite(Number(ready)) ? READY : Math.max(0, Math.min(10, Math.floor(Number(ready))));
+    function show() {
+      if (!readyNode) return;
+      if (n <= 0) {
+        clearInterval(readyTimer);
+        readyNode.parentNode.removeChild(readyNode);
+        readyNode = null;
+        playEvent(known, message, seconds, lines);
+        return;
+      }
+      readyNode.innerHTML = '<span class="chaos__icons">' + known.map(function (k) { return EVENTS[k].icon; }).join(" ") + "</span><b>" + n + "</b>";
+      // the number pops in again each second
+      var num = readyNode.querySelector("b");
+      num.style.animation = "none";
+      void num.offsetWidth;
+      num.style.animation = "";
+      PS.sfx.play("click");
+      n--;
+    }
+    show();
+    readyTimer = setInterval(show, 1000);
   }
 
   /** Play one or more events together (`kinds`: a list, one name, or "a,b"), for
@@ -4342,6 +4383,14 @@
       note.appendChild(sub);
     });
     note.appendChild(bar);
+    // the seconds left, counting down under the bar
+    var count = document.createElement("span");
+    count.className = "chaos__count";
+    var ends = Date.now() + length * 1000;
+    function countDown() { count.textContent = Math.max(0, Math.ceil((ends - Date.now()) / 1000)) + "s"; }
+    countDown();
+    note.appendChild(count);
+    timers.push(setInterval(countDown, 250));
 
     /** `count` things falling (or, with "is-up", rising) all the while, spread over the width. */
     function fall(count, cls, html, colour) {
@@ -4439,7 +4488,7 @@
         eventSeen = at;
         if (kinds.indexOf("stop") !== -1) stopEvent();
         else if (kinds[0] === "rush" || kinds[0] === "rushend") refreshRush(kinds[0], message);
-        else playEvent(kinds, message, ev.seconds);
+        else countIn(kinds, message, ev.seconds, null, ev.ready);
       }
     });
   }
@@ -4551,12 +4600,13 @@
   /** Each button that sends something asks "Sure?" first. */
   var abuse = {
     who: "all", withEvent: false, events: [], seconds: "", what: "gold", amount: 500, item: "", rarity: 0, message: "",
-    confirm: "", note: "", noteAt: "", rushGold: 2, rushGems: 2, rushMinutes: 30
+    confirm: "", note: "", noteAt: "", ready: 3, rushGold: 2, rushGems: 2, rushMinutes: 30
   };
 
   var ABUSE_WHO = [["all", "Everyone"], ["online", "Everyone online right now"], ["random", "One random player (lucky dip)"]];
   var RUSH_X = [1, 1.5, 2, 3, 5, 10];
   var RUSH_TIMES = [[10, "10 min"], [30, "30 min"], [60, "1 hour"], [180, "3 hours"], [1440, "1 day"], [10080, "1 week"]];
+  var READY_CHOICES = [[0, "Off"], [3, "3 s"], [5, "5 s"], [10, "10 s"]];
   var AMOUNTS = [100, 1000, 10000, 100000, 1000000];
 
   /** The ticked events, in the menu's order. */
@@ -4610,6 +4660,9 @@
           '<div class="abuse__tiles" role="group" aria-label="' + g[1] + '">' + menuEvents(g[0]).map(tile).join("") + "</div>";
       }).join("") +
       '<div class="abuse__go">' +
+        '<div class="abuse__ready"><span class="abuse__readylabel">Countdown first</span><div class="abuse__chips">' + READY_CHOICES.map(function (r) {
+          return chip("abuse-ready", ' data-value="' + r[0] + '"', r[1], abuse.ready === r[0]);
+        }).join("") + "</div></div>" +
         '<label class="abuse__secs">Seconds<input id="abuse-seconds" type="number" min="1" max="120" step="1" value="' + esc(String(abuse.seconds)) + '" placeholder="auto" /></label>' +
         '<button class="btn" type="button" data-act="abuse-try"' + (picked.length ? "" : " disabled") + ">▶ Try it on my screen</button>" +
         button("fire", picked.length ? "🔥 Fire " + esc(pickedNames) : "Fire the events (tick some first)", "btn--primary", !picked.length) +
@@ -5847,6 +5900,10 @@
       abuse.confirm = "";
       renderModal();
     },
+    "abuse-ready": function (node) {
+      abuse.ready = Number(node.getAttribute("data-value"));
+      renderModal();
+    },
     "abuse-time": function (node) {
       abuse.rushMinutes = Number(node.getAttribute("data-value"));
       abuse.confirm = "";
@@ -5865,10 +5922,10 @@
       if (msgBox) abuse.message = msgBox.value;
       var back = view.modal;
       closeModal();
-      playEvent(events, abuse.message.trim(), abuse.seconds);
+      countIn(events, abuse.message.trim(), abuse.seconds, null, abuse.ready);
       setTimeout(function () {
         if (!view.modal && el.gate.hidden) openModal(back);
-      }, eventLength(events, abuse.seconds) * 1000 + 400);
+      }, (abuse.ready + eventLength(events, abuse.seconds)) * 1000 + 400);
     },
     "abuse-stop": function () {
       abuse.note = "Stopping...";
@@ -5910,7 +5967,7 @@
         var gift = { kind: abuse.what, item: abuse.item, rarity: abuse.rarity, amount: abuse.amount, message: message, who: abuse.who };
         var label = abuse.what === "item" ? PS.RARITY[abuse.rarity].name + " " + PS.ITEMS[abuse.item].name : fmt(abuse.amount) + " " + abuse.what;
         // the events go at the same moment, so the gift pops up in the middle of them
-        var also = together ? PS.cloud.fireEvent(events, message, seconds) : Promise.resolve({});
+        var also = together ? PS.cloud.fireEvent(events, message, seconds, abuse.ready) : Promise.resolve({});
         job = Promise.all([also, PS.cloud.giveMany(gift)]).then(function (both) {
           if (both[0].error) return both[0];
           var res = both[1];
@@ -5929,7 +5986,7 @@
         });
       } else {
         if (!events.length) return;
-        job = PS.cloud.fireEvent(events, message, seconds).then(function (res) {
+        job = PS.cloud.fireEvent(events, message, seconds, abuse.ready).then(function (res) {
           return res.error ? res : { done: "Fired " + names + (seconds ? " for " + seconds + " seconds" : "") + ". Open games play it within about 10 seconds." };
         });
       }
