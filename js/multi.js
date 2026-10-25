@@ -1,7 +1,8 @@
 /*!
  * Pip Survivors — playing with a friend
- * The "Play with a friend" window: make a co-op or arena room (and get its
- * code), or join one with a code. Then it starts the battle on both games and
+ * The "Play with a friend" window: press Co-op or Duel next to someone online
+ * and they get an invite to join (invite.js), or make a room and tell a
+ * friend its code. Then it starts the battle on both games and
  * passes the battle's messages between them (net.js does the carrying).
  *
  * Co-op: both lemons in the host's chapter; the host's game runs the battle.
@@ -16,7 +17,7 @@
   var esc = PS.esc;
 
   var box = null;
-  var view = { screen: "home", kind: "coop", duelMode: "equal", code: "", error: "", busy: false, partner: null, hostInfo: null, link: "room" };
+  var view = { screen: "home", kind: "coop", duelMode: "equal", code: "", error: "", busy: false, partner: null, hostInfo: null, link: "room", inviteTo: "" };
   var session = null; // { role: "host"|"guest", kind, chapter, duelMode, inBattle }
   var hiddenAt = 0;
 
@@ -45,6 +46,18 @@
     if (kind === "duel") return "Arena duel · " + (duelMode === "full" ? "full power" : "equal");
     var ch = PS.chapter(chapter || 1);
     return "Co-op · chapter " + ch.n + ": " + ch.name;
+  }
+
+  function signedIn() {
+    return Boolean(PS.cloud && PS.cloud.me && PS.cloud.me() && !PS.cloud.offline());
+  }
+
+  /** What an invite to this room says under the name: the chapter, or the duel's rules. */
+  function inviteDetail() {
+    if (!session) return "";
+    if (session.kind === "duel") return session.duelMode === "full" ? "full power" : "equal";
+    var ch = PS.chapter(session.chapter || 1);
+    return "chapter " + ch.n + ": " + ch.name;
   }
 
   function linkText() {
@@ -87,9 +100,11 @@
       html =
         '<h2 id="mp-title">Your room</h2>' +
         '<p class="kicker">' + esc(kindText(view.kind, S.chapter, view.duelMode)) + "</p>" +
-        '<div class="mp__code" aria-label="Room code">' + esc(view.code) + "</div>" +
-        '<button class="btn btn--sm mp__copy" type="button" data-mp="copy">' + PS.icon("check") + "Copy the code</button>" +
-        '<p class="mp__how">Tell your friend this code. They press <b>Play with a friend</b> and type it in.</p>' +
+        (partner || !signedIn() ? "" : PS.invite.listHtml("data-mp", [[view.kind, "Invite"]], "Invite someone online")) +
+        '<p class="mp__how">' + (partner || !signedIn() ? "" : "Or tell a friend the code: ") +
+          '<b class="mp__code mp__code--small" aria-label="Room code">' + esc(view.code) + "</b> " +
+          '<button class="btn btn--sm mp__copy" type="button" data-mp="copy">' + PS.icon("check") + "Copy</button>" +
+          (partner ? "" : "<br>They press <b>Play with a friend</b> and type it in.") + "</p>" +
         '<div class="mp__who' + (partner ? " is-in" : "") + '">' +
           (partner
             ? '<span class="mp__dot"></span><b>' + esc(partner.name || "Your friend") + "</b> joined" +
@@ -115,12 +130,14 @@
       var ch = PS.chapter(S.chapter);
       html =
         '<h2 id="mp-title">Play with a friend</h2>' +
-        '<p class="hint mp__lead">Both of you need the game open and the internet. One of you makes a room; the other types in its code.</p>' +
+        '<p class="hint mp__lead">Both of you need the game open and the internet. Press <b>Co-op</b> or <b>Duel</b> next to someone online and they get a pop-up to join' +
+          (signedIn() ? "" : " (log in to see who is online)") + '. Or make a room and tell a friend its code.</p>' +
+        (signedIn() ? PS.invite.listHtml("data-mp", [["coop", "Co-op"], ["duel", "Duel"]]) : "") +
         '<div class="mp__cards">' +
           '<section class="mp__card">' +
             '<h3>' + PS.icon("tabBattle") + "Co-op</h3>" +
             "<p>Play <b>chapter " + ch.n + ": " + esc(ch.name) + "</b> together. More pests and a tougher boss; if one of you goes down, the other can help them up.</p>" +
-            '<button class="btn btn--primary" type="button" data-mp="host" data-kind="coop"' + (view.busy ? " disabled" : "") + ">Make a co-op room</button>" +
+            '<button class="btn" type="button" data-mp="host" data-kind="coop"' + (view.busy ? " disabled" : "") + ">Make a co-op room</button>" +
           "</section>" +
           '<section class="mp__card">' +
             '<h3>' + PS.icon("atk") + "Arena duel</h3>" +
@@ -132,7 +149,7 @@
             '<p class="hint">' + (view.duelMode === "equal"
               ? "Same health and damage for both: only weapons, perks and upgrades make the difference."
               : "Your real gear and stats. Hits between lemons are cut down so rounds still last.") + "</p>" +
-            '<button class="btn btn--primary" type="button" data-mp="host" data-kind="duel"' + (view.busy ? " disabled" : "") + ">Make an arena room</button>" +
+            '<button class="btn" type="button" data-mp="host" data-kind="duel"' + (view.busy ? " disabled" : "") + ">Make an arena room</button>" +
           "</section>" +
         "</div>" +
         '<form class="mp__join" data-mp-form="join">' +
@@ -170,6 +187,7 @@
   }
 
   function reset(error) {
+    if (PS.invite) PS.invite.forget(); // the room is gone, and so are the invites to it
     view.screen = "home";
     view.code = "";
     view.partner = null;
@@ -197,7 +215,17 @@
       render();
     } else if (act === "host") host(node.getAttribute("data-kind") === "duel" ? "duel" : "coop");
     else if (act === "copy") copyCode(node);
-    else if (act === "cancel") {
+    else if (act === "invite" || act === "invite-typed") {
+      var name = act === "invite" ? node.getAttribute("data-name") : PS.invite.typedName(box);
+      var kind = node.getAttribute("data-kind") === "duel" ? "duel" : "coop";
+      if (!name) return;
+      if (session && session.role === "host" && !view.partner) PS.invite.send(name, session.kind, view.code, inviteDetail());
+      else {
+        // a room first; the invite goes once it has its code
+        view.inviteTo = name;
+        host(kind);
+      }
+    } else if (act === "cancel") {
       leave();
       render();
     } else if (act === "start") startAsHost();
@@ -341,8 +369,12 @@
       view.busy = false;
       view.error = note || "";
       view.link = "room";
+      PS.invite.forget(); // a new room: invites to the old one don't count
+      if (view.inviteTo) PS.invite.send(view.inviteTo, kind, code, inviteDetail());
+      view.inviteTo = "";
       render();
     }, function (err) {
+      view.inviteTo = "";
       view.busy = false;
       view.error = err && err.message ? err.message : "Couldn't make a room. Try again.";
       render();
@@ -421,8 +453,20 @@
     reset();
   }
 
+  /** Join a friend's room by its code (an invite's Join button). */
+  function joinCode(code) {
+    mount();
+    if (session && session.inBattle) return;
+    if (session) leave();
+    view.error = "";
+    box.hidden = false;
+    render();
+    join(code);
+  }
+
   PS.multi = {
     open: open,
+    joinCode: joinCode,
     close: close,
     leave: leave,
     active: function () {

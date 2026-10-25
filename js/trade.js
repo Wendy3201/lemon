@@ -1,7 +1,8 @@
 /*!
  * Pip Survivors — trading
- * The Trade window: one player makes a trade code, the other types it in,
- * and both put in gear, pets, gold or gems. The server holds both offers
+ * The Trade window: one player invites the other (from the list of players
+ * online; invite.js), or makes a trade code the other types in, and both put
+ * in gear, pets, gold or gems. The server holds both offers
  * (supabase/setup.sql has the rules): changing an offer takes back both
  * acceptances, once both have accepted the trade locks so nothing can
  * change, and three seconds later it goes through. Each game then takes away
@@ -39,6 +40,7 @@
     pick: "all", // which part of the bag the picker shows: "all", a slot, or "pets"
     shown: PAGE,
     result: null, // { t, out } once a trade has gone through
+    inviteTo: "", // a player to invite as soon as the new trade has its code
     sig: ""
   };
   var pollTimer = 0;
@@ -266,11 +268,11 @@
     var t = view.t;
     if (view.screen === "waiting") {
       return (
-        '<h2 id="tr-title">Your trade code</h2>' +
-        '<div class="mp__code" aria-label="Trade code">' + esc(t.code) + "</div>" +
-        '<button class="btn btn--sm mp__copy" type="button" data-tr="copy">' + PS.icon("check") + "Copy the code</button>" +
-        '<p class="mp__how">Tell your friend this code. They press <b>Trade</b> and type it in.</p>' +
-        '<div class="mp__who"><span class="mp__spin"></span>Waiting for your friend to join...</div>' +
+        '<h2 id="tr-title">Your trade</h2>' +
+        '<div class="mp__who"><span class="mp__spin"></span>Waiting for someone to join...</div>' +
+        PS.invite.listHtml("data-tr", [["trade", "Invite"]], "Invite someone online") +
+        '<p class="mp__how">Or tell a friend the code: <b class="mp__code mp__code--small" aria-label="Trade code">' + esc(t.code) + "</b> " +
+          '<button class="btn btn--sm mp__copy" type="button" data-tr="copy">' + PS.icon("check") + "Copy</button><br>They press <b>Trade</b> and type it in.</p>" +
         '<div class="modal__actions"><button class="btn" type="button" data-tr="leave">Cancel</button></div>'
       );
     }
@@ -341,14 +343,15 @@
     var can = Boolean(who && !PS.cloud.offline());
     return (
       '<h2 id="tr-title">Trade with a friend</h2>' +
-      '<p class="hint mp__lead">Swap gear, pets, gold and gems. One of you makes a trade code; the other types it in. Both of you need the game open.</p>' +
+      '<p class="hint mp__lead">Swap gear, pets, gold and gems. Press <b>Trade</b> next to someone online and they get a pop-up to join. Both of you need the game open.</p>' +
       '<ul class="trade__how">' +
         "<li>Change anything, and you both have to accept again.</li>" +
         "<li>When you both accept, the trade <b>locks</b>: nothing can change.</li>" +
         "<li>3 seconds later it goes through. Press Stop in those 3 seconds if anything looks wrong.</li>" +
       "</ul>" +
       (can
-        ? '<button class="btn btn--primary" type="button" data-tr="new"' + (view.busy ? " disabled" : "") + ">" + PS.icon("gift") + "Make a trade code</button>" +
+        ? PS.invite.listHtml("data-tr", [["trade", "Trade"]]) +
+          '<button class="btn" type="button" data-tr="new"' + (view.busy ? " disabled" : "") + ">" + PS.icon("gift") + "Make a trade code instead</button>" +
           '<form class="mp__join" data-tr-form="join">' +
             '<label for="tr-code">Got a code from a friend?</label>' +
             '<div class="mp__joinrow"><input id="tr-code" maxlength="6" autocomplete="off" spellcheck="false" autocapitalize="characters" placeholder="ABC234" value="' + esc(view.code) + '" />' +
@@ -437,7 +440,13 @@
       deliver(t);
       return;
     }
-    if (t.status === "waiting") view.screen = "waiting";
+    if (t.status === "waiting") {
+      view.screen = "waiting";
+      if (view.inviteTo) {
+        PS.invite.send(view.inviteTo, "trade", t.code, "");
+        view.inviteTo = "";
+      }
+    }
     else if (t.status === "open" || t.status === "locked") view.screen = "trade";
     else view.screen = "over";
     schedule();
@@ -598,7 +607,16 @@
     else if (act === "new") start();
     else if (act === "leave") close(); // leaving closes the window (unless the trade had already gone through)
     else if (act === "copy") copyCode(node);
-    else if (act === "accept" && t) request(PS.cloud.tradeAccept(t.id, t.version, !t.my_ok));
+    else if (act === "invite" || act === "invite-typed") {
+      var name = act === "invite" ? node.getAttribute("data-name") : PS.invite.typedName(box);
+      if (!name) return;
+      if (t && t.status === "waiting") PS.invite.send(name, "trade", t.code, "");
+      else {
+        // a new trade first; the invite goes once it has its code
+        start();
+        view.inviteTo = name;
+      }
+    } else if (act === "accept" && t) request(PS.cloud.tradeAccept(t.id, t.version, !t.my_ok));
     else if (act === "stop" && t) request(PS.cloud.tradeAccept(t.id, t.version, false));
     else if (act === "pick") {
       view.pick = node.getAttribute("data-v");
@@ -659,6 +677,8 @@
 
   function reset() {
     stopTimers();
+    view.inviteTo = "";
+    if (PS.invite) PS.invite.forget();
     view.screen = "home";
     view.t = null;
     view.draft = null;
@@ -732,8 +752,23 @@
     });
   }
 
+  /** Join a friend's trade by its code (an invite's Join button). */
+  function joinCode(code) {
+    mount();
+    var go = function () {
+      reset();
+      view.code = code;
+      box.hidden = false;
+      render(true);
+      request(PS.cloud.tradeJoin(code));
+    };
+    if (live()) leave().then(go);
+    else go();
+  }
+
   PS.trade = {
     open: open,
+    joinCode: joinCode,
     close: close,
     pickUp: pickUp,
     active: live

@@ -292,6 +292,7 @@ lemon/
 │   ├── net.js        rooms on the server and the direct link between two games
 │   ├── multi.js      the "Play with a friend" window, and starting a battle for two
 │   ├── trade.js      the Trade window (the server holds both offers)
+│   ├── invite.js     invites to a trade or a room, and the pop-up to join
 │   └── ui.js         the menus: Battle, Equipment, Forge, Shop, Talents, Quests
 ├── supabase/setup.sql   the leaderboard table and its rules, run once in Supabase
 ├── assets/icons/lemon.svg
@@ -534,9 +535,20 @@ the buttons say the server needs an update. Up to 200 characters, plain text.
 
 ## Playing with a friend
 
-**Play with a friend** (under Battle) opens rooms for two. One player makes a
-room and gets a six-letter code; the other presses the same button and types
-the code in. Both need the game open and the internet.
+**Play with a friend** (under Battle) opens rooms for two. Both need the game
+open and the internet.
+
+- **Invites, no codes**: the window lists the players who have the game open
+  right now (amber means busy: in a battle, playing together or trading).
+  Press **Co-op** or **Duel** next to a name, or type a name in, and the game
+  makes the room and invites them. They get a pop-up at the top of their
+  screen, "alice invites you to play co-op: chapter 3: Tall Grass" (or "...to
+  an arena duel (equal)"), with **Join** and **No thanks**, for 2 minutes.
+  Join takes them straight into the room. The window shows whether they are
+  coming, said no thanks or didn't answer (with **Again**), and the room lists
+  the players online so more can be asked.
+- **The code still works**: make a room, and its six-letter code is shown to
+  read out; the other player presses the same button and types it in.
 
 - **Co-op**: both lemons in the room maker's chosen chapter. There are about
   60% more pests and the boss has 1.8 times the health. A lemon that drops goes
@@ -579,6 +591,19 @@ battle), and theirs first asks the server whether you really are on an admin
 account (`pip_dev_token` and `pip_dev_check` in setup.sql). Until it says yes,
 nothing you press does anything.
 
+### Invites
+
+The invited player sees the pop-up on any screen except a battle: one that
+arrives during a battle waits until it is over (it lasts 2 minutes). While a
+window of the game's own is open (the chat, settings, the admin menu), the
+browser lets nothing outside it be clicked, so the pop-up says to close it
+first. A game looks for invites every 4 seconds while it is in front. Joining a
+room while a trade is going (or the other way round) asks to finish the first
+one. Only signed-in players who aren't banned can see who is online or invite
+anyone, and the list shows names only. Server side: the `invites` table and
+`pip_online_players`, `pip_invite`, `pip_invites`, `pip_invite_answer` and
+`pip_invite_state` in `supabase/setup.sql` (run it again).
+
 ## Chat
 
 **Chat** (under Battle, next to Trade) is a public chat for everyone signed in.
@@ -619,8 +644,11 @@ trusted), `pip_say` and `pip_chat_delete` in `supabase/setup.sql`.
 ## Trading
 
 **Trade** (under Battle, next to Play with a friend) swaps gear, pets, gold
-and gems between two players. One makes a trade code, the other types it in;
-both need an account and the game open.
+and gems between two players. Both need an account and the game open. Press
+**Trade** next to someone in the window's list of players online (or type
+their name): the game makes the trade and they get a pop-up, "alice wants to
+trade with you", with **Join**. A trade code still works too: make one, read
+it out, and the other types it in.
 
 - Each side picks from their bag (worn gear can't be traded) and pets, up to
   20 items and 6 pets, plus any gold and gems they have.

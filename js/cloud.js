@@ -736,6 +736,35 @@
       return moderate("pip_chat_delete", { msg_id: id });
     },
 
+    /* Invites to a trade or a room, so nobody types a code. */
+    /** Who has the game open now: { rows: [{ name, busy }] } or { error }. */
+    onlinePlayers: function () {
+      return ask("pip_online_players").then(function (res) {
+        return res.error ? res : { rows: (Array.isArray(res.data) ? res.data : []).map(function (r) { return { name: String(r.name), busy: Boolean(r.busy) }; }) };
+      });
+    },
+    /** Invite a player by name: kind "trade", "coop" or "duel", with the code. Resolves with { id } or { error }. */
+    invite: function (name, kind, code, detail) {
+      return ask("pip_invite", { to_name: String(name || ""), kind: kind, code: code, detail: String(detail || "").slice(0, 60) }).then(function (res) {
+        return res.error ? res : { id: Number(res.data) };
+      });
+    },
+    /** The invites waiting for me: { rows: [{ id, from_name, kind, code, detail, age }] } or { error }. */
+    invites: function () {
+      return ask("pip_invites").then(function (res) {
+        return res.error ? res : { rows: Array.isArray(res.data) ? res.data : [] };
+      });
+    },
+    answerInvite: function (id, yes) {
+      return ask("pip_invite_answer", { invite_id: id, yes: Boolean(yes) });
+    },
+    /** One I sent: { state: "waiting" | "yes" | "no" | "expired" } or { error }. */
+    inviteState: function (id) {
+      return ask("pip_invite_state", { invite_id: id }).then(function (res) {
+        return res.error ? res : { state: res.data ? String(res.data) : "expired" };
+      });
+    },
+
     /** Admin abuse: a money rush, `gold` and `gems` times the battle rewards (1 to 10) for `minutes` (0 stops it). */
     setRush: function (gold, gems, minutes, message) {
       return moderate("pip_set_rush", {

@@ -365,6 +365,26 @@ create table if not exists public.presence (
 alter table public.presence enable row level security;
 revoke all on public.presence from anon, authenticated;
 
+-- Invites: "bob wants to trade with you" / "...to play co-op" / "...to a duel",
+-- with the trade or room code inside, so nobody has to type a code. They go
+-- in only through pip_invite and are read through pip_invites; an invite
+-- nobody answers is dropped after 2 minutes.
+create table if not exists public.invites (
+  id bigint generated always as identity primary key,
+  from_player uuid not null references public.players (id) on delete cascade,
+  from_name text not null,
+  to_player uuid not null references public.players (id) on delete cascade,
+  kind text not null check (kind in ('trade', 'coop', 'duel')),
+  code text not null check (code ~ '^[A-Z2-9]{6}$'),
+  detail text not null default '' check (char_length(detail) <= 60),
+  answer text check (answer in ('yes', 'no')),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists invites_to on public.invites (to_player, created_at desc);
+alter table public.invites enable row level security;
+revoke all on public.invites from anon, authenticated;
+
 /* The admin tools. minutes: how long a timeout lasts; 0 or null bans for good. */
 create or replace function public.pip_ban(target uuid, minutes integer, message text)
 returns void
@@ -1288,6 +1308,124 @@ begin
 end;
 $$;
 
+/* --------------------------------------------------------------- invites */
+
+/* Who has the game open right now, for the invite lists: names only, and
+   whether they are busy (in a battle, playing together or trading). Not the
+   banned, and not the one asking. */
+create or replace function public.pip_online_players()
+returns table (name text, busy boolean)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p.name, s.doing in ('battle', 'co-op', 'duel', 'trading')
+  from public.presence s
+  join public.players p on p.id = s.player
+  where public.pip_trader_name() is not null
+    and s.open and s.seen_at > now() - interval '2 minutes'
+    and s.player <> (select auth.uid())
+    and (p.banned_until is null or p.banned_until <= now())
+  order by lower(p.name)
+  limit 40;
+$$;
+
+/* Invite a player who has the game open to a trade ('trade') or a room
+   ('coop', 'duel') by its code. Returns the invite's id. A new invite to the
+   same player for the same thing replaces the old one. */
+create or replace function public.pip_invite(to_name text, kind text, code text, detail text)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  me uuid := (select auth.uid());
+  my_name text := public.pip_trader_name();
+  them uuid;
+  made bigint;
+begin
+  if me is null or my_name is null then
+    raise exception 'Log in to invite someone.';
+  end if;
+  if kind is null or kind not in ('trade', 'coop', 'duel') then
+    raise exception 'Pick what to invite them to.';
+  end if;
+  if coalesce(code, '') !~ '^[A-Z2-9]{6}$' then
+    raise exception 'Make a trade or a room first.';
+  end if;
+  select p.id into them from public.players p
+  where lower(p.name) = lower(btrim(coalesce(to_name, '')))
+    and (p.banned_until is null or p.banned_until <= now());
+  if them is null then
+    raise exception 'Nobody is called that. Check the name.';
+  end if;
+  if them = me then
+    raise exception 'That is you!';
+  end if;
+  if not exists (select 1 from public.presence s
+                 where s.player = them and s.open and s.seen_at > now() - interval '2 minutes') then
+    raise exception 'They are not online right now.';
+  end if;
+  if exists (select 1 from public.invites i where i.from_player = me and i.created_at > now() - interval '2 seconds') then
+    raise exception 'Slow down a little.';
+  end if;
+  delete from public.invites i
+  where (i.from_player = me and i.to_player = them and i.kind = pip_invite.kind and i.answer is null)
+     or i.created_at < now() - interval '1 day';
+  insert into public.invites (from_player, from_name, to_player, kind, code, detail)
+  values (me, my_name, them, pip_invite.kind, pip_invite.code, left(coalesce(detail, ''), 60))
+  returning id into made;
+  return made;
+end;
+$$;
+
+/* The invites waiting for this player (from the last 2 minutes, not answered). */
+create or replace function public.pip_invites()
+returns table (id bigint, from_name text, kind text, code text, detail text, age integer)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select i.id, i.from_name, i.kind, i.code, i.detail, floor(extract(epoch from now() - i.created_at))::integer
+  from public.invites i
+  where i.to_player = (select auth.uid()) and i.answer is null and i.created_at > now() - interval '2 minutes'
+  order by i.id;
+$$;
+
+/* Join (yes) or no thanks. */
+create or replace function public.pip_invite_answer(invite_id bigint, yes boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.invites
+  set answer = case when coalesce(yes, false) then 'yes' else 'no' end
+  where id = invite_id and to_player = (select auth.uid()) and answer is null;
+end;
+$$;
+
+/* For the one who sent it: 'waiting', 'yes', 'no' or 'expired'. */
+create or replace function public.pip_invite_state(invite_id bigint)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when i.answer is not null then i.answer
+    when i.created_at <= now() - interval '2 minutes' then 'expired'
+    else 'waiting'
+  end
+  from public.invites i
+  where i.id = invite_id and i.from_player = (select auth.uid());
+$$;
+
 /* ------------------------------------ admin dev tools in co-op and the arena */
 
 /* A proof, for the room maker's game, that this game belongs to an admin account. */
@@ -1384,6 +1522,16 @@ grant execute on function public.pip_give_many(text, text, integer, bigint, text
 grant execute on function public.pip_set_event(text, text, integer, integer) to authenticated;
 revoke execute on function public.pip_set_rush(numeric, numeric, integer, text) from public, anon;
 grant execute on function public.pip_set_rush(numeric, numeric, integer, text) to authenticated;
+revoke execute on function public.pip_online_players() from public, anon;
+revoke execute on function public.pip_invite(text, text, text, text) from public, anon;
+revoke execute on function public.pip_invites() from public, anon;
+revoke execute on function public.pip_invite_answer(bigint, boolean) from public, anon;
+revoke execute on function public.pip_invite_state(bigint) from public, anon;
+grant execute on function public.pip_online_players() to authenticated;
+grant execute on function public.pip_invite(text, text, text, text) to authenticated;
+grant execute on function public.pip_invites() to authenticated;
+grant execute on function public.pip_invite_answer(bigint, boolean) to authenticated;
+grant execute on function public.pip_invite_state(bigint) to authenticated;
 revoke execute on function public.pip_event() from public;
 grant execute on function public.pip_event() to anon, authenticated;
 revoke execute on function public.pip_rush() from public;
