@@ -10250,3 +10250,124 @@ html.chaos-oldfilm body {
     animation: none;
   }
 }
+
+/* ------------------------------------------------------------ past ???: Celestial, Cosmic, Infinity */
+.r8 { --rar: #e9b949; }
+.r9 { --rar: #7b5cff; }
+.r10 { --rar: #ff4d9d; }
+
+/* Celestial: a little sun, with rays turning slowly behind the item */
+.tile.r8 {
+  --glow: 34;
+  overflow: hidden;
+  border-color: #f7d57a;
+  border-width: 3px;
+  background: radial-gradient(circle at 50% 38%, #fffbea, #ffe39a 42%, #f0b43c 78%, #c98a1b);
+  animation: breathe 2.2s ease-in-out infinite;
+}
+
+.tile.r8::before {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 255, 255, 0.55) 0deg 8deg, transparent 8deg 30deg);
+  mask: radial-gradient(circle, #000 25%, transparent 68%);
+  animation: rarity-turn 14s linear infinite;
+  pointer-events: none;
+}
+
+/* Cosmic: a night sky in the tile, its stars twinkling, a violet edge */
+.tile.r9 {
+  --glow: 38;
+  overflow: hidden;
+  border-color: #a48cff;
+  border-width: 3px;
+  background:
+    radial-gradient(1.5px 1.5px at 18% 22%, #fff 60%, transparent),
+    radial-gradient(1px 1px at 72% 18%, #fff 60%, transparent),
+    radial-gradient(1.5px 1.5px at 84% 64%, #ffe9a8 60%, transparent),
+    radial-gradient(1px 1px at 30% 78%, #fff 60%, transparent),
+    radial-gradient(1px 1px at 55% 50%, #cfe3ff 60%, transparent),
+    radial-gradient(circle at 60% 35%, rgba(255, 110, 200, 0.45), transparent 45%),
+    radial-gradient(circle at 35% 65%, rgba(90, 160, 255, 0.45), transparent 50%),
+    radial-gradient(circle at 50% 50%, #2b1d6e, #0b0820 78%);
+  animation: breathe 1.9s ease-in-out infinite;
+}
+
+.tile.r9::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(2px 2px at 40% 30%, #fff 50%, transparent),
+    radial-gradient(2px 2px at 65% 75%, #fff 50%, transparent),
+    radial-gradient(2px 2px at 22% 55%, #fff 50%, transparent);
+  animation: rarity-twinkle 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Infinity: every colour at once, flowing through the tile and round its edge */
+.tile.r10 {
+  --glow: 44;
+  overflow: hidden;
+  border-color: transparent;
+  border-width: 3px;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(20, 10, 30, 0.35), rgba(20, 10, 30, 0.85) 75%) padding-box,
+    conic-gradient(from var(--spin), #ff4d9d, #ffb84d, #f9f871, #4dffb8, #4dc3ff, #9d4dff, #ff4d9d) padding-box,
+    conic-gradient(from var(--spin), #fff, #ff4d9d, #ffd166, #6ee7b7, #60a5fa, #c084fc, #fff) border-box;
+  box-shadow: var(--ring), 0 0 calc(var(--glow) * 1px) 4px rgba(255, 77, 157, 0.75), var(--shadow-sm);
+  animation: spin 2.6s linear infinite;
+}
+
+.tile.r10::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.65) 50%, transparent 60%);
+  animation: sheen 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* the item picture stays above the effects */
+.tile.r8 .tile__art,
+.tile.r9 .tile__art,
+.tile.r10 .tile__art {
+  z-index: 1;
+}
+
+@keyframes rarity-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes rarity-twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* the names, written in their colours */
+.rname.r9 {
+  color: color-mix(in srgb, #7b5cff 80%, var(--ink));
+}
+
+.rname.r10 {
+  background: linear-gradient(90deg, #ff4d9d, #ff9f43, #f2c94c, #3fcf8e, #4da3ff, #9d6bff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile.r8::before,
+  .tile.r9::before,
+  .tile.r10::before {
+    animation: none;
+  }
+}

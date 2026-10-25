@@ -1,6 +1,6 @@
 /*!
  * Pip Survivors — the battlefield's look
- * Each of the ten zones gets its own ground: a pattern laid into the floor
+ * Each zone gets its own ground: a pattern laid into the floor
  * (tiles, bricks, planks, furrows...), soft patches of light and shade, and
  * things scattered on it (flowers, mushrooms, crumbs, puddles, embers...).
  * Over the top go floating motes (pollen, dust, steam, embers, spores) that
@@ -41,7 +41,23 @@
     { pattern: null, props: ["puddle", "puddle", "tuft", "tuft", "leaf", "flower"], mote: "bubble", motes: "170,240,215", shade: 0.5, glow: "80,200,160" },
     { pattern: "tiles", props: ["puddle", "crack", "pea", "pebble"], mote: "steam", motes: "225,240,255", shade: 0.5, glow: "150,210,255" },
     { pattern: null, props: ["root", "root", "tuft", "flower", "crack"], mote: "pollen", motes: "255,175,205", shade: 0.55 },
-    { pattern: "furrows", props: ["apple", "apple", "flower", "flower", "tuft", "leaf"], mote: "pollen", motes: "255,230,140", shade: 0.4, glow: "255,205,90" }
+    { pattern: "furrows", props: ["apple", "apple", "flower", "flower", "tuft", "leaf"], mote: "pollen", motes: "255,230,140", shade: 0.4, glow: "255,205,90" },
+    // chapters 101 to 250
+    { pattern: null, props: ["flower", "flower", "flower", "tuft", "tuft", "leaf", "apple"], mote: "pollen", motes: "255,245,170", shade: 0.38 },
+    { pattern: null, props: ["root", "tuft", "leaf", "leaf", "flower", "apple"], mote: "pollen", motes: "220,255,180", shade: 0.5 },
+    { pattern: null, props: ["root", "root", "mushroom", "leaf", "leaf", "pebble"], mote: "spore", motes: "210,230,170", shade: 0.6 },
+    { pattern: null, props: ["mushroom", "mushroom", "mushroom", "spore", "tuft"], mote: "spore", motes: "255,180,230", shade: 0.55, glow: "230,120,200" },
+    { pattern: null, props: ["pebble", "pebble", "puddle", "tuft", "flower"], mote: "bubble", motes: "180,230,255", shade: 0.45 },
+    { pattern: null, props: ["puddle", "puddle", "tuft", "root", "mushroom"], mote: "bubble", motes: "190,235,200", shade: 0.6, glow: "140,220,160" },
+    { pattern: "cracks", props: ["pebble", "pebble", "crack", "tuft"], mote: "dust", motes: "235,225,210", shade: 0.45 },
+    { pattern: "cracks", props: ["pebble", "crack", "puddle"], mote: "dust", motes: "190,200,255", shade: 0.65, glow: "150,160,255" },
+    { pattern: "cracks", props: ["ember", "ember", "ember", "crack", "pebble"], mote: "ember", motes: "255,140,70", shade: 0.55, glow: "255,90,40" },
+    { pattern: "cracks", props: ["pebble", "crack", "puddle"], mote: "steam", motes: "220,230,255", shade: 0.6, glow: "160,190,255" },
+    { pattern: "tiles", props: ["flower", "flower", "tuft", "puddle"], mote: "steam", motes: "255,255,255", shade: 0.35, glow: "220,235,255" },
+    { pattern: "furrows", props: ["apple", "apple", "tuft", "flower", "leaf"], mote: "ember", motes: "255,240,150", shade: 0.7, glow: "120,130,255" },
+    { pattern: "cracks", props: ["pebble", "pebble", "crack", "tuft"], mote: "dust", motes: "240,240,255", shade: 0.6, glow: "220,225,255" },
+    { pattern: null, props: ["pebble", "crack"], mote: "dust", motes: "255,245,210", shade: 0.7, glow: "255,210,120" },
+    { pattern: "furrows", props: ["apple", "flower", "flower", "leaf", "sprout"], mote: "pollen", motes: "255,240,120", shade: 0.4, glow: "255,225,80" }
   ];
 
   function hash(x, y) {

@@ -3,7 +3,7 @@
 **A Lemon game.** You steer a lemon through swarms of garden pests. It attacks
 by itself; you dodge, grab gems, and pick an upgrade every level. Between
 battles you collect gear, forge it into rarer gear, open chests, learn talents
-and watch your Power climb through a hundred chapters in fifteen zones.
+and watch your Power climb through 250 chapters in thirty zones.
 
 Plain HTML, CSS and JavaScript. No build step, no framework, no dependencies,
 no accounts, no tracking. It works offline once the folder is on your computer.
@@ -117,7 +117,7 @@ and fireflies at night. It stays still when Animations is set to Off.
 | **Equipment** | Six slots: weapon, ring, amulet, helmet, armour, boots. Level slots up with gold, swap gear, and open the **Forge**. The **Collection** button shows every item in the game, slot by slot: the ones you have ever owned in colour, the rest as shadows. Finding 10, 25, 50, 100, 150, 200, 300, 400, 500 and all 612 pays gems (20 up to 1,000). |
 | **Shop** | **Daily rewards** (a seven-day streak: gold, gems and free chests, with 100 gems and three Gilded Chests on day 7; miss a day and it starts again), a free gift every four hours, chests bought with gems (a fixed price: 10 for a Seed Crate, 40 for a Gilded Chest), four deals a day (never S-grade), and gold for gems. |
 | **Pets** | Hatch pets from eggs bought with gems in the Shop (Common 70%, Uncommon 18%, Rare 9%, Epic 3%; never S or SS). You start with one team slot and can unlock a second (150 gems) and a third (400 gems); every pet in your team fights beside you and gives its stat bonus. Hatching a duplicate, or spending gold, levels it up. |
-| **Talents** | Permanent bonuses bought with gold. Max every talent in a tier and you can **ascend**: tier II and tier III repeat the talents at a bigger bonus and a much bigger price, and add Lucky Star, Wide Swing and Giant Slayer. |
+| **Talents** | Permanent bonuses bought with gold. Max every talent in a tier and you can **ascend**: tiers II to VI (Ascended, Transcended, Exalted, Divine and Eternal) repeat the talents at a bigger bonus and a much bigger price, and add Lucky Star, Wide Swing and Giant Slayer. Tiers IV to VI are priced for the gold chapters past 100 pay, and have no Head Start (it stops at tier III, seven free cards). |
 | **Quests** | Ladders of goals that pay gems. |
 
 **Power** is one number for how strong the lemon is: attack, health and
@@ -138,9 +138,16 @@ cap for its slot, and more of the item's perks switched on.
 | Mythic | ×5.6 | 60 | 4th |
 | Surpass | ×8 | 70 | |
 | ??? | ×12 | 80 | a hidden 5th |
+| Celestial | ×17 | 90 | |
+| Cosmic | ×24 | 100 | |
+| Infinity | ×34 | 110 | |
 
-Chapter loot, the free gift and the daily deals go up to Legendary at most.
-Mythic, Surpass and ??? never drop: they only come out of the forge.
+Chapter loot up to chapter 100, the free gift and the daily deals go up to
+Legendary at most. Past chapter 100, loot goes up to Mythic, then Surpass from
+chapter 151 and ??? from chapter 201. **Celestial, Cosmic and Infinity** (past
+???) never drop: they only come out of the forge, and they are how a lemon gets
+past the old ceiling of about 314M Power: a bigger main stat, and slot levels
+up to 110 (levels past 80 cost 35% more each).
 
 Some items are **S-grade** or **SS-grade**. The grade belongs to the item
 itself (an S-grade bow is S-grade at every rarity): ×1.2 or ×1.45 on the main
@@ -168,6 +175,9 @@ more). Only valuable gear sells, and the two prices add up:
 | Mythic | 20,000 | | S | 10,000 |
 | Surpass | 60,000 | | SS | 100,000 |
 | ??? | 200,000 | | | |
+| Celestial | 600,000 | | | |
+| Cosmic | 2,000,000 | | | |
+| Infinity | 6,000,000 | | | |
 
 So a ??? SS-grade item sells for 300,000. Anything below Mythic that is also plain
 grade is worth nothing to the buyer.
@@ -335,10 +345,26 @@ Most tweaks are one line in `js/data.js`.
   battles so that a fully maxed lemon only just beats chapter 100 and one a
   little short of max (205M) cannot. If gear or talents change what a maxed
   lemon reaches, change `MAX_POWER` to match.
+- **Chapters 101 to 250** climb past that, through `CHECKS` in `js/data.js`:
+  every 50 chapters, the build a lemon there is expected to have (chapter 150:
+  Celestial gear at slot level 90 and talents to tier IV, 2.2B Power; 200:
+  Cosmic, level 100, tier V, 16.3B; 250: Infinity, level 110, tier VI, 108B,
+  everything maxed, which reaches about 120B), and how much tougher than
+  chapter 100 its pests are. In between, every number grows by the same factor
+  each chapter. The checkpoints were tuned with simulated battles so each
+  build plays like a maxed lemon at chapter 100 (about six minutes, rarely
+  below 80% health); one checkpoint behind, battles take about a third longer
+  and the boss fight drags. A lemon with every defence the ??? perks give
+  rarely loses outright at any chapter, so past 100, Power mostly decides how
+  fast and how safe a battle is.
 - **More chapters:** `CHAPTER_COUNT` in `js/data.js`, plus a name, a boss name,
   a boss kind and a featured pest for each new one in the lists below it.
-  Chapters 51 to 100 are ten to a zone: the Rooftops, the Pond, the Ice Box,
-  the Thorn Wilds and the Golden Grove (their floors are in `js/arena.js`).
+  Chapters 51 to 250 are ten to a zone: from the Rooftops, the Pond, the Ice
+  Box, the Thorn Wilds and the Golden Grove on to the Wild Meadow, the
+  Hedgerow, the Old Woods, the Mushroom Ring, the Riverbank, the Marsh, the
+  Rocky Hills, the Crystal Caves, the Lava Fields, the Storm Peaks, the Cloud
+  Garden, the Night Orchard, the Moon Grove, the Starfield and the Heart of
+  Citrus (their floors are in `js/arena.js`).
 - **A new upgrade card:** add it to `UPGRADES` in `js/upgrades.js`.
 - **The daily challenge:** `PS.CHALLENGE` in `js/data.js` sets when it opens,
   how far behind your best it is, its reward and the twists. A twist is a
@@ -386,7 +412,7 @@ Diamond, Platinum, Citrine and Zenith, each with its own emblem. Each row shows
 the player's rank, the account window shows your rank on every board, and a
 ladder under the filters shows what each rank takes and what is next. The
 targets are the `ranks` lists in `BOARDS` in `js/cloud.js`. Chapter ranks are
-chapters 1, 10, 25, 40, 60, 80 and 100, and Power ranks are the Power those
+chapters 1, 10, 40, 80, 130, 190 and 250, and Power ranks are the Power those
 same chapters recommend.
 
 A player's figures go up a few seconds after they change, and only ever go up:

@@ -70,7 +70,7 @@
     { key: "zenith", name: "Zenith" }
   ];
   // Chapter ranks, and Power ranks at the Power those chapters recommend, so the two agree
-  var RANK_CHAPTERS = [1, 10, 25, 40, 60, 80, 100];
+  var RANK_CHAPTERS = [1, 10, 40, 80, 130, 190, 250];
 
   /* What the leaderboard can rank by. `then` breaks ties; `max` matches the
      limits in setup.sql, so a figure the server would refuse is never sent. */

@@ -12,8 +12,10 @@
 
   /* ------------------------------------------------------------- rarities */
   /* `mult` scales an item's main stat, `cap` is the highest slot level an
-     item of that rarity can use. Surpass and ??? never drop: they only come
-     out of the forge. */
+     item of that rarity can use. Surpass and ??? only drop in the last
+     stretch of chapters (see PS.dropCap); Celestial, Cosmic and Infinity only
+     come out of the forge, and are what takes a lemon past ???: a higher
+     main stat, and slot levels past 80. */
 
   PS.RARITY = [
     { key: "common", name: "Common", color: "#9AA1A9", mult: 1, cap: 10 },
@@ -23,10 +25,14 @@
     { key: "legendary", name: "Legendary", color: "#F2A31B", mult: 4, cap: 50 },
     { key: "mythic", name: "Mythic", color: "#E5484D", mult: 5.6, cap: 60 },
     { key: "surpass", name: "Surpass", color: "#17B8C4", mult: 8, cap: 70 },
-    { key: "unknown", name: "???", color: "#8E7BFF", mult: 12, cap: 80 }
+    { key: "unknown", name: "???", color: "#8E7BFF", mult: 12, cap: 80 },
+    { key: "celestial", name: "Celestial", color: "#E9B949", mult: 17, cap: 90 },
+    { key: "cosmic", name: "Cosmic", color: "#7B5CFF", mult: 24, cap: 100 },
+    { key: "infinity", name: "Infinity", color: "#FF4D9D", mult: 34, cap: 110 }
   ];
   PS.MAX_RARITY = PS.RARITY.length - 1;
-  PS.MAX_DROP_RARITY = 4; // Legendary: chapter loot, gifts and deals stop here; Mythic and up are forged
+  PS.MAX_DROP_RARITY = 4; // Legendary: loot up to chapter 100, and deals, stop here; Mythic and up are forged
+  PS.SECRET_RARITY = 7; // ???: its perks stay hidden until an item reaches it
 
   /* Grades are a property of the item itself: an S-grade bow is S-grade at
      every rarity. They raise the main stat and come with stronger perks. */
@@ -630,10 +636,11 @@
   ];
   /* Ascension: max out every talent of the top tier and you can ascend, which
      opens the next tier. Each higher tier has the same talents again (their
-     name ends in II or III) at a bigger bonus per level and a much bigger
-     price, plus three talents that only exist from tier II up. */
-  PS.TALENT_TIERS = 3;
-  PS.TALENT_TIER_NAMES = ["Talents", "Ascended talents", "Transcended talents"];
+     name ends in II, III and so on, up to VI) at a bigger bonus per level and
+     a much bigger price, plus three talents that only exist from tier II up.
+     Tiers IV to VI are for chapters past 100, priced for the gold those pay. */
+  PS.TALENT_TIERS = 6;
+  PS.TALENT_TIER_NAMES = ["Talents", "Ascended talents", "Transcended talents", "Exalted talents", "Divine talents", "Eternal talents"];
   (function () {
     var base = PS.TALENTS.map(function (t) {
       t.tier = 1;
@@ -644,11 +651,13 @@
       { id: "wid", name: "Wide Swing", icon: "area", stat: "area", per: 0.02, max: 15, base: 100, growth: 1.49 },
       { id: "gsl", name: "Giant Slayer", icon: "boom", stat: "bossDmg", per: 0.03, max: 20, base: 70, growth: 1.35 }
     ];
-    var rules = [null, { roman: "II", per: 1.5, cost: 60 }, { roman: "III", per: 2, cost: 600 }];
+    var rules = [null, { roman: "II", per: 1.5, cost: 60 }, { roman: "III", per: 2, cost: 600 },
+      { roman: "IV", per: 2.5, cost: 30000 }, { roman: "V", per: 3, cost: 300000 }, { roman: "VI", per: 3.5, cost: 3000000 }];
     var all = base.slice();
     for (var tier = 2; tier <= PS.TALENT_TIERS; tier++) {
       var rule = rules[tier - 1];
       base.concat(extras).forEach(function (t) {
+        if (t.fx && tier > 3) return; // Head Start stops at tier III: seven free cards are plenty to start a battle with
         var copy = {};
         Object.keys(t).forEach(function (key) { copy[key] = t[key]; });
         copy.id = t.id + tier;
@@ -700,8 +709,9 @@
      Gold grows 1.35x a chapter, the same slope as level and talent prices. */
 
   var FITTED_COUNT = 20; // the chapters the tables below were fitted for
-  var CHAPTER_COUNT = 100;
+  var CHAPTER_COUNT = 250;
   var TUNED_COUNT = 50; // the late stretch below was tuned when the game ended at chapter 50
+  var OLD_COUNT = 100; // where the game ended before chapters 101 to 250
 
   var HP_SCALE = [1, 1.5, 2.6, 4.2, 6.6, 10.5, 16.5, 26, 41, 64, 100, 158, 260, 420, 800, 1250, 2000, 3000, 3800, 4600];
   var DMG_SCALE = [0.85, 1.1, 1.4, 1.9, 2.6, 3.7, 5.2, 7.3, 10.3, 14.5, 20.5, 28.9, 42, 62, 100, 145, 205, 280, 370, 470];
@@ -731,25 +741,51 @@
     REC_POWER[j] = Math.round((REC_POWER[j - 1] * LATE.power) / 10) * 10;
   }
 
-  /* Chapters 51 to 100 keep climbing until the last one asks for MAX_POWER:
-     the most Power the game allows (every talent at the top tier, the best
-     pets, the hand-made SS gear at ??? and slot level 80). The recommended
-     Power grows by the same factor every chapter to get there. The pests grow
-     by END.pests a chapter, tuned with simulated battles so that a fully
-     maxed lemon can only just beat chapter 100. If gear or talents change what
-     a maxed lemon reaches, change MAX_POWER to match. */
+  /* Chapters 51 to 100 keep climbing until chapter 100 asks for MAX_POWER:
+     what was the most Power the game allowed before chapters 101 to 250 (every
+     talent to tier III, the best pets, the hand-made SS gear at ??? and slot
+     level 80). The recommended Power grows by the same factor every chapter to
+     get there. The pests grow by END.pests a chapter, tuned with simulated
+     battles so that a lemon maxed like that can only just beat chapter 100. */
   var MAX_POWER = 272000000;
   var END = {
-    power: Math.pow(MAX_POWER / REC_POWER[TUNED_COUNT - 1], 1 / (CHAPTER_COUNT - TUNED_COUNT)),
+    power: Math.pow(MAX_POWER / REC_POWER[TUNED_COUNT - 1], 1 / (OLD_COUNT - TUNED_COUNT)),
     pests: 1.078
   };
-  for (var k = TUNED_COUNT; k < CHAPTER_COUNT; k++) {
+  for (var k = TUNED_COUNT; k < OLD_COUNT; k++) {
     var climb = k - TUNED_COUNT + 1;
     HP_SCALE[k] = HP_SCALE[TUNED_COUNT - 1] * Math.pow(END.pests, climb);
     DMG_SCALE[k] = DMG_SCALE[TUNED_COUNT - 1] * Math.pow(END.pests, climb);
     BOSS_SCALE[k] = BOSS_SCALE[TUNED_COUNT - 1] * Math.pow(END.pests, climb);
     REC_POWER[k] = Math.round((REC_POWER[TUNED_COUNT - 1] * Math.pow(END.power, climb)) / 10) * 10;
   }
+
+  /* Chapters 101 to 250 go past the old ceiling: Celestial, Cosmic and
+     Infinity gear (and slot levels to 110) and talent tiers IV to VI let a
+     lemon keep growing. Every 50 chapters is a checkpoint with the build a
+     lemon there is expected to have, the Power that build has, and how much
+     tougher than chapter 100 the pests are: their health, their bite and the
+     boss's health, fitted with simulated battles so that the build wins about
+     as often as a lemon maxed for chapter 100 does there. Chapter 250 asks for
+     everything: Infinity gear at slot level 110 and every talent to tier VI.
+     Between checkpoints every number grows by the same factor each chapter. */
+  var CHECKS = [
+    { n: 150, power: 2210000000, hp: 8.0, dmg: 7.0, boss: 8.0 }, // Celestial gear at slot level 90, talents to tier IV
+    { n: 200, power: 16250000000, hp: 56.9, dmg: 19.6, boss: 102 }, // Cosmic gear at slot level 100, talents to tier V
+    { n: 250, power: 108400000000, hp: 362, dmg: 90, boss: 830 } // Infinity gear at slot level 110, talents to tier VI
+  ];
+  var last = { n: OLD_COUNT, power: REC_POWER[OLD_COUNT - 1], hp: 1, dmg: 1, boss: 1 };
+  CHECKS.forEach(function (next) {
+    for (var c2 = last.n + 1; c2 <= next.n; c2++) {
+      var f = (c2 - last.n) / (next.n - last.n);
+      var between = function (key) { return last[key] * Math.pow(next[key] / last[key], f); };
+      HP_SCALE[c2 - 1] = HP_SCALE[OLD_COUNT - 1] * between("hp");
+      DMG_SCALE[c2 - 1] = DMG_SCALE[OLD_COUNT - 1] * between("dmg");
+      BOSS_SCALE[c2 - 1] = BOSS_SCALE[OLD_COUNT - 1] * between("boss");
+      REC_POWER[c2 - 1] = Math.round(between("power") / 10) * 10;
+    }
+    last = next;
+  });
 
   PS.BAL = {
     CHAPTERS: CHAPTER_COUNT,
@@ -760,10 +796,11 @@
     dmgScale: function (chapter) { return DMG_SCALE[chapter - 1]; },
     bossScale: function (chapter) { return BOSS_SCALE[chapter - 1]; },
     recPower: function (chapter) { return REC_POWER[chapter - 1]; },
-    // grows 35% a chapter up to chapter 20, then 8%: there is little left to buy by then
+    // grows 35% a chapter up to chapter 20, then 8% (there is little left to buy by then), then 5% after chapter 100
     gold: function (chapter) {
       var base = 450 * Math.pow(1.35, Math.min(chapter, FITTED_COUNT) - 1);
-      return Math.round(base * Math.pow(1.08, Math.max(0, chapter - FITTED_COUNT)));
+      base *= Math.pow(1.08, Math.max(0, Math.min(chapter, OLD_COUNT) - FITTED_COUNT));
+      return Math.round(base * Math.pow(1.05, Math.max(0, chapter - OLD_COUNT)));
     },
     /** What one chest costs, in gems. Fixed: it does not change with your chapter. */
     chestPrice: function (kind) {
@@ -772,16 +809,25 @@
     gemsFirst: function (chapter) { return 100 + 10 * chapter; },
     gemsRepeat: 5,
     duration: function (chapter) { return 180 + Math.min(chapter - 1, 4) * 30; },
-    levelCost: function (level) { return Math.round(30 * Math.pow(1.09, level - 1)); },
+    // slot levels past 80 (Celestial gear and up) cost 35% more each
+    levelCost: function (level) { return Math.round(30 * Math.pow(1.09, Math.min(level, 80) - 1) * Math.pow(1.35, Math.max(0, level - 80))); },
     levelMult: function (level) { return Math.pow(PS.BAL.LEVEL_GROWTH, level - 1); },
     lootMu: function (chapter) { return 0.315 * (chapter - 1) - 0.5; }
   };
 
-  /** Chances for Common up to MAX_DROP_RARITY when loot is centred on rarity `mu`. */
-  PS.rarityWeights = function (mu) {
+  /** The rarest gear a chapter's loot can be: Legendary up to chapter 100,
+   *  then Mythic, Surpass from 151 and ??? from 201, so forging the rarities
+   *  past ??? never needs thousands of Legendaries. */
+  PS.dropCap = function (chapter) {
+    return chapter <= OLD_COUNT ? PS.MAX_DROP_RARITY : chapter <= 150 ? 5 : chapter <= 200 ? 6 : 7;
+  };
+
+  /** Chances for Common up to `cap` (MAX_DROP_RARITY unless given) when loot is centred on rarity `mu`. */
+  PS.rarityWeights = function (mu, cap) {
+    var top = cap === undefined ? PS.MAX_DROP_RARITY : cap;
     var weights = [];
-    for (var r = 0; r <= PS.MAX_DROP_RARITY; r++) {
-      var d = r - Math.min(mu, PS.MAX_DROP_RARITY);
+    for (var r = 0; r <= top; r++) {
+      var d = r - Math.min(mu, top);
       weights.push(Math.exp(-(d * d) / 0.98));
     }
     return weights;
@@ -804,9 +850,25 @@
     { name: "The Pond", floor: "#162D29", dot: "rgba(160,240,210,0.09)", prop: "#22443D", accent: "#5FC9A6" },
     { name: "The Ice Box", floor: "#1B2633", dot: "rgba(210,235,255,0.10)", prop: "#2B3B4E", accent: "#9BDCFF" },
     { name: "The Thorn Wilds", floor: "#2A1A20", dot: "rgba(255,180,205,0.08)", prop: "#432630", accent: "#E07A9C" },
-    { name: "The Golden Grove", floor: "#2B2614", dot: "rgba(255,232,150,0.10)", prop: "#463D1E", accent: "#F2C94C" }
+    { name: "The Golden Grove", floor: "#2B2614", dot: "rgba(255,232,150,0.10)", prop: "#463D1E", accent: "#F2C94C" },
+    // chapters 101 to 250: out past the First Tree, into the wide world and up to the stars
+    { name: "The Wild Meadow", floor: "#2A3320", dot: "rgba(220,240,170,0.10)", prop: "#3D4A2C", accent: "#A8C94F" },
+    { name: "The Hedgerow", floor: "#1F2B1C", dot: "rgba(190,230,160,0.09)", prop: "#2E4229", accent: "#6FAE5A" },
+    { name: "The Old Woods", floor: "#1E241A", dot: "rgba(200,220,170,0.08)", prop: "#2F3A27", accent: "#8BA05E" },
+    { name: "The Mushroom Ring", floor: "#2B1F26", dot: "rgba(255,200,230,0.09)", prop: "#432F3B", accent: "#E08AB8" },
+    { name: "The Riverbank", floor: "#1A2A2E", dot: "rgba(170,225,240,0.09)", prop: "#27414A", accent: "#5FB3D9" },
+    { name: "The Marsh", floor: "#1F2620", dot: "rgba(180,220,190,0.08)", prop: "#2E3B30", accent: "#7FA88A" },
+    { name: "The Rocky Hills", floor: "#2A2826", dot: "rgba(230,220,210,0.08)", prop: "#403C38", accent: "#B8A48F" },
+    { name: "The Crystal Caves", floor: "#1A1A2E", dot: "rgba(190,200,255,0.10)", prop: "#2A2B4A", accent: "#9FB4FF" },
+    { name: "The Lava Fields", floor: "#2A1512", dot: "rgba(255,150,100,0.10)", prop: "#45211A", accent: "#FF6A3D" },
+    { name: "The Storm Peaks", floor: "#1E2230", dot: "rgba(210,220,255,0.09)", prop: "#2E3448", accent: "#8FA8E0" },
+    { name: "The Cloud Garden", floor: "#2A2E38", dot: "rgba(255,255,255,0.12)", prop: "#3E4454", accent: "#CFE3FF" },
+    { name: "The Night Orchard", floor: "#141628", dot: "rgba(200,190,255,0.08)", prop: "#22264A", accent: "#7C83E8" },
+    { name: "The Moon Grove", floor: "#22232A", dot: "rgba(235,235,245,0.10)", prop: "#363845", accent: "#D9DCE8" },
+    { name: "The Starfield", floor: "#0F0E1E", dot: "rgba(255,240,200,0.12)", prop: "#1E1C3A", accent: "#FFD36E" },
+    { name: "The Heart of Citrus", floor: "#2E2810", dot: "rgba(255,240,150,0.12)", prop: "#4A401A", accent: "#FFE14A" }
   ];
-  /* chapters 1-20 are four to a zone, 21-50 six to a zone, and 51-100 ten */
+  /* chapters 1-20 are four to a zone, 21-50 six to a zone, and 51-250 ten */
   function zoneOf(c) {
     if (c <= FITTED_COUNT) return Math.floor((c - 1) / 4);
     if (c <= TUNED_COUNT) return 5 + Math.floor((c - FITTED_COUNT - 1) / 6);
@@ -833,7 +895,37 @@
     "Bramble Gate", "Nettle Path", "Rose Thicket", "Hawthorn Hedge", "Thistledown",
     "Blackberry Maze", "Gorse Hill", "Briar Hollow", "Spine Wood", "The Thorn Throne",
     "Sunlit Path", "Honey Meadow", "Amber Orchard", "Golden Boughs", "Pollen Haze",
-    "Gilded Roots", "The Old Orchard", "Seed Vault", "Sun Temple", "The First Tree"
+    "Gilded Roots", "The Old Orchard", "Seed Vault", "Sun Temple", "The First Tree",
+    "Through the Fence", "Buttercup Field", "Long Grass Sea", "Clover Hill", "Poppy Patch",
+    "Dandelion Clocks", "Molehill Rise", "Cowslip Bank", "Harvest Mouse Run", "The Meadow Crown",
+    "Hawthorn Gap", "Sloe Bushes", "Bird's Nest", "Hazel Tangle", "Wren's Hollow",
+    "Ivy Wall", "Dormouse Den", "Elderflower Arch", "Bramble Underpass", "The Green Tunnel",
+    "Bluebell Wood", "Fallen Oak", "Bracken Deep", "Badger Sett", "Owl Hollow",
+    "Woodpecker Drum", "Fern Gully", "Lichen Stones", "Antler Glade", "The Ancient Oak",
+    "Toadstool Path", "Puffball Patch", "Fairy Ring", "Ink Cap Corner", "Bracket Steps",
+    "Glowcap Cave", "Morel Maze", "Truffle Burrow", "Spore Storm", "The Toadstool Throne",
+    "Pebble Shore", "Kingfisher Bend", "Otter Slide", "Watercress Beds", "Mill Wheel",
+    "Weir Falls", "Heron Shallows", "Rushing Rapids", "Sandbar Island", "The River Mouth",
+    "Bog Edge", "Peat Cuttings", "Wisp Lights", "Cattail Forest", "Sinking Sands",
+    "Mosquito Cloud", "Leech Pools", "Heron's Watch", "Fog Banks", "The Drowned Tree",
+    "Scree Slope", "Goat Track", "Heather Moor", "Granite Tor", "Wind Gap",
+    "Shepherd's Hut", "Slate Quarry", "Eagle Crag", "Boulder Run", "The High Cairn",
+    "Cave Mouth", "Dripstone Hall", "Glow-worm Grotto", "Quartz Garden", "Echo Chamber",
+    "Amethyst Vein", "Underground Lake", "Geode Hollow", "Crystal Bridge", "The Diamond Heart",
+    "Ash Plains", "Basalt Steps", "Steam Vents", "Obsidian Ridge", "Magma Pools",
+    "Cinder Cone", "Sulphur Springs", "Fire Fountain", "Smoke Wall", "The Burning Peak",
+    "Thunder Path", "Hail Field", "Lightning Spire", "Gale Bridge", "Snow Line",
+    "Cloudbreak", "Frozen Falls", "Raven's Ledge", "The Eye of the Storm", "The Storm Throne",
+    "Rainbow Stair", "Cotton Hills", "Sky Orchard", "Floating Isles", "Mist Fountains",
+    "Dew Terraces", "Sunbeam Bridge", "Wind Chimes", "Cloud Palace", "The Silver Lining",
+    "Dusk Gate", "Firefly Lanes", "Owl Branches", "Moonlit Pond", "Shadow Rows",
+    "Bat Roost", "Dream Blossoms", "Midnight Well", "Starlit Bough", "The Witching Hour",
+    "Crater Rim", "Silver Dust", "Low Gravity Hop", "Moonstone Field", "Night Tide Pools",
+    "Earthrise", "Pale Orchard", "Lunar Lake", "The Dark Side", "The Moon Tree",
+    "Comet Trail", "Nebula Drift", "Asteroid Belt", "Star Nursery", "Constellation Path",
+    "Solar Wind", "Galaxy Spiral", "Pulsar Beacon", "Supernova", "The Edge of Everything",
+    "Seed of Stars", "Rind Cathedral", "Juice Falls", "Pith Labyrinth", "Zest Storm",
+    "Peel Peaks", "Golden Segment", "The Sour Sea", "Lemon Light", "The Great Pip"
   ];
   /* Which creature each chapter's boss is, to match its name (Spider Mother is
      a spider, Pipe Worm a worm...), in an order where no two chapters in a row
@@ -848,7 +940,22 @@
     "worm", "hornet", "queen", "slug", "beetle", "spider", "fly", "mould", "moth", "worm",
     "hornet", "slug", "beetle", "mould", "spider", "moth", "fly", "queen", "worm", "beetle",
     "hornet", "spider", "queen", "beetle", "moth", "slug", "fly", "worm", "mould", "queen",
-    "beetle", "hornet", "slug", "moth", "fly", "worm", "spider", "mould", "hornet", "queen"
+    "beetle", "hornet", "slug", "moth", "fly", "worm", "spider", "mould", "hornet", "queen",
+    "beetle", "moth", "worm", "queen", "hornet", "fly", "slug", "spider", "mould", "moth",
+    "hornet", "slug", "spider", "beetle", "moth", "queen", "worm", "fly", "mould", "beetle",
+    "hornet", "beetle", "spider", "worm", "moth", "fly", "slug", "mould", "queen", "beetle",
+    "slug", "mould", "moth", "fly", "beetle", "spider", "worm", "hornet", "queen", "mould",
+    "beetle", "fly", "slug", "queen", "moth", "worm", "spider", "hornet", "mould", "worm",
+    "beetle", "mould", "moth", "fly", "slug", "queen", "worm", "spider", "hornet", "beetle",
+    "spider", "fly", "moth", "beetle", "hornet", "mould", "worm", "queen", "slug", "spider",
+    "moth", "slug", "worm", "beetle", "fly", "spider", "hornet", "mould", "queen", "beetle",
+    "moth", "slug", "fly", "spider", "worm", "hornet", "mould", "beetle", "queen", "worm",
+    "beetle", "moth", "fly", "spider", "slug", "hornet", "mould", "worm", "queen", "beetle",
+    "moth", "slug", "hornet", "spider", "fly", "worm", "beetle", "mould", "queen", "worm",
+    "moth", "fly", "spider", "slug", "hornet", "beetle", "mould", "worm", "queen", "spider",
+    "beetle", "moth", "fly", "slug", "worm", "hornet", "mould", "spider", "queen", "beetle",
+    "fly", "moth", "beetle", "slug", "spider", "hornet", "worm", "mould", "queen", "worm",
+    "beetle", "moth", "fly", "slug", "hornet", "spider", "worm", "mould", "queen", "beetle"
   ];
   var BOSS_NAMES = [
     "The Hornet", "Aphid Queen", "Slug Baron", "Stump Rot",
@@ -870,7 +977,37 @@
     "Bramble Wasp", "Nettle Spider", "Rose Aphid Queen", "Hedge Beetle", "Thistle Moth",
     "Bramble Slug", "Gorse Fly", "Briar Worm", "Spine Mould", "The Thorn Queen",
     "Sun Beetle", "Honey Wasp", "Amber Slug", "Gilded Moth", "Pollen Fly",
-    "Golden Worm", "Orchard Spider", "Vault Mould", "Temple Hornet", "The Last Pest"
+    "Golden Worm", "Orchard Spider", "Vault Mould", "Temple Hornet", "The Last Pest",
+    "Fence Post Beetle", "Buttercup Moth", "Meadow Worm", "Clover Aphid Queen", "Poppy Hornet",
+    "Dandelion Fly", "Molehill Slug", "Cowslip Spider", "Hay Mould", "The Meadow Monarch",
+    "Gap Hornet", "Sloe Slug", "Nest Spider", "Hazel Weevil", "Hollow Moth",
+    "Ivy Aphid Queen", "Den Worm", "Elder Fly", "Underpass Mould", "The Hedge Colossus",
+    "Bluebell Hornet", "Oak Borer", "Bracken Spider", "Sett Worm", "Owl Moth",
+    "Drumming Fly", "Gully Slug", "Lichen Mould", "Glade Aphid Queen", "The Stag King",
+    "Toadstool Slug", "Puffball Mould", "Ring Moth", "Ink Cap Fly", "Bracket Beetle",
+    "Glowcap Spider", "Morel Worm", "Truffle Hornet", "Spore Queen", "The Mould Emperor",
+    "Shore Beetle", "Kingfisher Fly", "Otter Slug", "Cress Aphid Queen", "Mill Moth",
+    "Weir Worm", "Water Spider", "Rapids Hornet", "Sandbar Mould", "The River Serpent",
+    "Bog Beetle", "Peat Mould", "Wisp Moth", "Cattail Fly", "Sinking Slug",
+    "Mosquito Queen", "Leech Worm", "Marsh Spider", "Fog Hornet", "The Bog Colossus",
+    "Scree Spider", "Track Fly", "Heather Moth", "Tor Beetle", "Gale Hornet",
+    "Hut Mould", "Quarry Worm", "Crag Aphid Queen", "Boulder Slug", "The Cairn Spider",
+    "Cave Moth", "Drip Slug", "Glow Worm", "Quartz Beetle", "Echo Fly",
+    "Amethyst Spider", "Lake Hornet", "Geode Mould", "Crystal Aphid Queen", "The Crystal Colossus",
+    "Ash Moth", "Basalt Slug", "Vent Fly", "Obsidian Spider", "Magma Worm",
+    "Cinder Hornet", "Sulphur Mould", "Flame Beetle", "Smoke Aphid Queen", "The Lava Wyrm",
+    "Thunder Beetle", "Hail Moth", "Spark Fly", "Gale Spider", "Snow Slug",
+    "Cloud Hornet", "Falls Mould", "Ledge Worm", "Storm Aphid Queen", "The Thunder King",
+    "Rainbow Moth", "Cotton Slug", "Sky Hornet", "Isle Spider", "Mist Fly",
+    "Dew Worm", "Sunbeam Beetle", "Chime Mould", "Palace Aphid Queen", "The Sky Serpent",
+    "Dusk Moth", "Lantern Fly", "Night Spider", "Moon Slug", "Shadow Hornet",
+    "Roost Beetle", "Dream Mould", "Well Worm", "Star Aphid Queen", "The Night Mother",
+    "Crater Beetle", "Dust Moth", "Hopping Fly", "Moonstone Slug", "Tide Worm",
+    "Earthrise Hornet", "Pale Mould", "Lunar Spider", "Dark Aphid Queen", "The Moon Colossus",
+    "Comet Fly", "Nebula Moth", "Asteroid Beetle", "Nursery Slug", "Star Spider",
+    "Solar Hornet", "Spiral Worm", "Pulsar Mould", "Nova Aphid Queen", "The Star Eater",
+    "Star Seed Beetle", "Rind Moth", "Juice Fly", "Pith Slug", "Zest Hornet",
+    "Peel Spider", "Segment Worm", "Sour Mould", "The Pest Queen", "The Pest Emperor"
   ];
   /* the pest that turns up twice as often in each chapter */
   var FEATURED = [
@@ -885,6 +1022,11 @@
     "spitter", "dart", "splitter", "charger", "brute", "bomber", "spitter", "dart", "splitter", "charger",
     "brute", "bomber", "dart", "spitter", "splitter", "charger", "brute", "bomber", "spitter", "brute"
   ];
+  // chapters 101 to 250 go round the six in an order that never repeats one chapter to the next
+  (function () {
+    var round = ["splitter", "charger", "spitter", "bomber", "brute", "dart", "charger", "splitter", "brute", "spitter", "dart", "bomber"];
+    for (var n = OLD_COUNT + 1; n <= CHAPTER_COUNT; n++) FEATURED.push(round[(n - OLD_COUNT - 1) % round.length]);
+  })();
   /* first clear of a zone boss hands out a special item: [grade, slot or null] */
   var MILESTONES = {
     4: ["S", "weapon"], 8: ["S", null], 12: ["S", "weapon"], 16: ["SS", null], 20: ["SS", "weapon"],
@@ -894,6 +1036,9 @@
     74: ["S", null], 78: ["SS", null], 82: ["S", "weapon"], 86: ["SS", null], 90: ["SS", "weapon"],
     94: ["SS", null], 98: ["SS", null], 100: ["SS", "weapon"]
   };
+  // chapters 101 to 250: an S or SS item every fourth chapter, and an SS weapon at the end of every zone
+  for (var mn = OLD_COUNT + 4; mn <= CHAPTER_COUNT; mn += 4) MILESTONES[mn] = [mn % 8 === 0 ? "SS" : "S", mn % 12 === 0 ? "weapon" : null];
+  for (var mz = OLD_COUNT + 10; mz <= CHAPTER_COUNT; mz += 10) MILESTONES[mz] = ["SS", "weapon"];
 
   /* Every boss looks different. The four kinds above decide how a boss fights;
      its look (colours, a pattern and an extra part) is worked out per chapter
@@ -982,7 +1127,7 @@
      a ??? SS-grade item sells for both added together. Below Mythic, and plain
      (A) grade, is worth nothing to the buyer. */
   PS.SELL = {
-    rarity: { 5: 20000, 6: 60000, 7: 200000 },
+    rarity: { 5: 20000, 6: 60000, 7: 200000, 8: 600000, 9: 2000000, 10: 6000000 },
     grade: { S: 10000, SS: 100000 }
   };
   PS.CHEST_BULK = { count: 10, big: 100, discount: 0.9 }; // 10 and 100 at once, both 10% off
@@ -1076,8 +1221,8 @@
 
   PS.QUESTS = [
     { id: "chapters", name: "Pest Control", stat: "best", text: "Clear chapter {n}",
-      tiers: [1, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100],
-      gems: [40, 40, 50, 60, 70, 80, 100, 120, 140, 160, 200, 400, 250, 300, 350, 400, 500, 800, 500, 600, 700, 800, 1500] },
+      tiers: [1, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 125, 150, 175, 200, 225, 250],
+      gems: [40, 40, 50, 60, 70, 80, 100, 120, 140, 160, 200, 400, 250, 300, 350, 400, 500, 800, 500, 600, 700, 800, 1500, 1000, 1200, 1400, 1600, 1800, 3000] },
     { id: "kills", name: "Squasher", stat: "kills", text: "Squash {n} pests",
       tiers: [100, 500, 2000, 5000, 15000, 40000, 100000], gems: [30, 40, 60, 80, 100, 150, 250] },
     { id: "forge", name: "Blacksmith", stat: "forges", text: "Forge {n} times", first: "Forge an item",
@@ -1089,10 +1234,11 @@
     { id: "talents", name: "Student", stat: "talents", text: "Learn {n} talent levels",
       tiers: [3, 10, 30, 60, 100, 150, 200], gems: [30, 40, 60, 80, 100, 150, 200] },
     { id: "power", name: "Powerhouse", stat: "bestPower", text: "Reach {n} power",
-      tiers: [1000, 2500, 6000, 15000, 40000, 100000, 250000], gems: [30, 50, 70, 100, 150, 200, 300] },
+      tiers: [1000, 2500, 6000, 15000, 40000, 100000, 250000, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11],
+      gems: [30, 50, 70, 100, 150, 200, 300, 400, 500, 600, 800, 1000, 1500] },
     { id: "rarity", name: "Collector", stat: "maxRarity", text: "Own {n} item",
-      tiers: [2, 3, 4, 5, 6, 7], labels: ["a Rare", "an Epic", "a Legendary", "a Mythic", "a Surpass", "a ???"],
-      gems: [30, 60, 100, 150, 250, 500] },
+      tiers: [2, 3, 4, 5, 6, 7, 8, 9, 10], labels: ["a Rare", "an Epic", "a Legendary", "a Mythic", "a Surpass", "a ???", "a Celestial", "a Cosmic", "an Infinity"],
+      gems: [30, 60, 100, 150, 250, 500, 800, 1200, 2000] },
     { id: "grade", name: "Top Shelf", stat: "grade", text: "Own {n} item",
       tiers: [1, 2], labels: ["an S-grade", "an SS-grade"], gems: [100, 300] },
     { id: "runlevel", name: "Snowball", stat: "bestLevel", text: "Reach level {n} in one battle",

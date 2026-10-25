@@ -236,7 +236,7 @@
   /* ------------------------------------------------------- battle screen */
 
   function lootPreview(chapter) {
-    var weights = PS.rarityWeights(PS.BAL.lootMu(chapter));
+    var weights = PS.rarityWeights(PS.BAL.lootMu(chapter), PS.dropCap(chapter));
     var total = weights.reduce(function (a, b) { return a + b; }, 0);
     var out = "";
     weights.forEach(function (w, r) {
@@ -506,7 +506,7 @@
         '<div class="forge__gain">' +
           "<p>" + rarityName(main.r) + " " + PS.icon("right") + " " + rarityName(next.r) + "</p>" +
           "<p>Level cap " + PS.RARITY[main.r].cap + " " + PS.icon("right") + " " + PS.RARITY[next.r].cap + (gain ? " · Power +" + fmt(gain) : "") + "</p>" +
-          (unlocked ? '<p class="forge__perk">New perk: ' + esc(next.r === PS.MAX_RARITY ? "? ? ?" : PS.perkText(unlocked)) + "</p>" : "") +
+          (unlocked ? '<p class="forge__perk">New perk: ' + esc(next.r === PS.SECRET_RARITY ? "? ? ?" : PS.perkText(unlocked)) + "</p>" : "") +
         "</div>";
     }
 
@@ -1125,7 +1125,7 @@
     );
   }
 
-  var TIER_NUMERALS = ["I", "II", "III", "IV", "V"];
+  var TIER_NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII"];
 
   SCREENS.talents = function () {
     var asc = st.ascendInfo();
@@ -1301,13 +1301,23 @@
     }
     def.perks.forEach(function (perk) {
       var on = item.r >= perk.at;
-      var secret = perk.at === PS.MAX_RARITY && !on;
+      var secret = perk.at === PS.SECRET_RARITY && !on;
       out +=
         '<li class="perk' + (on ? " is-on" : "") + '">' +
           '<span class="perk__when rname r' + perk.at + '">' + PS.RARITY[perk.at].name + (on ? "" : PS.icon("lock")) + "</span>" +
           "<span>" + (secret ? "? ? ?" : esc(PS.perkText(perk))) + "</span>" +
         "</li>";
     });
+    // the rarities past ???: no perk of their own, but a bigger main stat and a higher level cap
+    var stat = PS.STATS[PS.SLOT[def.slot].stat].phrase;
+    for (var r = PS.SECRET_RARITY + 1; r <= PS.MAX_RARITY; r++) {
+      var reached = item.r >= r;
+      out +=
+        '<li class="perk' + (reached ? " is-on" : "") + '">' +
+          '<span class="perk__when rname r' + r + '">' + PS.RARITY[r].name + (reached ? "" : PS.icon("lock")) + "</span>" +
+          "<span>×" + PS.RARITY[r].mult + " " + stat + " (×" + PS.RARITY[r - 1].mult + " at " + PS.RARITY[r - 1].name + "), and the slot levels up to " + PS.RARITY[r].cap + "</span>" +
+        "</li>";
+    }
     return out;
   }
 
@@ -1517,7 +1527,7 @@
             "<li>There are " + PS.ITEM_ORDER.filter(function (id) { return PS.ITEMS[id].slot === "weapon"; }).length + " weapons and " +
               PS.ITEM_ORDER.filter(function (id) { return PS.ITEMS[id].slot !== "weapon"; }).length + " other pieces of gear to find. Most names are two words: the second says what it is (a <b>Mortar</b> lobs shells, a <b>Chakram</b> flies out and back, a <b>Visor</b> is a helmet), the first what it adds (<b>Cinder</b> burns, <b>Frost</b> slows, <b>Volt</b> softens pests up, <b>Venom</b> poisons and heals you, <b>Shadow</b> is quick and reaches far, <b>Radiant</b> finds weak spots, <b>Briar</b> is covered in thorns).</li>" +
             '<li>Rarities, from the bottom: <span class="rlist">' + rarities + "</span>. Rarer gear is stronger and unlocks more of its perks.</li>" +
-            "<li>Battles drop gear up to " + rarityName(PS.MAX_DROP_RARITY) + ". Anything rarer comes from the <b>Forge</b>: put in three items of the same slot and rarity, and the one you keep goes up a rarity. <b>Quick forge</b> does every forge it can at once.</li>" +
+            "<li>Battles drop gear up to " + rarityName(PS.MAX_DROP_RARITY) + " (past chapter 100, up to " + rarityName(5) + ", then " + rarityName(6) + " from 151 and " + rarityName(7) + " from 201). Anything rarer comes from the <b>Forge</b>: put in three items of the same slot and rarity, and the one you keep goes up a rarity. Past " + rarityName(7) + " are " + rarityName(8) + ", " + rarityName(9) + " and " + rarityName(10) + ", which take slot levels past 80. <b>Quick forge</b> does every forge it can at once.</li>" +
             "<li>Spend gold to <b>level up</b> each slot. An item's rarity caps how high its slot's level counts.</li>" +
             "<li>Some items are <b>S</b> or <b>SS grade</b>: stronger at every rarity.</li>" +
             "<li>The <b>Collection</b> button on the Equipment screen keeps every different item you have ever owned. Find more of them for gems: the first reward comes at " + PS.BOOK[0].at + " items.</li>" +
@@ -4896,7 +4906,7 @@
             }).join("") + "</div>"
           : '<p class="hint">No gear this time. Get at least halfway through a chapter to find some.</p>') +
         (result.unlocked ? '<p class="results__unlock">' + PS.icon("check") + "Chapter " + result.unlocked + " is open.</p>" : "") +
-        (result.finished ? '<p class="results__unlock">That was the last chapter. Surpass and ??? gear is still out there for the forge.</p>' : "") +
+        (result.finished ? '<p class="results__unlock">That was the last chapter. There is still Infinity gear to forge and talents to grow, and the leaderboard to climb.</p>' : "") +
         (result.together ? '<p class="hint">Played together with ' + esc(result.partner || "a friend") + "." +
           (result.left ? " They left before the end." : "") +
           (result.assist ? " That chapter is past your own progress, so it paid like your furthest chapter and opened nothing new." : "") + "</p>" : "") +

@@ -801,13 +801,14 @@
 
   /* ---------------------------------------------------------------- loot */
 
-  function rollRarity(mu, rnd) {
-    var weights = PS.rarityWeights(mu);
+  function rollRarity(mu, rnd, cap) {
+    var weights = PS.rarityWeights(mu, cap);
     return PS.weighted(weights.map(function (w, r) { return r; }), weights, rnd ? rnd() : undefined);
   }
 
   /** Pick an item. opts: s / ss (grade chances), grade and slot (forced),
-   *  minR (lowest rarity), rnd (random stream). */
+   *  minR (lowest rarity), rnd (random stream), cap (the rarest it can be:
+   *  PS.MAX_DROP_RARITY unless given). */
   function rollItem(mu, opts) {
     opts = opts || {};
     var rnd = opts.rnd || Math.random;
@@ -834,7 +835,7 @@
     // fixed odds (chests) ignore how far the player has got
     var rarity = opts.odds
       ? PS.weighted([0, 1, 2, 3, 4, 5], opts.odds, rnd())
-      : PS.clamp(Math.max(rollRarity(mu, rnd), opts.minR || 0), 0, PS.MAX_DROP_RARITY);
+      : PS.clamp(Math.max(rollRarity(mu, rnd, opts.cap), opts.minR || 0), 0, opts.cap === undefined ? PS.MAX_DROP_RARITY : opts.cap);
     return { id: id, r: rarity };
   }
 
@@ -897,7 +898,8 @@
     var mu = PS.BAL.lootMu(ch.n);
     var grade = {
       s: ch.n >= PS.DROP_GRADE.sFrom ? PS.DROP_GRADE.s : 0,
-      ss: ch.n >= PS.DROP_GRADE.ssFrom ? PS.DROP_GRADE.ss : 0
+      ss: ch.n >= PS.DROP_GRADE.ssFrom ? PS.DROP_GRADE.ss : 0,
+      cap: PS.dropCap(ch.n) // past chapter 100, loot goes up to Mythic, then Surpass, then ???
     };
     var count = result.won ? 3 : result.boss ? 2 : progress >= 0.5 ? 1 : 0;
     var rolls = [];
@@ -905,7 +907,7 @@
     if (first) {
       rolls.push(rollItem(mu, grade));
       rolls.push(rollItem(mu + 1, grade));
-      if (ch.milestone) rolls.push(rollItem(mu + 1, { grade: ch.milestone[0], slot: ch.milestone[1] }));
+      if (ch.milestone) rolls.push(rollItem(mu + 1, { grade: ch.milestone[0], slot: ch.milestone[1], cap: grade.cap }));
     }
 
     S.gold += gold;
