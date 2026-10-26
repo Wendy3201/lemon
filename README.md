@@ -194,11 +194,13 @@ as each other on that gear:
 The room shows the list for the gear picked. A piece of gear holds one
 enchantment, and **stacking** buys it room for more, up to 4: under the gear
 on the table are its four spaces, and the next locked one can be unlocked with
-gems (500 for the 2nd, 1,500 for the 3rd, 4,000 for the 4th; that room is for
-that piece only). A key fills an empty space first; on full gear it replaces
-the one you pick (the last, unless you click another). The same enchantment
-twice adds up. Enchantments count while the gear is worn, stay on it with its
-bought room when it is forged up (gear melted down in a forge loses its own,
+gems (2,500 for the 2nd, 7,500 for the 3rd, 20,000 for the 4th, so 30,000 to
+fill one piece; that room is for that piece only). Click a space to aim the
+next key at it: a filled one has its enchantment changed for a new one (even
+while other spaces are empty), an empty one is filled. Without a click, a key
+fills the first empty space, or on full gear changes the last one. The same
+enchantment twice adds up. Enchantments count while the gear is worn, stay on
+it with its bought room when it is forged up (gear melted down in a forge loses its own,
 and Quick forge's "keep safe" never melts an enchanted piece or one with
 bought room), and go with it in a trade (that needs the newer
 `supabase/setup.sql`; an older server drops them). Saves from before stacking

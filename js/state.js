@@ -750,9 +750,10 @@
   }
 
   /** Use a key on a piece of gear: one of the enchantments for that kind of gear,
-   *  each as likely as the next, goes into an empty space on it, or (when it is
-   *  full) in place of the one at `at` (the last if `at` is not given). Returns
-   *  { item, ench, old, index } or null (no key, or no such item). */
+   *  each as likely as the next, goes in place of the one at `at` (any filled
+   *  space, even with empty ones left), or else into the first empty space, or
+   *  (when it is full) in place of the last. Returns { item, ench, old, index }
+   *  or null (no key, or no such item). */
   function enchant(u, at) {
     var item = byUid(u);
     if (!item || S.keys < 1) return null;
@@ -761,11 +762,12 @@
     var list = PS.enchantsOf(item).map(function (e) { return e.id; });
     var old = null;
     var index;
-    if (list.length < PS.enchantRoom(item)) {
+    if (typeof at !== "number" || at < 0 || at >= list.length) at = -1;
+    if (at < 0 && list.length < PS.enchantRoom(item)) {
       index = list.length;
       list.push(ench.id);
     } else {
-      index = typeof at === "number" && at >= 0 && at < list.length ? at : list.length - 1;
+      index = at >= 0 ? at : list.length - 1;
       old = PS.ENCHANT[list[index]] || null;
       list[index] = ench.id;
     }

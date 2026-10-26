@@ -10930,6 +10930,11 @@ button.enchant__space:disabled {
   border-color: rgba(198, 166, 255, 0.5);
 }
 
+.enchant__space.is-empty.is-target {
+  border-style: solid;
+  border-color: #ffb0d8;
+}
+
 .enchant__space.is-buy {
   border-color: rgba(233, 185, 73, 0.55);
   background: linear-gradient(180deg, rgba(233, 185, 73, 0.16), rgba(233, 185, 73, 0.04));

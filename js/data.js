@@ -1288,7 +1288,7 @@
      prices are for the 2nd, 3rd and 4th. A key fills an empty space first;
      once the gear is full, it takes the place of the one you choose. The same
      enchantment twice adds up. */
-  PS.ENCHANT_STACK = { max: 4, gems: [500, 1500, 4000] };
+  PS.ENCHANT_STACK = { max: 4, gems: [2500, 7500, 20000] };
 
   /** The enchantments on an item, in order (none: []). */
   PS.enchantsOf = function (item) {

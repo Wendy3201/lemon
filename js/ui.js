@@ -848,10 +848,12 @@
     var on = PS.enchantsOf(item);
     var room = item ? PS.enchantRoom(item) : 1;
     var full = item && on.length >= room;
-    // on full gear the last one is aimed at, until another is picked (none while there is room)
-    if (!full) ench.target = -1;
-    else if (ench.target < 0 || ench.target >= on.length) ench.target = on.length - 1;
-    var target = full ? on[ench.target] : null;
+    /* The space the next key goes into: the one clicked (a filled one gets its enchantment
+       changed, an empty one means the first empty one), or else the first empty one, or the
+       last on full gear. */
+    if (ench.target >= room) ench.target = -1;
+    var aim = ench.target >= 0 ? Math.min(ench.target, on.length) : full ? on.length - 1 : on.length;
+    var target = aim < on.length ? on[aim] : null;
     var worn = PS.SLOTS.map(function (slot) { return st.equipped(slot.key); }).filter(Boolean);
     var bag = st.sorted(S.items.filter(function (it) { return !st.isEquipped(it); }));
     var result = ench.result;
@@ -869,14 +871,16 @@
       var cost = st.stackCost(item);
       var out = "";
       for (var k = 0; k < PS.ENCHANT_STACK.max; k++) {
+        var at = k === aim;
         if (k < on.length) {
-          var aim = full && k === ench.target;
-          out += '<button class="enchant__space is-filled' + (aim ? " is-target" : "") + '" type="button" data-en="target" data-i="' + k + '"' + (full && !ench.casting ? "" : " disabled") +
-            ' title="' + (full ? "A key will replace this one" : "") + '">' +
+          out += '<button class="enchant__space is-filled' + (at ? " is-target" : "") + '" type="button" data-en="target" data-i="' + k + '" aria-pressed="' + at + '"' + (ench.casting ? " disabled" : "") +
+            ' title="Click to change this one with the next key">' +
             PS.icon(on[k].icon) + "<b>" + esc(on[k].name) + "</b><small>" + esc(PS.enchantText(on[k])) + "</small>" +
-            (aim ? '<em class="enchant__swap">the next key replaces this</em>' : "") + "</button>";
+            (at ? '<em class="enchant__swap">the next key changes this</em>' : "") + "</button>";
         } else if (k < room) {
-          out += '<div class="enchant__space is-empty"><b>Empty</b><small>The next key fills this</small></div>';
+          out += '<button class="enchant__space is-empty' + (at ? " is-target" : "") + '" type="button" data-en="target" data-i="' + k + '" aria-pressed="' + at + '"' + (ench.casting ? " disabled" : "") +
+            ' title="Click to fill an empty space with the next key"><b>Empty</b>' +
+            (at ? '<em class="enchant__swap">the next key fills this</em>' : "<small>Click to fill this one next</small>") + "</button>";
         } else if (k === room && cost) {
           out += '<div class="enchant__space is-buy"><b>Unlock space ' + (k + 1) + "</b><small>Stack " + (k + 1) + " enchantments on this gear</small>" +
             '<button class="btn btn--sm enchant__buy" type="button" data-en="stack" aria-label="Unlock space ' + (k + 1) + " for " + fmt(cost) + ' gems"' + (S.gems >= cost && !ench.casting ? "" : " disabled") + ">" + price("gems", cost) + "</button></div>";
@@ -912,7 +916,7 @@
             '<p class="enchant__keys"><span class="enchant__keyart" aria-hidden="true">' + PS.art("enchkey") + "</span>Enchantment Keys: <b>" + fmt(S.keys) + "</b>" + '<span class="enchant__gems">' + price("gems", S.gems) + "</span></p>" +
             (S.keys
               ? '<button class="btn btn--primary btn--xl enchant__go" type="button" data-en="go"' + (item && !ench.casting ? "" : " disabled") + ">" +
-                  (ench.casting ? "The key is turning..." : "Use a key" + (target ? " · replaces " + esc(target.name) : on.length ? " · fills space " + (on.length + 1) : "")) + "</button>"
+                  (ench.casting ? "The key is turning..." : "Use a key" + (target ? " · changes " + esc(target.name) : on.length ? " · fills space " + (aim + 1) : "")) + "</button>"
               : '<p class="hint">You have no Enchantment Keys. They come from the Enchantment Chest in the Shop.</p>' +
                 '<button class="btn btn--primary" type="button" data-en="shop">Go to the Shop</button>') +
           "</section>" +
@@ -936,7 +940,7 @@
           }).join("") + "</div>" +
           '<p class="hint">Each kind of gear has its own enchantments: pick other gear to see its list. A piece holds one, and room for more (up to ' + PS.ENCHANT_STACK.max + ") can be bought with gems: " +
             PS.ENCHANT_STACK.gems.map(function (g, k) { return fmt(g) + " for the " + ["2nd", "3rd", "4th"][k]; }).join(", ") +
-            ". A key fills an empty space first; on full gear it replaces the one you pick. The same one twice adds up. They work while the gear is worn, stay on it when it is forged up (gear melted down in a forge loses its own) and go with it in a trade.</p>" +
+            ". Click a space to aim the next key at it: a filled one has its enchantment changed for a new one, an empty one is filled. The same one twice adds up. They work while the gear is worn, stay on it when it is forged up (gear melted down in a forge loses its own) and go with it in a trade.</p>" +
         "</section>" +
       "</div>";
   }
@@ -961,6 +965,7 @@
       }
       PS.sfx.play("shrine");
       ench.result = null;
+      ench.target = -1; // the next key goes into the new space
       paintEnchant();
       toast("Room for " + PS.enchantRoom(st.item(ench.u)) + " enchantments on this gear");
     } else if (act === "bag") {
@@ -982,6 +987,8 @@
         var res = st.enchant(ench.u, ench.target);
         ench.casting = false;
         ench.result = res;
+        // after changing one, stay on it to try again; after filling one, go on to the next empty space
+        if (res && !res.old) ench.target = -1;
         if (res) PS.sfx.play("reveal", 5);
         if (enchBox && !enchBox.hidden) paintEnchant();
       }, CAST_MS);
