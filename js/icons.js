@@ -485,6 +485,21 @@
       box(20, 18, 8, 9.5, 2, C.goldDark) + dot(24, 22.6, 2.5, C.red) +
       poly(star(40.5, 7, 5, 1.7, 4), C.white) + poly(star(8, 12, 3.2, 1.1, 4), C.white),
 
+    // the Enchantment Chest: night-dark wood and a glowing rune
+    runechest:
+      box(7, 19, 34, 23, 3, "#241A40") + box(8.6, 20.6, 30.8, 19.8, 2, "#433580") +
+      fill("M5 22V17Q5 7 24 7Q43 7 43 17V22Z", "#241A40") + fill("M7 20.5V17Q7 9 24 9Q41 9 41 17V20.5Z", "#6A55C9") +
+      box(12, 9.5, 3.4, 32, 1, "#C9A9FF", 'opacity="0.5"') + box(32.6, 9.5, 3.4, 32, 1, "#C9A9FF", 'opacity="0.5"') +
+      box(19.5, 17.5, 9, 10.5, 2, "#1B1433") + poly(star(24, 22.8, 3.8, 1.4, 4), "#C6A6FF") + dot(24, 22.8, 1.2, "#FFFFFF") +
+      poly(star(40.5, 7, 5, 1.7, 4), "#E8D9FF") + poly(star(8, 12, 3.2, 1.1, 4), "#E8D9FF") + poly(star(39, 33, 2.4, 0.9, 4), "#E8D9FF"),
+
+    // an Enchantment Key: old gold, with a violet stone that keeps its secret
+    enchkey:
+      ring(15, 24, 8.5, "#B98A2A", 5) + ring(15, 24, 8.5, "#EAC45E", 3) + dot(15, 24, 3.8, "#7B5CFF") + dot(14, 22.8, 1.3, "#D8CCFF") +
+      box(22, 21.8, 21, 4.6, 2, "#B98A2A") + box(22, 21.8, 21, 3, 1.5, "#EAC45E") +
+      box(34, 25.6, 3.6, 6.4, 1, "#B98A2A") + box(39, 25.6, 3.6, 4.6, 1, "#B98A2A") +
+      poly(star(37, 12, 3.6, 1.3, 4), "#D8C8FF") + poly(star(9, 37, 2.6, 1, 4), "#D8C8FF"),
+
     gift:
       box(8, 20, 32, 22, 3, "#6E9150") + box(9.6, 21.6, 28.8, 18.8, 2, C.leaf) + box(5.5, 13.5, 37, 9, 2.6, "#6E9150") + box(5.5, 13.5, 37, 3.4, 1.7, C.leafLight) +
       box(21, 13.5, 6, 28.5, 1, C.gold) +

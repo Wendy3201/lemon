@@ -1161,6 +1161,130 @@
     return Math.round(150 * Math.pow(1.15, level - 1) * (1 + 0.5 * r));
   };
 
+  /* Enchantments: one can go on any piece of gear and adds to your stats (or,
+     for a few, does something in battle) while that piece is worn, whatever its
+     rarity. Each kind of gear has its own list, so armour gets armour things
+     and a weapon weapon things. An Enchantment Key (from the Enchantment Chest
+     in the shop) holds one, and nobody knows which until it is used at the
+     enchanting table (Equipment > Enchant): any on the list for that gear, each
+     as likely as the next. A new enchantment takes the place of the old one.
+     `fx` are battle effects (as gear perks have), `pw` what they add to Power. */
+  PS.ENCHANT_POOLS = {
+    weapon: [
+      { id: "sharp", name: "Sharpness", icon: "atk", s: { atkPct: 0.12 } },
+      { id: "vigour", name: "Vigour", icon: "hp", s: { hpPct: 0.12 } },
+      { id: "keen", name: "Keen Eye", icon: "crit", s: { crit: 0.05 } },
+      { id: "brutal", name: "Brutality", icon: "critDmg", s: { critDmg: 0.3 } },
+      { id: "quick", name: "Quickness", icon: "haste", s: { haste: 0.1 } },
+      { id: "feather", name: "Featherfoot", icon: "speed", s: { speed: 0.08 } },
+      { id: "ward", name: "Warding", icon: "armor", s: { armor: 0.04 } },
+      { id: "mend", name: "Mending", icon: "regen", s: { regen: 0.003 } },
+      { id: "pull", name: "Attraction", icon: "magnet", s: { magnet: 0.25 } },
+      { id: "greed", name: "Greed", icon: "coin", s: { gold: 0.15 } },
+      { id: "insight", name: "Insight", icon: "xp", s: { xp: 0.15 } },
+      { id: "kiss", name: "Fortune's Kiss", icon: "luck", s: { luck: 0.1 } },
+      { id: "expanse", name: "Expanse", icon: "area", s: { area: 0.12 } },
+      { id: "bane", name: "Giantbane", icon: "skull", s: { bossDmg: 0.2 } }
+    ],
+    ring: [
+      { id: "focus", name: "Focus", icon: "crit", s: { crit: 0.04 } },
+      { id: "cruelty", name: "Cruelty", icon: "critDmg", s: { critDmg: 0.25 } },
+      { id: "hands", name: "Swift Hands", icon: "haste", s: { haste: 0.08 } },
+      { id: "charm", name: "Lucky Charm", icon: "luck", s: { luck: 0.12 } },
+      { id: "midas", name: "Midas Touch", icon: "coin", s: { gold: 0.2 } },
+      { id: "scholar", name: "Scholar's Loop", icon: "xp", s: { xp: 0.18 } },
+      { id: "might", name: "Might", icon: "atk", s: { atkPct: 0.08 } },
+      { id: "twin", name: "Twin Edge", icon: "critDmg", s: { crit: 0.03, critDmg: 0.15 } },
+      { id: "reach", name: "Long Reach", icon: "area", s: { area: 0.1 } },
+      { id: "kingsbane", name: "Kingsbane", icon: "skull", s: { bossDmg: 0.15 } },
+      { id: "drain", name: "Life Drain", icon: "leech", fx: { leech: 0.003 }, pw: 0.04, text: "Heal 0.3% of your health for every pest you squash" },
+      { id: "glory", name: "Fortune and Glory", icon: "gift", s: { gold: 0.1, xp: 0.1 } },
+      { id: "lodestone", name: "Lodestone", icon: "magnet", s: { magnet: 0.3 } },
+      { id: "tempo", name: "Tempo", icon: "speed", s: { haste: 0.05, speed: 0.05 } },
+      { id: "starlit", name: "Starlit", icon: "xp", s: { luck: 0.06, atkPct: 0.04 } }
+    ],
+    amulet: [
+      { id: "lifebloom", name: "Lifebloom", icon: "hp", s: { hpPct: 0.1 } },
+      { id: "renewal", name: "Renewal", icon: "regen", s: { regen: 0.0025 } },
+      { id: "aegis", name: "Aegis", icon: "armor", fx: { barrier: 0.06 }, pw: 0.04, text: "A shield worth 6% of your health, that soaks up hits first" },
+      { id: "wisdom", name: "Wisdom", icon: "xp", s: { xp: 0.2 } },
+      { id: "clover", name: "Clover", icon: "luck", s: { luck: 0.12 } },
+      { id: "arcane", name: "Arcane Power", icon: "atk", s: { atkPct: 0.08, area: 0.04 } },
+      { id: "spark", name: "Spark", icon: "bolt", s: { haste: 0.06 } },
+      { id: "talisman", name: "Talisman", icon: "armor", s: { armor: 0.03 } },
+      { id: "coincharm", name: "Coin Charm", icon: "coin", s: { gold: 0.18 } },
+      { id: "magnetism", name: "Magnetism", icon: "magnet", s: { magnet: 0.35 } },
+      { id: "clarity", name: "Clarity", icon: "crit", s: { crit: 0.03, xp: 0.1 } },
+      { id: "vampire", name: "Vampire's Kiss", icon: "leech", fx: { leech: 0.004 }, pw: 0.05, text: "Heal 0.4% of your health for every pest you squash" },
+      { id: "titan", name: "Titan's Pendant", icon: "skull", s: { bossDmg: 0.2 } },
+      { id: "soulbound", name: "Soulbound", icon: "hp", s: { hpPct: 0.06, atkPct: 0.06 } }
+    ],
+    helmet: [
+      { id: "ironclad", name: "Ironclad", icon: "armor", s: { armor: 0.04 } },
+      { id: "hardy", name: "Hardy", icon: "hp", s: { hpPct: 0.12 } },
+      { id: "clearmind", name: "Clear Mind", icon: "xp", s: { xp: 0.18 } },
+      { id: "hawk", name: "Hawk Sight", icon: "magnet", s: { magnet: 0.25 } },
+      { id: "soothing", name: "Soothing", icon: "regen", s: { regen: 0.0025 } },
+      { id: "halo", name: "Halo", icon: "armor", fx: { barrier: 0.06 }, pw: 0.04, text: "A shield worth 6% of your health, that soaks up hits first" },
+      { id: "crowned", name: "Crowned", icon: "coin", s: { gold: 0.12, xp: 0.08 } },
+      { id: "stout", name: "Stout", icon: "hp", s: { hpPct: 0.08, armor: 0.02 } },
+      { id: "fourleaf", name: "Four-Leaf", icon: "luck", s: { luck: 0.1 } },
+      { id: "battlefocus", name: "Battle Focus", icon: "atk", s: { atkPct: 0.06 } },
+      { id: "bold", name: "Bold", icon: "skull", s: { bossDmg: 0.15 } },
+      { id: "calm", name: "Calm", icon: "haste", s: { haste: 0.05 } },
+      { id: "sage", name: "Sage", icon: "xp", s: { xp: 0.1, luck: 0.08 } },
+      { id: "watchful", name: "Watchful", icon: "magnet", s: { xp: 0.08, magnet: 0.15 } }
+    ],
+    armor: [
+      { id: "fortress", name: "Fortress", icon: "armor", s: { armor: 0.05 } },
+      { id: "bulwark", name: "Bulwark", icon: "hp", s: { hpPct: 0.15 } },
+      { id: "regrowth", name: "Regrowth", icon: "regen", s: { regen: 0.0035 } },
+      { id: "shell", name: "Shell", icon: "armor", fx: { barrier: 0.08 }, pw: 0.05, text: "A shield worth 8% of your health, that soaks up hits first" },
+      { id: "thorns", name: "Thorns", icon: "burst", fx: { thornBurst: 1 }, pw: 0.05, text: "When you are hit, thorns burst out and hurt the pests around you" },
+      { id: "secondwind", name: "Second Wind", icon: "revive", fx: { revive: 1 }, pw: 0.08, text: "One more Second Wind: get back up once more with half your health" },
+      { id: "bloodplate", name: "Bloodplate", icon: "leech", fx: { leech: 0.003 }, pw: 0.04, text: "Heal 0.3% of your health for every pest you squash" },
+      { id: "heavyplate", name: "Heavy Plate", icon: "hp", s: { hpPct: 0.1, armor: 0.02 } },
+      { id: "toughened", name: "Toughened", icon: "hp", s: { hpPct: 0.08, regen: 0.0015 } },
+      { id: "gilded", name: "Gilded", icon: "coin", s: { gold: 0.15 } },
+      { id: "spiked", name: "Spiked", icon: "area", s: { area: 0.1 } },
+      { id: "warmth", name: "Warmth", icon: "regen", s: { regen: 0.002, armor: 0.02 } },
+      { id: "battleworn", name: "Battle-Worn", icon: "atk", s: { atkPct: 0.06, hpPct: 0.06 } },
+      { id: "padded", name: "Padded", icon: "speed", s: { speed: 0.05, hpPct: 0.05 } }
+    ],
+    boots: [
+      { id: "swiftness", name: "Swiftness", icon: "speed", s: { speed: 0.1 } },
+      { id: "windwalk", name: "Windwalk", icon: "speed", s: { speed: 0.06, haste: 0.04 } },
+      { id: "gatherer", name: "Gatherer", icon: "magnet", s: { magnet: 0.4 } },
+      { id: "luckysteps", name: "Lucky Steps", icon: "luck", s: { luck: 0.12 } },
+      { id: "pathfinder", name: "Pathfinder", icon: "xp", s: { xp: 0.15 } },
+      { id: "treasure", name: "Treasure Hunter", icon: "coin", s: { gold: 0.18 } },
+      { id: "evasion", name: "Evasion", icon: "armor", s: { armor: 0.03 } },
+      { id: "springheel", name: "Springheel", icon: "speed", s: { speed: 0.08, magnet: 0.1 } },
+      { id: "stomp", name: "Stomp", icon: "area", s: { area: 0.1 } },
+      { id: "runnershigh", name: "Runner's High", icon: "regen", s: { regen: 0.0025 } },
+      { id: "fleet", name: "Fleet", icon: "speed", s: { speed: 0.12 } },
+      { id: "hunter", name: "Hunter", icon: "skull", s: { bossDmg: 0.15 } },
+      { id: "trailblazer", name: "Trailblazer", icon: "haste", s: { haste: 0.08 } },
+      { id: "steady", name: "Steady", icon: "hp", s: { hpPct: 0.08 } },
+      { id: "pounce", name: "Pounce", icon: "atk", s: { atkPct: 0.06, speed: 0.04 } }
+    ]
+  };
+  PS.ENCHANTS = [];
+  PS.ENCHANT = {};
+  Object.keys(PS.ENCHANT_POOLS).forEach(function (slot) {
+    PS.ENCHANT_POOLS[slot].forEach(function (e) {
+      e.slot = slot;
+      PS.ENCHANTS.push(e);
+      PS.ENCHANT[e.id] = e;
+    });
+  });
+  /** What an enchantment does, in words. */
+  PS.enchantText = function (e) {
+    return e.text || PS.statsText(e.s || {});
+  };
+  // the Enchantment Chest: one key each, ten at once a little cheaper
+  PS.ENCHANT_KEY = { gems: 60, bulk: { count: 10, discount: 0.9 } };
+
   PS.GIFT = { every: 4 * 60 * 60 * 1000, gems: 10, goldShare: 0.25 };
   /* Daily rewards: one claim per calendar day. Claiming on the day after the
      last claim moves the streak on; missing a day starts it again at day 1.

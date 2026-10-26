@@ -900,7 +900,8 @@ $$;
 /* ------------------------------------------------------------- trading */
 
 /* An offer as the server keeps it: at most 20 items and 6 pets, each with
-   only the fields the game reads, and gold and gems as whole numbers.
+   only the fields the game reads (an item's enchantment too), and gold and
+   gems as whole numbers.
    Anything else in what was sent is dropped; a broken offer is refused. */
 create or replace function public.pip_trade_clean(offer jsonb)
 returns jsonb
@@ -933,7 +934,7 @@ begin
         'id', x ->> 'id',
         'r', least(greatest(floor((x ->> 'r')::numeric), 0), 20)::integer,
         'u', least(greatest(floor((x ->> 'u')::numeric), 0), 1000000000000)::bigint
-      ));
+      ) || case when coalesce(x ->> 'e', '') ~ '^[a-z]{1,16}$' then jsonb_build_object('e', x ->> 'e') else '{}'::jsonb end);
     end loop;
   end if;
   if jsonb_typeof(offer -> 'pets') = 'array' then

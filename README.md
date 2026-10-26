@@ -174,6 +174,30 @@ back to ??? once: each save gets it the next time it loads, and the player is
 told how many pieces changed. Slot levels were kept. It is `LOWER_ID` in
 `js/state.js`; change it to do it again.
 
+**Enchantments.** The Shop's **Enchantment Chest** (60 gems, or 10 for 540)
+holds one **Enchantment Key**, and the key does not say what is in it. Press
+**Enchant** on the Equipment screen to go to the **Enchanting Room**, a dark
+room with its own music: pick any piece of gear (worn or in the bag), press
+**Use a key**, and the key turns and shows its enchantment, which goes on that
+gear. Each kind of gear has its own list, all of one rarity and all as likely
+as each other on that gear:
+
+| Gear | Enchantments |
+| --- | --- |
+| Weapon (14) | Sharpness (+12% attack), Vigour (+12% health), Keen Eye (+5% crit chance), Brutality (+30% crit damage), Quickness (+10% attack speed), Featherfoot (+8% move speed), Warding (+4% damage reduction), Mending (+0.3% health a second), Attraction (+25% pickup range), Greed (+15% gold), Insight (+15% XP), Fortune's Kiss (+10% luck), Expanse (+12% attack size), Giantbane (+20% boss damage) |
+| Ring (15) | Focus, Cruelty, Swift Hands, Lucky Charm, Midas Touch, Scholar's Loop, Might, Twin Edge, Long Reach, Kingsbane, Life Drain (heal per pest squashed), Fortune and Glory, Lodestone, Tempo, Starlit: crit, attack speed, luck, gold and XP |
+| Amulet (14) | Lifebloom, Renewal, Aegis (a shield of 6% of your health), Wisdom, Clover, Arcane Power, Spark, Talisman, Coin Charm, Magnetism, Clarity, Vampire's Kiss (heal per pest squashed), Titan's Pendant, Soulbound |
+| Helmet (14) | Ironclad, Hardy, Clear Mind, Hawk Sight, Soothing, Halo (a 6% shield), Crowned, Stout, Four-Leaf, Battle Focus, Bold, Calm, Sage, Watchful: health, damage reduction, XP and sight, no crit |
+| Armour (14) | Fortress, Bulwark, Regrowth, Shell (an 8% shield), Thorns (hit back when hit), Second Wind (one more get-up), Bloodplate (heal per pest squashed), Heavy Plate, Toughened, Gilded, Spiked, Warmth, Battle-Worn, Padded: toughness, no crit |
+| Boots (15) | Swiftness, Windwalk, Gatherer, Lucky Steps, Pathfinder, Treasure Hunter, Evasion, Springheel, Stomp, Runner's High, Fleet, Hunter, Trailblazer, Steady, Pounce: speed, pickups, luck and XP |
+
+The room shows the list for the gear picked. One per piece of gear: a new one takes the place of the old.
+It counts while the gear is worn, stays on it when it is forged up (gear melted
+down in a forge loses its own, and Quick forge's "keep safe" never melts an
+enchanted piece), and goes with it in a trade (that needs the newer
+`supabase/setup.sql`; an older server drops it). The lists are `PS.ENCHANT_POOLS` in
+`js/data.js`. Admins can add keys in the admin menu, Money tab.
+
 **Selling.** Open an item you are not wearing and press **Sell** (it asks once
 more). Only valuable gear sells, and the two prices add up:
 

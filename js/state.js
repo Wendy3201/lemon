@@ -28,6 +28,7 @@
       gold: PS.START.gold,
       gems: PS.START.gems,
       shards: 0, // SS shards from Gilded Chests
+      keys: 0, // Enchantment Keys, waiting to be used at the enchanting table
       ascend: 0, // how many times the talents have been ascended
       pets: [], // { u, sp, r, lv }
       petSlots: PS.PET_SLOTS.start, // how many pets can come along
@@ -54,7 +55,7 @@
       stats: {
         kills: 0, runs: 0, wins: 0, forges: 0, chests: 0, upgrades: 0, talents: 0,
         bestLevel: 0, bestPower: 0, maxRarity: 0, grade: 0, time: 0, earned: 0, eggs: 0, bestCombo: 0, duels: 0, duelsPlayed: 0,
-        trades: 0
+        trades: 0, keys: 0, enchants: 0
       }
     };
     PS.SLOTS.forEach(function (slot) {
@@ -85,6 +86,7 @@
     save.gold = Math.floor(num(raw.gold, 0));
     save.gems = Math.floor(num(raw.gems, 0));
     save.shards = Math.floor(num(raw.shards, 0));
+    save.keys = Math.floor(num(raw.keys, 0, 0, 1e9));
     save.ascend = Math.floor(num(raw.ascend, 0, 0, PS.TALENT_TIERS - 1));
     save.best = Math.floor(num(raw.best, 0, 0, PS.BAL.CHAPTERS));
     save.chapter = Math.floor(num(raw.chapter, 1, 1, Math.min(PS.BAL.CHAPTERS, save.best + 1)));
@@ -99,6 +101,7 @@
       seen[u] = true;
       var clean = { u: u, id: item.id, r: Math.floor(num(item.r, 0, 0, PS.MAX_RARITY)) };
       if (item.n) clean.n = 1;
+      if (typeof item.e === "string" && PS.ENCHANT[item.e]) clean.e = item.e;
       save.items.push(clean);
       if (u >= save.uid) save.uid = u + 1;
     });
@@ -468,6 +471,11 @@
         applyBlock(perk, t, fx);
         bonus += perk.pw;
       });
+      // its enchantment, if it has one
+      if (item.e && PS.ENCHANT[item.e]) {
+        applyBlock(PS.ENCHANT[item.e], t, fx);
+        bonus += PS.ENCHANT[item.e].pw || 0;
+      }
     });
 
     PS.TALENTS.forEach(function (talent) {
@@ -624,14 +632,14 @@
      forge in the same pass. In each group of the same slot and rarity, the worn
      item is the one that rises (otherwise the best one that can be forged), and the
      cheapest ones are used up; an S or SS-grade item only rises on two of its own
-     grade. With `keep`, Epic or rarer and S / SS-grade items are never used up. */
+     grade. With `keep`, Epic or rarer, S / SS-grade and enchanted items are never used up. */
 
   function quickPlan(keep) {
     var items = S.items.map(function (item) {
       var def = defOf(item);
-      return { u: item.u, id: item.id, r: item.r, slot: def.slot, rank: GRADE_RANK[def.grade], base: def.base, eq: isEquipped(item), gone: false, made: false };
+      return { u: item.u, id: item.id, r: item.r, slot: def.slot, rank: GRADE_RANK[def.grade], base: def.base, eq: isEquipped(item), e: Boolean(item.e), gone: false, made: false };
     });
-    function valuable(it) { return it.r >= 3 || it.rank > 0; }
+    function valuable(it) { return it.r >= 3 || it.rank > 0 || it.e; }
     function worth(it) { return it.rank * 1000 + it.base; }
     var steps = [];
     var usedUp = [];
@@ -712,6 +720,42 @@
     S.stats.forges++;
     commit();
     return main;
+  }
+
+  /* ---------------------------------------------------------- enchanting */
+
+  /** What `count` Enchantment Chests cost, in gems. */
+  function keyCost(count) {
+    var cost = PS.ENCHANT_KEY.gems * count;
+    return count >= PS.ENCHANT_KEY.bulk.count ? Math.round(cost * PS.ENCHANT_KEY.bulk.discount) : cost;
+  }
+
+  /** Open Enchantment Chests: one key in each. Returns how many keys came (0: not enough gems). */
+  function buyKeys(count) {
+    count = Math.max(1, Math.floor(count || 1));
+    var cost = keyCost(count);
+    if (S.gems < cost) return 0;
+    S.gems -= cost;
+    S.keys += count;
+    S.stats.keys += count;
+    commit();
+    return count;
+  }
+
+  /** Use a key on a piece of gear: one of the enchantments for that kind of gear,
+   *  each as likely as the next, goes on it in place of the one it had. Returns
+   *  { item, ench, old } or null (no key, or no such item). */
+  function enchant(u) {
+    var item = byUid(u);
+    if (!item || S.keys < 1) return null;
+    var old = item.e && PS.ENCHANT[item.e] ? PS.ENCHANT[item.e] : null;
+    var pool = PS.ENCHANT_POOLS[defOf(item).slot];
+    var ench = pool[Math.floor(Math.random() * pool.length)];
+    S.keys--;
+    item.e = ench.id;
+    S.stats.enchants++;
+    commit();
+    return { item: item, ench: ench, old: old };
   }
 
   /* -------------------------------------------------------------- talents */
@@ -1555,7 +1599,9 @@
         out.skipped++;
         return;
       }
-      out.items.push(add(x.id, Math.floor(num(x.r, 0, 0, PS.MAX_RARITY))));
+      var got = add(x.id, Math.floor(num(x.r, 0, 0, PS.MAX_RARITY)));
+      if (typeof x.e === "string" && PS.ENCHANT[x.e]) got.e = x.e; // an enchantment goes with the item
+      out.items.push(got);
     });
     (Array.isArray(get.pets) ? get.pets : []).forEach(function (x) {
       if (!x || !PS.PET[x.sp] || !PS.PET_RARITY[x.r]) {
@@ -1666,6 +1712,14 @@
     upgrade: upgrade,
     // forge
     forgeMaterials: forgeMaterials,
+    keyCost: keyCost,
+    buyKeys: buyKeys,
+    enchant: enchant,
+    devAddKeys: function (n) {
+      S.keys = Math.max(0, Math.min(1e9, S.keys + Math.floor(n || 0)));
+      commit();
+      return S.keys;
+    },
     takeLowered: takeLowered,
     canForge: canForge,
     forgeAvailable: forgeAvailable,

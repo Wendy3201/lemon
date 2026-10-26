@@ -74,6 +74,7 @@
       (opts.disabled ? " disabled" : "") +
       ' title="' + esc(PS.RARITY[item.r].name + " " + def.name) + '">' +
       '<span class="tile__art">' + PS.itemIcon(item.id) + "</span>" + gradeTag(def) +
+      (item.e && PS.ENCHANT[item.e] ? '<span class="tile__ench" title="Enchanted: ' + esc(PS.ENCHANT[item.e].name) + '">✦</span>' : "") +
       (opts.mark ? '<span class="tile__mark">' + opts.mark + "</span>" : "") +
       "</" + tag + ">"
     );
@@ -397,6 +398,7 @@
         '<div class="slot__text">' +
           '<strong class="rname r' + item.r + '">' + esc(st.def(item).name) + "</strong>" +
           "<span>" + PS.STATS[slot.stat].name + " " + PS.fmtStat(st.mainStat(item.id, item.r, level)) + " · Lv " + level + "/" + cap + "</span>" +
+          (item.e && PS.ENCHANT[item.e] ? '<span class="slot__ench">✦ ' + esc(PS.ENCHANT[item.e].name) + "</span>" : "") +
         "</div>" +
         '<button class="btn btn--sm slot__up" type="button" data-act="upgrade" data-slot="' + slot.key + '" data-key="up-' + slot.key + '"' + (info.ok ? "" : " disabled") +
           ' title="' + (info.ok ? "Level up this slot" : info.reason) + '">' +
@@ -438,6 +440,7 @@
               '<button class="btn btn--sm' + (st.bookInfo().ready ? " has-badge" : "") + '" type="button" data-act="book" data-key="book">' + PS.icon("book") + "Collection</button>" +
               '<button class="btn btn--sm" type="button" data-act="forge-quick" data-key="forge-quick">' + PS.icon("bolt") + "Quick forge</button>" +
               '<button class="btn btn--sm btn--primary' + (canForge ? " has-badge" : "") + '" type="button" data-act="forge-open" data-key="forge-open">' + PS.icon("forge") + "Forge</button>" +
+              '<button class="btn btn--sm btn--enchant' + (S.keys ? " has-badge" : "") + '" type="button" data-act="enchant-open" data-key="enchant-open">' + PS.icon("critDmg") + "Enchant" + (S.keys ? ' <span class="count">' + fmt(S.keys) + "</span>" : "") + "</button>" +
             "</div>" +
           "</div>" +
           '<div class="chipstats">' + statChips(stats) + "</div>" +
@@ -463,7 +466,7 @@
    *  Epic or rarer, or S / SS grade. */
   function costlyMats(forge) {
     return forge.mats.map(function (u) { return st.item(u); }).filter(function (item) {
-      return item && (item.r >= 3 || st.def(item).grade !== "A");
+      return item && (item.r >= 3 || st.def(item).grade !== "A" || item.e);
     });
   }
 
@@ -716,6 +719,9 @@
           '<button class="btn btn--primary" type="button" data-act="craft" data-key="craft"' + (S.shards >= PS.SHARDS.needed ? "" : " disabled") + ">Craft</button>" +
         "</div>" +
 
+        '<h2 class="section">Enchantments</h2>' +
+        enchantChestCard() +
+
         '<h2 class="section">Pet eggs</h2>' +
         eggCard() +
 
@@ -751,6 +757,199 @@
       "</section>"
     );
   };
+
+  /** The shop's Enchantment Chest: one Enchantment Key in each, its enchantment a secret. */
+  function enchantChestCard() {
+    var S = st.get();
+    var one = st.keyCost(1);
+    var ten = st.keyCost(PS.ENCHANT_KEY.bulk.count);
+    return (
+      '<div class="panel chest chest--rune">' +
+        '<div class="chest__art">' + PS.art("runechest") + "</div>" +
+        '<div class="chest__body">' +
+          "<h3>Enchantment Chest</h3>" +
+          "<p>Holds one <b>Enchantment Key</b>. Which enchantment is in a key stays a secret until you use it on a piece of gear at the enchanting table (Equipment, then <b>Enchant</b>). Each kind of gear has its own enchantments, 14 or 15 of them, all as likely as each other.</p>" +
+          '<p class="pity">You have ' + fmt(S.keys) + " key" + (S.keys === 1 ? "" : "s") + "</p>" +
+          '<div class="chest__buy">' +
+            '<button class="btn btn--primary" type="button" data-act="keys" data-count="1" data-key="keys-1"' + (S.gems >= one ? "" : " disabled") + ">Open " + price("gems", one) + "</button>" +
+            '<button class="btn" type="button" data-act="keys" data-count="' + PS.ENCHANT_KEY.bulk.count + '" data-key="keys-10"' + (S.gems >= ten ? "" : " disabled") + ">Open " + PS.ENCHANT_KEY.bulk.count + " " + price("gems", ten) + "</button>" +
+          "</div>" +
+        "</div>" +
+      "</div>"
+    );
+  }
+
+  /* ---------------------------------------------------- the enchanting room */
+  /* Equipment > Enchant: a dark room of its own, with its own music. Pick a
+     piece of gear and use an Enchantment Key on it: the key's enchantment
+     shows itself and goes on the gear, in place of any it had. */
+
+  var ench = { u: 0, bag: false, shown: 48, casting: false, result: null };
+  var enchBox = null;
+  var CAST_MS = 1500; // the key turning, before the enchantment shows
+
+  function enchantMount() {
+    if (enchBox) return;
+    enchBox = document.createElement("div");
+    enchBox.className = "enchant";
+    enchBox.hidden = true;
+    enchBox.setAttribute("role", "dialog");
+    enchBox.setAttribute("aria-modal", "true");
+    enchBox.setAttribute("aria-labelledby", "en-title");
+    document.body.appendChild(enchBox);
+    enchBox.addEventListener("click", function (e) {
+      var node = e.target.closest("[data-en]");
+      if (!node || node.disabled) return;
+      PS.sfx.play("click");
+      enchantPress(node.getAttribute("data-en"), node);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (enchBox.hidden || e.key !== "Escape") return;
+      e.preventDefault();
+      enchantClose();
+    });
+  }
+
+  function enchantOpen() {
+    enchantMount();
+    closeModal();
+    ench.result = null;
+    ench.casting = false;
+    ench.shown = 48;
+    if (!ench.u || !st.item(ench.u)) {
+      var weapon = st.equipped("weapon");
+      ench.u = weapon ? weapon.u : 0;
+    }
+    enchBox.hidden = false;
+    paintEnchant();
+    PS.music.play("enchant");
+    PS.sfx.play("shrine");
+    var first = enchBox.querySelector('[data-en="go"]') || enchBox.querySelector("[data-en]");
+    if (first) first.focus();
+  }
+
+  function enchantClose() {
+    if (!enchBox || enchBox.hidden || ench.casting) return;
+    enchBox.hidden = true;
+    PS.music.play("camp");
+    render();
+  }
+
+  function paintEnchant() {
+    var S = st.get();
+    var item = ench.u ? st.item(ench.u) : null;
+    var def = item ? st.def(item) : null;
+    var has = item && item.e ? PS.ENCHANT[item.e] : null;
+    var worn = PS.SLOTS.map(function (slot) { return st.equipped(slot.key); }).filter(Boolean);
+    var bag = st.sorted(S.items.filter(function (it) { return !st.isEquipped(it); }));
+    var result = ench.result;
+    var pool = PS.ENCHANT_POOLS[item ? def.slot : "weapon"];
+    function pick(it) {
+      var e = it.e ? PS.ENCHANT[it.e] : null;
+      return '<button class="enchant__item' + (it.u === ench.u ? " is-on" : "") + '" type="button" data-en="pick" data-u="' + it.u + '" aria-pressed="' + (it.u === ench.u) + '"' + (ench.casting ? " disabled" : "") + ">" +
+        tile(it, { plain: true, cls: "tile--mini" }) +
+        '<span><b class="rname r' + it.r + '">' + esc(st.def(it).name) + "</b><small>" + (e ? "✦ " + esc(e.name) : "No enchantment") + "</small></span></button>";
+    }
+    var motes = "";
+    for (var i = 0; i < 16; i++) motes += '<i style="--x:' + ((i * 37) % 100) + "%;--d:" + (6 + (i % 5) * 1.7) + "s;--w:" + (i % 4) * 0.9 + 's"></i>';
+    enchBox.innerHTML =
+      '<div class="enchant__motes" aria-hidden="true">' + motes + "</div>" +
+      '<div class="enchant__room">' +
+        '<header class="enchant__head"><div><p class="kicker">Equipment</p><h2 id="en-title">The Enchanting Room</h2></div>' +
+          '<button class="btn btn--sm" type="button" data-en="close"' + (ench.casting ? " disabled" : "") + ">" + PS.icon("left") + "Back to equipment</button></header>" +
+        '<div class="enchant__main">' +
+          '<section class="enchant__table' + (ench.casting ? " is-casting" : "") + (result ? " is-done" : "") + '">' +
+            '<div class="enchant__altar">' +
+              '<div class="enchant__circle" aria-hidden="true"></div>' +
+              (item ? '<div class="enchant__gear">' + tile(item, { plain: true, cls: "tile--big" }) + "</div>" : '<p class="enchant__empty">Choose a piece of gear</p>') +
+              '<div class="enchant__key" aria-hidden="true">' + PS.art("enchkey") + "</div>" +
+            "</div>" +
+            (item
+              ? '<p class="enchant__what"><b class="rname r' + item.r + '">' + esc(def.name) + "</b> " +
+                  (has ? 'has <b class="enchant__name">✦ ' + esc(has.name) + "</b> (" + esc(PS.enchantText(has)) + ")" : "has no enchantment yet") + "</p>"
+              : "") +
+            (result
+              ? '<div class="enchant__result" role="status"><p class="kicker">The key held</p><h3>✦ ' + esc(result.ench.name) + "</h3>" +
+                  "<p>" + esc(PS.enchantText(result.ench)) + " while it is worn</p>" +
+                  (result.old ? '<p class="hint">It took the place of ' + esc(result.old.name) + ".</p>" : "") + "</div>"
+              : "") +
+            '<p class="enchant__keys"><span class="enchant__keyart" aria-hidden="true">' + PS.art("enchkey") + "</span>Enchantment Keys: <b>" + fmt(S.keys) + "</b></p>" +
+            (S.keys
+              ? '<button class="btn btn--primary btn--xl enchant__go" type="button" data-en="go"' + (item && !ench.casting ? "" : " disabled") + ">" +
+                  (ench.casting ? "The key is turning..." : "Use a key" + (has ? " · replaces " + esc(has.name) : "")) + "</button>"
+              : '<p class="hint">You have no Enchantment Keys. They come from the Enchantment Chest in the Shop.</p>' +
+                '<button class="btn btn--primary" type="button" data-en="shop">Go to the Shop</button>') +
+          "</section>" +
+          '<section class="enchant__pick">' +
+            "<h3>Choose a piece of gear</h3>" +
+            '<p class="enchant__label">What you are wearing</p>' +
+            '<div class="enchant__items">' + worn.map(pick).join("") + "</div>" +
+            (ench.bag
+              ? '<p class="enchant__label">In your bag</p>' +
+                (bag.length
+                  ? '<div class="enchant__items">' + bag.slice(0, ench.shown).map(pick).join("") + "</div>" +
+                    (bag.length > ench.shown ? '<button class="btn btn--sm" type="button" data-en="more">Show more (' + fmt(bag.length - ench.shown) + " left)</button>" : "")
+                  : '<p class="hint">Nothing else in your bag.</p>')
+              : '<button class="btn btn--sm" type="button" data-en="bag">Show what is in your bag (' + fmt(bag.length) + ")</button>") +
+          "</section>" +
+        "</div>" +
+        '<section class="enchant__list"><h3>What a key can hold on ' + ({ weapon: "a weapon", ring: "a ring", amulet: "an amulet", helmet: "a helmet", armor: "armour", boots: "boots" })[item ? def.slot : "weapon"] +
+          " <small>(each one as likely as the next: 1 in " + pool.length + ")</small></h3>" +
+          '<div class="enchant__chips">' + pool.map(function (e) {
+            return '<span class="enchant__chip">' + PS.icon(e.icon) + "<b>" + esc(e.name) + "</b><small>" + esc(PS.enchantText(e)) + "</small></span>";
+          }).join("") + "</div>" +
+          '<p class="hint">Each kind of gear has its own enchantments: pick other gear to see its list. One enchantment on each piece; a new one takes the place of the old. It works while the gear is worn and stays on it when it is forged up (gear melted down in a forge loses its own). It goes with the gear in a trade.</p>' +
+        "</section>" +
+      "</div>";
+  }
+
+  function enchantPress(act, node) {
+    if (act === "close") enchantClose();
+    else if (act === "pick") {
+      ench.u = Number(node.getAttribute("data-u"));
+      ench.result = null;
+      paintEnchant();
+    } else if (act === "bag") {
+      ench.bag = true;
+      paintEnchant();
+    } else if (act === "more") {
+      ench.shown += 48;
+      paintEnchant();
+    } else if (act === "shop") {
+      enchantClose();
+      go("shop");
+    } else if (act === "go") {
+      if (ench.casting || !ench.u || !st.item(ench.u) || st.get().keys < 1) return;
+      ench.casting = true;
+      ench.result = null;
+      paintEnchant();
+      PS.sfx.play("forge");
+      setTimeout(function () {
+        var res = st.enchant(ench.u);
+        ench.casting = false;
+        ench.result = res;
+        if (res) PS.sfx.play("reveal", 5);
+        if (enchBox && !enchBox.hidden) paintEnchant();
+      }, CAST_MS);
+    }
+  }
+
+  /** "You got 10 Enchantment Keys", after opening chests. */
+  function keysModal(modal) {
+    var S = st.get();
+    return (
+      '<div class="loot loot--reveal">' +
+        '<div class="loot__flash r9"></div><div class="loot__box">' + PS.art("enchkey") + "</div>" +
+        '<h2 id="modal-title">' + (modal.n === 1 ? "An Enchantment Key!" : fmt(modal.n) + " Enchantment Keys!") + "</h2>" +
+        '<p class="hint">What is inside ' + (modal.n === 1 ? "it" : "each one") + " is a secret until you use " + (modal.n === 1 ? "it" : "them") +
+          " at the enchanting table. You have " + fmt(S.keys) + " now.</p>" +
+        '<div class="modal__actions">' +
+          '<button class="btn" type="button" data-act="close">Later</button>' +
+          '<button class="btn btn--primary" type="button" data-act="enchant-open" data-key="m-ok" autofocus>' + PS.icon("critDmg") + "Enchant now</button>" +
+        "</div>" +
+      "</div>"
+    );
+  }
 
   /* -------------------------------------------------------------- casino */
 
@@ -1351,6 +1550,9 @@
             (delta ? '<p class="delta delta--' + (delta > 0 ? "up" : "down") + '">' + PS.icon("power") + (delta > 0 ? "+" : "−") + fmt(Math.abs(delta)) + " power if you equip it</p>" : "") +
           "</div>" +
         "</div>" +
+        (item.e && PS.ENCHANT[item.e]
+          ? '<p class="itemsheet__ench"><b>✦ ' + esc(PS.ENCHANT[item.e].name) + "</b> " + esc(PS.enchantText(PS.ENCHANT[item.e])) + " while worn</p>"
+          : "") +
         '<p class="itemsheet__blurb">' + esc(def.blurb) + "</p>" +
         '<ul class="perks">' + perkList(item) + "</ul>" +
         '<div class="itemsheet__actions">' +
@@ -1533,6 +1735,7 @@
             "<li>Battles drop gear up to " + rarityName(PS.MAX_DROP_RARITY) + " (past chapter 100, up to " + rarityName(5) + ", then " + rarityName(6) + " from 151 and " + rarityName(7) + " from 201). Anything rarer comes from the <b>Forge</b>: put in three items of the same slot and rarity, and the one you keep goes up a rarity. Past " + rarityName(7) + " are " + rarityName(8) + ", " + rarityName(9) + " and " + rarityName(10) + ", which take slot levels past 80. <b>Quick forge</b> does every forge it can at once.</li>" +
             "<li>Spend gold to <b>level up</b> each slot. An item's rarity caps how high its slot's level counts.</li>" +
             "<li>Some items are <b>S</b> or <b>SS grade</b>: stronger at every rarity. Forging one takes two more of the same grade.</li>" +
+            "<li><b>Enchantments</b>: an Enchantment Key from the Shop's Enchantment Chest puts a random enchantment on any piece of gear, at Equipment, then <b>Enchant</b>. Each kind of gear has its own list (14 or 15, all as likely). It works while the gear is worn.</li>" +
             "<li>The <b>Collection</b> button on the Equipment screen keeps every different item you have ever owned. Find more of them for gems: the first reward comes at " + PS.BOOK[0].at + " items.</li>" +
             "<li><b>Power</b> sums up how strong you are. Each chapter shows a recommended Power; below it, the chapter will be tough.</li>" +
           "</ul>") +
@@ -1937,6 +2140,15 @@
           devButton("dev-add", "+100K gems", ' data-gold="0" data-gems="100000"') +
           devButton("dev-add", "+10M gems", ' data-gold="0" data-gems="10000000"')
         )
+      ) +
+      devCard("Enchantment Keys",
+        devRow(
+          devButton("dev-keys", "+1 key", ' data-n="1"') +
+          devButton("dev-keys", "+10 keys", ' data-n="10"') +
+          devButton("dev-keys", "+100 keys", ' data-n="100"') +
+          devButton("dev-keys", "Take them all", ' data-n="-1000000000"')
+        ),
+        [["Keys", fmt(S.keys)], ["Enchantments made", fmt(S.stats.enchants || 0)]]
       ) +
       devCard("SS shards",
         '<div class="dev__give">' + devNumber("dev-shards", "SS shards", S.shards, 0) + devButton("dev-shards-set", "Set") + "</div>" +
@@ -2621,6 +2833,7 @@
     else if (modal.type === "quick") html = quickModal(modal);
     else if (modal.type === "notice") html = noticeModal();
     else if (modal.type === "lowered") html = loweredModal(modal);
+    else if (modal.type === "keys") html = keysModal(modal);
     else if (modal.type === "womp") html = wompModal();
     else if (modal.type === "hatch") html = hatchModal(modal);
     else if (modal.type === "chestinfo") html = chestInfoModal(modal);
@@ -5057,6 +5270,22 @@
 
   var ACTIONS = {
     tab: function (node) { go(node.getAttribute("data-tab")); },
+    "enchant-open": function () { enchantOpen(); },
+    keys: function (node) {
+      var n = st.buyKeys(Number(node.getAttribute("data-count")) || 1);
+      if (!n) {
+        PS.sfx.play("deny");
+        toast("Not enough gems");
+        return;
+      }
+      PS.sfx.play("chestOpen");
+      openModal({ type: "keys", n: n });
+    },
+    "dev-keys": function (node) {
+      var have = st.devAddKeys(Number(node.getAttribute("data-n")) || 0);
+      toast("Enchantment Keys: " + fmt(have));
+      renderModal();
+    },
     close: function () { closeModal(); },
     settings: function () { openModal({ type: "settings", armed: false }); },
     "rename-open": function () {

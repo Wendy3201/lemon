@@ -1,11 +1,12 @@
 /*!
  * Pip Survivors — music
- * Three songs, written as patterns and played by a small synthesiser made
+ * Four songs, written as patterns and played by a small synthesiser made
  * with the Web Audio API, so there are no music files either:
  *
- *   camp    the menus: slow and warm, soft keys over a lazy beat
- *   battle  a battle: quick and bright, driving bass and arpeggios
- *   boss    the boss: dark and heavy, in a minor key with brass stabs
+ *   camp     the menus: slow and warm, soft keys over a lazy beat
+ *   battle   a battle: quick and bright, driving bass and arpeggios
+ *   boss     the boss: dark and heavy, in a minor key with brass stabs
+ *   enchant  the enchanting room: slow, dark and glassy, in harmonic minor
  *
  *   PS.music.play("battle")   switches song (a short cross-fade)
  *   PS.music.duck(true)       quieter while the game is paused
@@ -198,6 +199,16 @@
       bass: "bass", bassRhythm: "xxxxxxxxxxxxxxxx",
       chordPart: "stab", stabRhythm: "x..x..x...x..x..", arp: "pluck", arpRhythm: "x.x.x.x.x.x.x.x.", arpOctave: 24,
       lead: "lead", leadRhythm: "x...x.x.x...x...", leadOctave: 12
+    },
+    enchant: {
+      bpm: 66, swing: 0.1, master: 0.85,
+      // Am - Fmaj7 - Dm - E (the E major pulls back to A minor, a little uneasy)
+      chords: [[57, 60, 64], [53, 57, 60, 64], [50, 53, 57], [52, 56, 59]],
+      scale: [0, 2, 3, 5, 7, 8, 11], root: 57,
+      drums: { soft: "x.........x.....", rim: "........x.......", hat: "....o.......o..o" },
+      bass: "softBass", bassRhythm: "x.......x.......",
+      chordPart: "pad", arp: "keys", arpRhythm: "x..x..x...x..x..", arpOctave: 12,
+      lead: "flute", leadRhythm: "x.......x...x...", leadOctave: 12
     }
   };
 

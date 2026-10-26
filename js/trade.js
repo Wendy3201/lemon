@@ -70,7 +70,9 @@
     o = o && typeof o === "object" ? o : {};
     return {
       items: (Array.isArray(o.items) ? o.items : []).filter(function (x) { return x && typeof x.id === "string"; }).slice(0, MAX_ITEMS).map(function (x) {
-        return { id: x.id, r: whole(x.r, 20), u: whole(x.u, 1e12) };
+        var out = { id: x.id, r: whole(x.r, 20), u: whole(x.u, 1e12) };
+        if (typeof x.e === "string" && PS.ENCHANT[x.e]) out.e = x.e; // its enchantment goes with it
+        return out;
       }),
       pets: (Array.isArray(o.pets) ? o.pets : []).filter(function (x) { return x && typeof x.sp === "string"; }).slice(0, MAX_PETS).map(function (x) {
         return { sp: x.sp, r: whole(x.r, 20), lv: Math.max(1, whole(x.lv, 1000)), u: whole(x.u, 1e12) };
@@ -630,7 +632,7 @@
       if (item && !PS.state.isEquipped(item)) {
         edit(function (d) {
           if (d.items.length >= MAX_ITEMS) return false;
-          d.items.push({ id: item.id, r: item.r, u: item.u });
+          d.items.push(item.e ? { id: item.id, r: item.r, u: item.u, e: item.e } : { id: item.id, r: item.r, u: item.u });
         });
       }
     } else if (act === "add-pet") {

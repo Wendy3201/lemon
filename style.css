@@ -10394,3 +10394,456 @@ html.chaos-oldfilm body {
 .devbox .abuse__packs {
   margin-top: 10px;
 }
+
+/* ------------------------------------------------------------ the enchanting room */
+.enchant {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  overflow-y: auto;
+  background: radial-gradient(1200px 700px at 50% 25%, #2a1d52 0%, #140d2b 55%, #07050f 100%);
+  color: #e9e2ff;
+}
+
+.enchant[hidden] {
+  display: none;
+}
+
+/* sparks drifting up through the dark */
+.enchant__motes {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.enchant__motes i {
+  position: absolute;
+  bottom: -10px;
+  left: var(--x);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #c6a6ff;
+  box-shadow: 0 0 10px 3px rgba(180, 140, 255, 0.7);
+  opacity: 0;
+  animation: enchant-rise var(--d) linear var(--w) infinite;
+}
+
+@keyframes enchant-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  15% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(30px, -105vh);
+  }
+}
+
+.enchant__room {
+  position: relative;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 22px 16px 40px;
+}
+
+.enchant__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.enchant__head h2 {
+  margin: 0;
+  color: #f3e9ff;
+  font-family: var(--font-display);
+  font-size: 30px;
+  text-shadow: 0 0 18px rgba(170, 120, 255, 0.6);
+}
+
+.enchant .kicker {
+  color: #b9a6e8;
+}
+
+.enchant .hint {
+  color: #b9a6e8;
+}
+
+.enchant .rname {
+  color: color-mix(in srgb, var(--rar) 75%, #fff);
+}
+
+.enchant__main {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(280px, 1.1fr);
+  gap: 18px;
+}
+
+@media (max-width: 760px) {
+  .enchant__main {
+    grid-template-columns: 1fr;
+  }
+}
+
+.enchant__table,
+.enchant__pick,
+.enchant__list {
+  padding: 18px;
+  border: 1px solid rgba(190, 160, 255, 0.25);
+  border-radius: 22px;
+  background: rgba(30, 20, 60, 0.65);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+
+.enchant__table {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+/* the table: a magic circle, the gear on it, and the key beside it */
+.enchant__altar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 220px;
+  height: 220px;
+}
+
+.enchant__circle {
+  position: absolute;
+  inset: 0;
+  border: 2px dashed rgba(200, 170, 255, 0.5);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(140, 90, 255, 0.25), transparent 65%);
+  box-shadow: 0 0 40px rgba(150, 100, 255, 0.35), inset 0 0 40px rgba(150, 100, 255, 0.25);
+  animation: enchant-turn 30s linear infinite;
+}
+
+.enchant__circle::before {
+  content: "";
+  position: absolute;
+  inset: 18px;
+  border: 1px solid rgba(200, 170, 255, 0.35);
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(200, 170, 255, 0.35) 0deg 4deg, transparent 4deg 30deg);
+  mask: radial-gradient(circle, transparent 58%, #000 60%, #000 66%, transparent 68%);
+}
+
+.enchant__gear {
+  position: relative;
+  width: 110px;
+}
+
+.enchant__gear .tile {
+  width: 110px;
+}
+
+.enchant__empty {
+  color: #b9a6e8;
+  font-weight: 800;
+}
+
+.enchant__key {
+  position: absolute;
+  right: -6px;
+  bottom: 8px;
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0 0 10px rgba(255, 215, 120, 0.6));
+  transition: transform 0.4s ease;
+}
+
+.enchant__key svg,
+.enchant__keyart svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.enchant__table.is-casting .enchant__circle {
+  animation-duration: 1.2s;
+  box-shadow: 0 0 70px rgba(190, 140, 255, 0.8), inset 0 0 60px rgba(190, 140, 255, 0.6);
+}
+
+.enchant__table.is-casting .enchant__key {
+  transform: translate(-58px, -62px) rotate(90deg) scale(0.8);
+  animation: enchant-shake 0.15s linear infinite;
+}
+
+.enchant__table.is-casting .enchant__gear {
+  animation: enchant-glow 0.5s ease-in-out infinite alternate;
+}
+
+.enchant__table.is-done .enchant__gear {
+  animation: enchant-burst 0.8s ease-out both;
+}
+
+@keyframes enchant-turn {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes enchant-shake {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 2px -1px;
+  }
+}
+
+@keyframes enchant-glow {
+  from {
+    filter: drop-shadow(0 0 6px #b48cff);
+  }
+  to {
+    filter: drop-shadow(0 0 26px #e6d6ff) brightness(1.3);
+  }
+}
+
+@keyframes enchant-burst {
+  0% {
+    filter: drop-shadow(0 0 40px #fff) brightness(2);
+    scale: 1.15;
+  }
+  100% {
+    filter: drop-shadow(0 0 12px #b48cff);
+    scale: 1;
+  }
+}
+
+.enchant__what {
+  margin: 4px 0 0;
+  color: #d9ceff;
+}
+
+.enchant__name {
+  color: #e6c8ff;
+}
+
+.enchant__result {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(220, 200, 255, 0.5);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(180, 140, 255, 0.35), rgba(90, 60, 180, 0.35));
+  animation: enchant-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.enchant__result h3 {
+  margin: 2px 0;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 26px;
+  text-shadow: 0 0 14px rgba(200, 160, 255, 0.9);
+}
+
+.enchant__result p {
+  margin: 0;
+}
+
+@keyframes enchant-pop {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+.enchant__keys {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  font-weight: 800;
+}
+
+.enchant__keyart {
+  width: 30px;
+  height: 30px;
+}
+
+.btn.enchant__go {
+  min-width: 240px;
+  border-color: #5b3fd6;
+  background: linear-gradient(180deg, #b48cff, #7b5cff);
+  box-shadow: 0 0 24px rgba(150, 110, 255, 0.6);
+  color: #fff;
+}
+
+.enchant__pick h3,
+.enchant__list h3 {
+  margin: 0 0 8px;
+  color: #f3e9ff;
+  font-family: var(--font-display);
+  font-size: 20px;
+}
+
+.enchant__list h3 small {
+  color: #b9a6e8;
+  font-family: var(--font);
+  font-size: 13px;
+}
+
+.enchant__label {
+  margin: 10px 0 6px;
+  color: #a995dd;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.enchant__items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.enchant__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid rgba(190, 160, 255, 0.2);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.enchant__item:hover:not(:disabled) {
+  border-color: rgba(210, 185, 255, 0.6);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.enchant__item.is-on {
+  border-color: #c6a6ff;
+  background: rgba(160, 120, 255, 0.22);
+  box-shadow: 0 0 0 2px rgba(198, 166, 255, 0.4);
+}
+
+.enchant__item .tile {
+  flex: none;
+  width: 44px;
+}
+
+.enchant__item span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.enchant__item b {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.enchant__item small {
+  color: #b9a6e8;
+  font-size: 12px;
+}
+
+.enchant__list {
+  margin-top: 18px;
+}
+
+.enchant__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.enchant__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid rgba(190, 160, 255, 0.25);
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+}
+
+.enchant__chip .ico {
+  width: 16px;
+  height: 16px;
+  color: #c6a6ff;
+}
+
+.enchant__chip small {
+  color: #b9a6e8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enchant__motes,
+  .enchant__circle {
+    animation: none;
+  }
+  .enchant__motes i {
+    animation: none;
+  }
+}
+
+/* enchanted gear: a small star on its tile, a line on its slot and in its window */
+.tile__ench {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  z-index: 2;
+  color: #d8c4ff;
+  font-size: 15px;
+  line-height: 1;
+  text-shadow: 0 0 6px #7b5cff, 0 0 2px #000;
+  pointer-events: none;
+}
+
+.slot__ench {
+  display: block;
+  color: color-mix(in srgb, #7b5cff 75%, var(--ink));
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.itemsheet__ench {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border: 1px solid rgba(123, 92, 255, 0.35);
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(123, 92, 255, 0.18), rgba(123, 92, 255, 0.05));
+}
+
+.itemsheet__ench b {
+  color: color-mix(in srgb, #7b5cff 80%, var(--ink));
+}
+
+.btn.btn--enchant {
+  border-color: #4a32b8;
+  background: linear-gradient(180deg, #8f74ff, #5b3fd6);
+  color: #fff;
+}
+
+.btn.btn--enchant .count {
+  color: #fff;
+  opacity: 0.85;
+}
+
+.chest--rune .chest__art {
+  filter: drop-shadow(0 0 12px rgba(140, 100, 255, 0.55));
+}
