@@ -71,7 +71,13 @@
     return {
       items: (Array.isArray(o.items) ? o.items : []).filter(function (x) { return x && typeof x.id === "string"; }).slice(0, MAX_ITEMS).map(function (x) {
         var out = { id: x.id, r: whole(x.r, 20), u: whole(x.u, 1e12) };
-        if (typeof x.e === "string" && PS.ENCHANT[x.e]) out.e = x.e; // its enchantment goes with it
+        // its enchantments and stack room go with it
+        var es = Math.min(whole(x.es, 3), PS.ENCHANT_STACK.max - 1);
+        var en = (Array.isArray(x.en) ? x.en : typeof x.e === "string" ? [x.e] : []).filter(function (id) {
+          return typeof id === "string" && PS.ENCHANT[id];
+        }).slice(0, 1 + es);
+        if (es) out.es = es;
+        if (en.length) out.en = en;
         return out;
       }),
       pets: (Array.isArray(o.pets) ? o.pets : []).filter(function (x) { return x && typeof x.sp === "string"; }).slice(0, MAX_PETS).map(function (x) {
@@ -632,7 +638,10 @@
       if (item && !PS.state.isEquipped(item)) {
         edit(function (d) {
           if (d.items.length >= MAX_ITEMS) return false;
-          d.items.push(item.e ? { id: item.id, r: item.r, u: item.u, e: item.e } : { id: item.id, r: item.r, u: item.u });
+          var put = { id: item.id, r: item.r, u: item.u };
+          if (item.en && item.en.length) put.en = item.en.slice();
+          if (item.es) put.es = item.es;
+          d.items.push(put);
         });
       }
     } else if (act === "add-pet") {

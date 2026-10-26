@@ -10673,6 +10673,10 @@ html.chaos-oldfilm body {
   height: 30px;
 }
 
+.enchant__gems {
+  margin-left: 10px;
+}
+
 .btn.enchant__go {
   min-width: 240px;
   border-color: #5b3fd6;
@@ -10831,6 +10835,131 @@ html.chaos-oldfilm body {
 
 .itemsheet__ench b {
   color: color-mix(in srgb, #7b5cff 80%, var(--ink));
+}
+
+.itemsheet__ench p {
+  margin: 2px 0;
+}
+
+.itemsheet__ench .itemsheet__room {
+  margin-top: 6px;
+  opacity: 0.75;
+  font-size: 12px;
+}
+
+/* stacking: the four enchantment spaces on the gear at the table */
+.enchant__spaces {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  margin: 10px 0 4px;
+}
+
+@media (max-width: 640px) {
+  .enchant__spaces {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.enchant__space {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 108px;
+  padding: 8px 6px;
+  border: 1px solid rgba(190, 160, 255, 0.25);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+  text-align: center;
+}
+
+.enchant__space .ico {
+  width: 22px;
+  height: 22px;
+  color: #c6a6ff;
+}
+
+.enchant__space b {
+  color: #f3e9ff;
+  font-size: 13px;
+}
+
+.enchant__space small {
+  color: #b9a6e8;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.enchant__space.is-filled {
+  border-color: rgba(198, 166, 255, 0.55);
+  background: linear-gradient(180deg, rgba(180, 140, 255, 0.28), rgba(90, 60, 180, 0.18));
+  box-shadow: inset 0 0 14px rgba(180, 140, 255, 0.25);
+}
+
+button.enchant__space:not(:disabled) {
+  cursor: pointer;
+}
+
+button.enchant__space:hover:not(:disabled) {
+  border-color: #d8c4ff;
+}
+
+button.enchant__space:disabled {
+  opacity: 1;
+}
+
+.enchant__space.is-target {
+  border-color: #ffb0d8;
+  box-shadow: 0 0 0 2px rgba(255, 140, 200, 0.55), inset 0 0 14px rgba(255, 140, 200, 0.25);
+}
+
+.enchant__swap {
+  color: #ffc4e2;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.enchant__space.is-empty {
+  border-style: dashed;
+  border-color: rgba(198, 166, 255, 0.5);
+}
+
+.enchant__space.is-buy {
+  border-color: rgba(233, 185, 73, 0.55);
+  background: linear-gradient(180deg, rgba(233, 185, 73, 0.16), rgba(233, 185, 73, 0.04));
+}
+
+.btn.enchant__buy {
+  margin-top: 4px;
+  border-color: #a8791b;
+  background: linear-gradient(180deg, #f2cf73, #d39a2a);
+  max-width: 100%;
+  padding-inline: 10px;
+  color: #2b1a00;
+}
+
+.btn.enchant__buy .price {
+  white-space: nowrap;
+}
+
+.btn.enchant__buy .ico {
+  width: 14px;
+  height: 14px;
+  color: currentColor;
+}
+
+.enchant__space.is-locked {
+  opacity: 0.45;
+}
+
+.tile__ench {
+  white-space: nowrap;
 }
 
 .btn.btn--enchant {

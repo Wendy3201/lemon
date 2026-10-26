@@ -55,7 +55,7 @@
       stats: {
         kills: 0, runs: 0, wins: 0, forges: 0, chests: 0, upgrades: 0, talents: 0,
         bestLevel: 0, bestPower: 0, maxRarity: 0, grade: 0, time: 0, earned: 0, eggs: 0, bestCombo: 0, duels: 0, duelsPlayed: 0,
-        trades: 0, keys: 0, enchants: 0
+        trades: 0, keys: 0, enchants: 0, stacks: 0
       }
     };
     PS.SLOTS.forEach(function (slot) {
@@ -101,7 +101,13 @@
       seen[u] = true;
       var clean = { u: u, id: item.id, r: Math.floor(num(item.r, 0, 0, PS.MAX_RARITY)) };
       if (item.n) clean.n = 1;
-      if (typeof item.e === "string" && PS.ENCHANT[item.e]) clean.e = item.e;
+      // enchantments (a save from before stacking kept one, as `e`) and the room bought for more
+      var es = Math.floor(num(item.es, 0, 0, PS.ENCHANT_STACK.max - 1));
+      var en = (Array.isArray(item.en) ? item.en : typeof item.e === "string" ? [item.e] : []).filter(function (id) {
+        return typeof id === "string" && PS.ENCHANT[id];
+      }).slice(0, 1 + es);
+      if (es) clean.es = es;
+      if (en.length) clean.en = en;
       save.items.push(clean);
       if (u >= save.uid) save.uid = u + 1;
     });
@@ -471,11 +477,11 @@
         applyBlock(perk, t, fx);
         bonus += perk.pw;
       });
-      // its enchantment, if it has one
-      if (item.e && PS.ENCHANT[item.e]) {
-        applyBlock(PS.ENCHANT[item.e], t, fx);
-        bonus += PS.ENCHANT[item.e].pw || 0;
-      }
+      // its enchantments, if it has any (the same one twice adds up)
+      PS.enchantsOf(item).forEach(function (e) {
+        applyBlock(e, t, fx);
+        bonus += e.pw || 0;
+      });
     });
 
     PS.TALENTS.forEach(function (talent) {
@@ -526,6 +532,7 @@
     var ehp = (out.hp / (1 - out.armor)) * (1 + out.regen * 25) * (1 + 0.6 * out.speed);
     var extra = 1 + bonus + 0.15 * out.xp + 0.1 * out.luck + 0.05 * out.magnet;
     out.power = Math.round((dps * 20 + ehp * 2) * extra);
+    out.realPower = out.power; // what the gear and stats give, which is what a battle uses
     if (boost && boost.power !== null) out.power = boost.power;
     return out;
   }
@@ -637,7 +644,7 @@
   function quickPlan(keep) {
     var items = S.items.map(function (item) {
       var def = defOf(item);
-      return { u: item.u, id: item.id, r: item.r, slot: def.slot, rank: GRADE_RANK[def.grade], base: def.base, eq: isEquipped(item), e: Boolean(item.e), gone: false, made: false };
+      return { u: item.u, id: item.id, r: item.r, slot: def.slot, rank: GRADE_RANK[def.grade], base: def.base, eq: isEquipped(item), e: PS.enchantsOf(item).length > 0 || (item.es || 0) > 0, gone: false, made: false };
     });
     function valuable(it) { return it.r >= 3 || it.rank > 0 || it.e; }
     function worth(it) { return it.rank * 1000 + it.base; }
@@ -743,19 +750,49 @@
   }
 
   /** Use a key on a piece of gear: one of the enchantments for that kind of gear,
-   *  each as likely as the next, goes on it in place of the one it had. Returns
-   *  { item, ench, old } or null (no key, or no such item). */
-  function enchant(u) {
+   *  each as likely as the next, goes into an empty space on it, or (when it is
+   *  full) in place of the one at `at` (the last if `at` is not given). Returns
+   *  { item, ench, old, index } or null (no key, or no such item). */
+  function enchant(u, at) {
     var item = byUid(u);
     if (!item || S.keys < 1) return null;
-    var old = item.e && PS.ENCHANT[item.e] ? PS.ENCHANT[item.e] : null;
     var pool = PS.ENCHANT_POOLS[defOf(item).slot];
     var ench = pool[Math.floor(Math.random() * pool.length)];
+    var list = PS.enchantsOf(item).map(function (e) { return e.id; });
+    var old = null;
+    var index;
+    if (list.length < PS.enchantRoom(item)) {
+      index = list.length;
+      list.push(ench.id);
+    } else {
+      index = typeof at === "number" && at >= 0 && at < list.length ? at : list.length - 1;
+      old = PS.ENCHANT[list[index]] || null;
+      list[index] = ench.id;
+    }
+    item.en = list;
+    delete item.e;
     S.keys--;
-    item.e = ench.id;
     S.stats.enchants++;
     commit();
-    return { item: item, ench: ench, old: old };
+    return { item: item, ench: ench, old: old, index: index };
+  }
+
+  /** What room for one more enchantment on this item costs, in gems (0: it has all it can). */
+  function stackCost(item) {
+    var es = (item && item.es) || 0;
+    return es >= PS.ENCHANT_STACK.max - 1 ? 0 : PS.ENCHANT_STACK.gems[es];
+  }
+
+  /** Buy room for one more enchantment on an item. Returns its new room, or 0. */
+  function buyStack(u) {
+    var item = byUid(u);
+    var cost = item ? stackCost(item) : 0;
+    if (!cost || S.gems < cost) return 0;
+    S.gems -= cost;
+    item.es = (item.es || 0) + 1;
+    S.stats.stacks++;
+    commit();
+    return PS.enchantRoom(item);
   }
 
   /* -------------------------------------------------------------- talents */
@@ -1600,7 +1637,13 @@
         return;
       }
       var got = add(x.id, Math.floor(num(x.r, 0, 0, PS.MAX_RARITY)));
-      if (typeof x.e === "string" && PS.ENCHANT[x.e]) got.e = x.e; // an enchantment goes with the item
+      // its enchantments and stack room go with the item (`e`: one, from a game from before stacking)
+      var es = Math.floor(num(x.es, 0, 0, PS.ENCHANT_STACK.max - 1));
+      var en = (Array.isArray(x.en) ? x.en : typeof x.e === "string" ? [x.e] : []).filter(function (id) {
+        return typeof id === "string" && PS.ENCHANT[id];
+      }).slice(0, 1 + es);
+      if (es) got.es = es;
+      if (en.length) got.en = en;
       out.items.push(got);
     });
     (Array.isArray(get.pets) ? get.pets : []).forEach(function (x) {
@@ -1715,6 +1758,8 @@
     keyCost: keyCost,
     buyKeys: buyKeys,
     enchant: enchant,
+    stackCost: stackCost,
+    buyStack: buyStack,
     devAddKeys: function (n) {
       S.keys = Math.max(0, Math.min(1e9, S.keys + Math.floor(n || 0)));
       commit();

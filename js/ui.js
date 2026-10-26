@@ -74,7 +74,9 @@
       (opts.disabled ? " disabled" : "") +
       ' title="' + esc(PS.RARITY[item.r].name + " " + def.name) + '">' +
       '<span class="tile__art">' + PS.itemIcon(item.id) + "</span>" + gradeTag(def) +
-      (item.e && PS.ENCHANT[item.e] ? '<span class="tile__ench" title="Enchanted: ' + esc(PS.ENCHANT[item.e].name) + '">✦</span>' : "") +
+      (PS.enchantsOf(item).length
+        ? '<span class="tile__ench" title="Enchanted: ' + esc(PS.enchantsOf(item).map(function (e) { return e.name; }).join(", ")) + '">✦' + (PS.enchantsOf(item).length > 1 ? PS.enchantsOf(item).length : "") + "</span>"
+        : "") +
       (opts.mark ? '<span class="tile__mark">' + opts.mark + "</span>" : "") +
       "</" + tag + ">"
     );
@@ -302,7 +304,8 @@
     var ch = PS.chapter(S.chapter);
     var zone = PS.ZONES[ch.zone];
     var stats = st.calc();
-    var ratio = stats.power / ch.rec;
+    // a Power set by hand (admin menu) only changes the number shown: the battle uses the gear
+    var ratio = (stats.realPower || stats.power) / ch.rec;
     var verdict = ratio >= 1 ? ["good", "You are ready"] : ratio >= 0.7 ? ["warn", "This will be tough"] : ["bad", "Far too strong for you yet"];
     var record = S.clears[ch.n];
     var cleared = S.best >= ch.n;
@@ -338,6 +341,9 @@
           "</div>" +
 
           '<p class="verdict verdict--' + verdict[0] + '">' + verdict[1] + " · recommended power " + fmt(ch.rec) + "</p>" +
+          (stats.realPower && stats.realPower !== stats.power
+            ? '<p class="hint">Your Power is set by hand in the admin menu. Your gear really gives ' + fmt(stats.realPower) + ", and that is what fights.</p>"
+            : "") +
 
           '<dl class="facts">' +
             "<div><dt>Length</dt><dd>" + PS.clock(ch.duration) + (PS.chapterBosses(ch.n).length > 1 ? " then two bosses: " + esc(PS.chapterBosses(ch.n).map(function (c) { return c.bossName; }).join(" & ")) : " then the boss") + "</dd></div>" +
@@ -398,7 +404,7 @@
         '<div class="slot__text">' +
           '<strong class="rname r' + item.r + '">' + esc(st.def(item).name) + "</strong>" +
           "<span>" + PS.STATS[slot.stat].name + " " + PS.fmtStat(st.mainStat(item.id, item.r, level)) + " · Lv " + level + "/" + cap + "</span>" +
-          (item.e && PS.ENCHANT[item.e] ? '<span class="slot__ench">✦ ' + esc(PS.ENCHANT[item.e].name) + "</span>" : "") +
+          (PS.enchantsOf(item).length ? '<span class="slot__ench">✦ ' + esc(PS.enchantsOf(item).map(function (e) { return e.name; }).join(" · ")) + "</span>" : "") +
         "</div>" +
         '<button class="btn btn--sm slot__up" type="button" data-act="upgrade" data-slot="' + slot.key + '" data-key="up-' + slot.key + '"' + (info.ok ? "" : " disabled") +
           ' title="' + (info.ok ? "Level up this slot" : info.reason) + '">' +
@@ -466,7 +472,7 @@
    *  Epic or rarer, or S / SS grade. */
   function costlyMats(forge) {
     return forge.mats.map(function (u) { return st.item(u); }).filter(function (item) {
-      return item && (item.r >= 3 || st.def(item).grade !== "A" || item.e);
+      return item && (item.r >= 3 || st.def(item).grade !== "A" || PS.enchantsOf(item).length || item.es);
     });
   }
 
@@ -784,7 +790,7 @@
      piece of gear and use an Enchantment Key on it: the key's enchantment
      shows itself and goes on the gear, in place of any it had. */
 
-  var ench = { u: 0, bag: false, shown: 48, casting: false, result: null };
+  var ench = { u: 0, bag: false, shown: 48, casting: false, result: null, target: -1 };
   var enchBox = null;
   var CAST_MS = 1500; // the key turning, before the enchantment shows
 
@@ -839,16 +845,46 @@
     var S = st.get();
     var item = ench.u ? st.item(ench.u) : null;
     var def = item ? st.def(item) : null;
-    var has = item && item.e ? PS.ENCHANT[item.e] : null;
+    var on = PS.enchantsOf(item);
+    var room = item ? PS.enchantRoom(item) : 1;
+    var full = item && on.length >= room;
+    // on full gear the last one is aimed at, until another is picked (none while there is room)
+    if (!full) ench.target = -1;
+    else if (ench.target < 0 || ench.target >= on.length) ench.target = on.length - 1;
+    var target = full ? on[ench.target] : null;
     var worn = PS.SLOTS.map(function (slot) { return st.equipped(slot.key); }).filter(Boolean);
     var bag = st.sorted(S.items.filter(function (it) { return !st.isEquipped(it); }));
     var result = ench.result;
     var pool = PS.ENCHANT_POOLS[item ? def.slot : "weapon"];
     function pick(it) {
-      var e = it.e ? PS.ENCHANT[it.e] : null;
+      var list = PS.enchantsOf(it);
       return '<button class="enchant__item' + (it.u === ench.u ? " is-on" : "") + '" type="button" data-en="pick" data-u="' + it.u + '" aria-pressed="' + (it.u === ench.u) + '"' + (ench.casting ? " disabled" : "") + ">" +
         tile(it, { plain: true, cls: "tile--mini" }) +
-        '<span><b class="rname r' + it.r + '">' + esc(st.def(it).name) + "</b><small>" + (e ? "✦ " + esc(e.name) : "No enchantment") + "</small></span></button>";
+        '<span><b class="rname r' + it.r + '">' + esc(st.def(it).name) + "</b><small>" +
+          (list.length ? "✦ " + esc(list.map(function (e) { return e.name; }).join(" · ")) : "No enchantment") +
+          (PS.enchantRoom(it) > 1 ? " (" + list.length + "/" + PS.enchantRoom(it) + ")" : "") + "</small></span></button>";
+    }
+    /* the item's four enchantment spaces: filled, empty, the next one to buy, and locked */
+    function spaces() {
+      var cost = st.stackCost(item);
+      var out = "";
+      for (var k = 0; k < PS.ENCHANT_STACK.max; k++) {
+        if (k < on.length) {
+          var aim = full && k === ench.target;
+          out += '<button class="enchant__space is-filled' + (aim ? " is-target" : "") + '" type="button" data-en="target" data-i="' + k + '"' + (full && !ench.casting ? "" : " disabled") +
+            ' title="' + (full ? "A key will replace this one" : "") + '">' +
+            PS.icon(on[k].icon) + "<b>" + esc(on[k].name) + "</b><small>" + esc(PS.enchantText(on[k])) + "</small>" +
+            (aim ? '<em class="enchant__swap">the next key replaces this</em>' : "") + "</button>";
+        } else if (k < room) {
+          out += '<div class="enchant__space is-empty"><b>Empty</b><small>The next key fills this</small></div>';
+        } else if (k === room && cost) {
+          out += '<div class="enchant__space is-buy"><b>Unlock space ' + (k + 1) + "</b><small>Stack " + (k + 1) + " enchantments on this gear</small>" +
+            '<button class="btn btn--sm enchant__buy" type="button" data-en="stack" aria-label="Unlock space ' + (k + 1) + " for " + fmt(cost) + ' gems"' + (S.gems >= cost && !ench.casting ? "" : " disabled") + ">" + price("gems", cost) + "</button></div>";
+        } else {
+          out += '<div class="enchant__space is-locked">' + PS.icon("lock") + "<small>Unlock the one before first</small></div>";
+        }
+      }
+      return '<div class="enchant__spaces" role="group" aria-label="Enchantment spaces">' + out + "</div>";
     }
     var motes = "";
     for (var i = 0; i < 16; i++) motes += '<i style="--x:' + ((i * 37) % 100) + "%;--d:" + (6 + (i % 5) * 1.7) + "s;--w:" + (i % 4) * 0.9 + 's"></i>';
@@ -865,18 +901,18 @@
               '<div class="enchant__key" aria-hidden="true">' + PS.art("enchkey") + "</div>" +
             "</div>" +
             (item
-              ? '<p class="enchant__what"><b class="rname r' + item.r + '">' + esc(def.name) + "</b> " +
-                  (has ? 'has <b class="enchant__name">✦ ' + esc(has.name) + "</b> (" + esc(PS.enchantText(has)) + ")" : "has no enchantment yet") + "</p>"
+              ? '<p class="enchant__what"><b class="rname r' + item.r + '">' + esc(def.name) + "</b> · " + on.length + " of " + room + " enchantment space" + (room === 1 ? "" : "s") + " used" +
+                  (on.length ? "" : " (no enchantment yet)") + "</p>" + spaces()
               : "") +
             (result
               ? '<div class="enchant__result" role="status"><p class="kicker">The key held</p><h3>✦ ' + esc(result.ench.name) + "</h3>" +
                   "<p>" + esc(PS.enchantText(result.ench)) + " while it is worn</p>" +
-                  (result.old ? '<p class="hint">It took the place of ' + esc(result.old.name) + ".</p>" : "") + "</div>"
+                  '<p class="hint">' + (result.old ? "It took the place of " + esc(result.old.name) + "." : "It went into space " + (result.index + 1) + ".") + "</p></div>"
               : "") +
-            '<p class="enchant__keys"><span class="enchant__keyart" aria-hidden="true">' + PS.art("enchkey") + "</span>Enchantment Keys: <b>" + fmt(S.keys) + "</b></p>" +
+            '<p class="enchant__keys"><span class="enchant__keyart" aria-hidden="true">' + PS.art("enchkey") + "</span>Enchantment Keys: <b>" + fmt(S.keys) + "</b>" + '<span class="enchant__gems">' + price("gems", S.gems) + "</span></p>" +
             (S.keys
               ? '<button class="btn btn--primary btn--xl enchant__go" type="button" data-en="go"' + (item && !ench.casting ? "" : " disabled") + ">" +
-                  (ench.casting ? "The key is turning..." : "Use a key" + (has ? " · replaces " + esc(has.name) : "")) + "</button>"
+                  (ench.casting ? "The key is turning..." : "Use a key" + (target ? " · replaces " + esc(target.name) : on.length ? " · fills space " + (on.length + 1) : "")) + "</button>"
               : '<p class="hint">You have no Enchantment Keys. They come from the Enchantment Chest in the Shop.</p>' +
                 '<button class="btn btn--primary" type="button" data-en="shop">Go to the Shop</button>') +
           "</section>" +
@@ -898,7 +934,9 @@
           '<div class="enchant__chips">' + pool.map(function (e) {
             return '<span class="enchant__chip">' + PS.icon(e.icon) + "<b>" + esc(e.name) + "</b><small>" + esc(PS.enchantText(e)) + "</small></span>";
           }).join("") + "</div>" +
-          '<p class="hint">Each kind of gear has its own enchantments: pick other gear to see its list. One enchantment on each piece; a new one takes the place of the old. It works while the gear is worn and stays on it when it is forged up (gear melted down in a forge loses its own). It goes with the gear in a trade.</p>' +
+          '<p class="hint">Each kind of gear has its own enchantments: pick other gear to see its list. A piece holds one, and room for more (up to ' + PS.ENCHANT_STACK.max + ") can be bought with gems: " +
+            PS.ENCHANT_STACK.gems.map(function (g, k) { return fmt(g) + " for the " + ["2nd", "3rd", "4th"][k]; }).join(", ") +
+            ". A key fills an empty space first; on full gear it replaces the one you pick. The same one twice adds up. They work while the gear is worn, stay on it when it is forged up (gear melted down in a forge loses its own) and go with it in a trade.</p>" +
         "</section>" +
       "</div>";
   }
@@ -908,7 +946,23 @@
     else if (act === "pick") {
       ench.u = Number(node.getAttribute("data-u"));
       ench.result = null;
+      ench.target = -1;
       paintEnchant();
+    } else if (act === "target") {
+      ench.target = Number(node.getAttribute("data-i"));
+      paintEnchant();
+    } else if (act === "stack") {
+      var item = st.item(ench.u);
+      var cost = item ? st.stackCost(item) : 0;
+      if (!st.buyStack(ench.u)) {
+        PS.sfx.play("deny");
+        toast(cost ? "Not enough gems: that costs " + fmt(cost) : "This gear has all the room it can");
+        return;
+      }
+      PS.sfx.play("shrine");
+      ench.result = null;
+      paintEnchant();
+      toast("Room for " + PS.enchantRoom(st.item(ench.u)) + " enchantments on this gear");
     } else if (act === "bag") {
       ench.bag = true;
       paintEnchant();
@@ -925,7 +979,7 @@
       paintEnchant();
       PS.sfx.play("forge");
       setTimeout(function () {
-        var res = st.enchant(ench.u);
+        var res = st.enchant(ench.u, ench.target);
         ench.casting = false;
         ench.result = res;
         if (res) PS.sfx.play("reveal", 5);
@@ -1550,8 +1604,11 @@
             (delta ? '<p class="delta delta--' + (delta > 0 ? "up" : "down") + '">' + PS.icon("power") + (delta > 0 ? "+" : "−") + fmt(Math.abs(delta)) + " power if you equip it</p>" : "") +
           "</div>" +
         "</div>" +
-        (item.e && PS.ENCHANT[item.e]
-          ? '<p class="itemsheet__ench"><b>✦ ' + esc(PS.ENCHANT[item.e].name) + "</b> " + esc(PS.enchantText(PS.ENCHANT[item.e])) + " while worn</p>"
+        (PS.enchantsOf(item).length
+          ? '<div class="itemsheet__ench">' + PS.enchantsOf(item).map(function (e) {
+              return "<p><b>✦ " + esc(e.name) + "</b> " + esc(PS.enchantText(e)) + "</p>";
+            }).join("") +
+            '<p class="itemsheet__room">While worn · ' + PS.enchantsOf(item).length + " of " + PS.enchantRoom(item) + " enchantment spaces used</p></div>"
           : "") +
         '<p class="itemsheet__blurb">' + esc(def.blurb) + "</p>" +
         '<ul class="perks">' + perkList(item) + "</ul>" +

@@ -191,12 +191,20 @@ as each other on that gear:
 | Armour (14) | Fortress, Bulwark, Regrowth, Shell (an 8% shield), Thorns (hit back when hit), Second Wind (one more get-up), Bloodplate (heal per pest squashed), Heavy Plate, Toughened, Gilded, Spiked, Warmth, Battle-Worn, Padded: toughness, no crit |
 | Boots (15) | Swiftness, Windwalk, Gatherer, Lucky Steps, Pathfinder, Treasure Hunter, Evasion, Springheel, Stomp, Runner's High, Fleet, Hunter, Trailblazer, Steady, Pounce: speed, pickups, luck and XP |
 
-The room shows the list for the gear picked. One per piece of gear: a new one takes the place of the old.
-It counts while the gear is worn, stays on it when it is forged up (gear melted
-down in a forge loses its own, and Quick forge's "keep safe" never melts an
-enchanted piece), and goes with it in a trade (that needs the newer
-`supabase/setup.sql`; an older server drops it). The lists are `PS.ENCHANT_POOLS` in
-`js/data.js`. Admins can add keys in the admin menu, Money tab.
+The room shows the list for the gear picked. A piece of gear holds one
+enchantment, and **stacking** buys it room for more, up to 4: under the gear
+on the table are its four spaces, and the next locked one can be unlocked with
+gems (500 for the 2nd, 1,500 for the 3rd, 4,000 for the 4th; that room is for
+that piece only). A key fills an empty space first; on full gear it replaces
+the one you pick (the last, unless you click another). The same enchantment
+twice adds up. Enchantments count while the gear is worn, stay on it with its
+bought room when it is forged up (gear melted down in a forge loses its own,
+and Quick forge's "keep safe" never melts an enchanted piece or one with
+bought room), and go with it in a trade (that needs the newer
+`supabase/setup.sql`; an older server drops them). Saves from before stacking
+keep their one enchantment. The lists are `PS.ENCHANT_POOLS` and the prices
+`PS.ENCHANT_STACK` in `js/data.js`. Admins can add keys in the admin menu,
+Money tab.
 
 **Selling.** Open an item you are not wearing and press **Sell** (it asks once
 more). Only valuable gear sells, and the two prices add up:

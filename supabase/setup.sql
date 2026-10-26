@@ -900,8 +900,8 @@ $$;
 /* ------------------------------------------------------------- trading */
 
 /* An offer as the server keeps it: at most 20 items and 6 pets, each with
-   only the fields the game reads (an item's enchantment too), and gold and
-   gems as whole numbers.
+   only the fields the game reads (an item's enchantments and stack room too),
+   and gold and gems as whole numbers.
    Anything else in what was sent is dropped; a broken offer is refused. */
 create or replace function public.pip_trade_clean(offer jsonb)
 returns jsonb
@@ -934,7 +934,12 @@ begin
         'id', x ->> 'id',
         'r', least(greatest(floor((x ->> 'r')::numeric), 0), 20)::integer,
         'u', least(greatest(floor((x ->> 'u')::numeric), 0), 1000000000000)::bigint
-      ) || case when coalesce(x ->> 'e', '') ~ '^[a-z]{1,16}$' then jsonb_build_object('e', x ->> 'e') else '{}'::jsonb end);
+      ) || case when coalesce(x ->> 'e', '') ~ '^[a-z]{1,16}$' then jsonb_build_object('e', x ->> 'e') else '{}'::jsonb end
+        || case when jsonb_typeof(x -> 'en') = 'array' then jsonb_build_object('en', (
+             select coalesce(jsonb_agg(q.v order by q.n), '[]'::jsonb)
+             from (select t.v, t.n from jsonb_array_elements_text(x -> 'en') with ordinality as t(v, n)
+                   where t.v ~ '^[a-z]{1,16}$' order by t.n limit 4) q)) else '{}'::jsonb end
+        || case when jsonb_typeof(x -> 'es') = 'number' then jsonb_build_object('es', least(greatest(floor((x ->> 'es')::numeric), 0), 3)::integer) else '{}'::jsonb end);
     end loop;
   end if;
   if jsonb_typeof(offer -> 'pets') = 'array' then

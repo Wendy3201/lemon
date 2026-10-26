@@ -1282,6 +1282,24 @@
   PS.enchantText = function (e) {
     return e.text || PS.statsText(e.s || {});
   };
+
+  /* Stacking: a piece of gear holds one enchantment, and more room can be
+     bought for it at the enchanting table, one at a time, up to `max`. The
+     prices are for the 2nd, 3rd and 4th. A key fills an empty space first;
+     once the gear is full, it takes the place of the one you choose. The same
+     enchantment twice adds up. */
+  PS.ENCHANT_STACK = { max: 4, gems: [500, 1500, 4000] };
+
+  /** The enchantments on an item, in order (none: []). */
+  PS.enchantsOf = function (item) {
+    var list = item && Array.isArray(item.en) ? item.en : [];
+    return list.map(function (id) { return PS.ENCHANT[id]; }).filter(Boolean);
+  };
+
+  /** How many enchantments an item has room for. */
+  PS.enchantRoom = function (item) {
+    return 1 + Math.max(0, Math.min(PS.ENCHANT_STACK.max - 1, (item && item.es) || 0));
+  };
   // the Enchantment Chest: one key each, ten at once a little cheaper
   PS.ENCHANT_KEY = { gems: 60, bulk: { count: 10, discount: 0.9 } };
 

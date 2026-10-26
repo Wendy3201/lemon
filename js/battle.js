@@ -1119,10 +1119,17 @@
     // a boss tires: the longer the fight drags on, the more each hit hurts it,
     // so a weak build gets a long fight rather than an endless one
     if (e.boss) dmg *= 1 + (e.age / 25) * (e.age / 25);
+    // what really came off the pest: the meter, "damage dealt" and the results all count this
     var done = Math.min(dmg, Math.max(0, e.hp));
     R.dmgBy[R.src] = (R.dmgBy[R.src] || 0) + done;
     e.hp -= dmg;
-    R.dealt += dmg;
+    R.dealt += done;
+    if (!dot) {
+      // the hits as they float up, for the admin panel's average and biggest hit
+      R.hitSum = (R.hitSum || 0) + dmg;
+      R.hitN = (R.hitN || 0) + 1;
+      if (dmg > (R.bestHit || 0)) R.bestHit = dmg;
+    }
 
     if (!dot) {
       PS.sfx.play("hit", Boolean(flags & 2), panOf(e.x));

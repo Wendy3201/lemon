@@ -394,7 +394,8 @@
       label("You") +
       facts([
         ["Weapon", PS.esc(weaponName(R.weaponId))],
-        ["Damage per hit", PS.fmt(B.dmg())],
+        ["Base damage", PS.fmt(B.dmg()) + " (before the weapon's own multiplier, crits and boss damage)"],
+        ["Average hit · biggest", R.hitN ? PS.fmt(R.hitSum / R.hitN) + " · " + PS.fmt(R.bestHit) : "no hits yet"],
         ["Attacks a second", (1 / B.cooldown(R.weapon.cd)).toFixed(2)],
         ["Crit chance", pct(Math.min(1, p.crit + p.mods.crit))],
         ["Crit damage", "×" + (p.critDmg + p.mods.critDmg).toFixed(2)],
@@ -418,7 +419,7 @@
         ["Time", PS.clock(R.t) + (R.mode === "swarm" ? "" : " of " + PS.clock(R.dur))],
         ["Pests alive · elites", alive + " · " + elites],
         ["Squashed", PS.fmt(R.kills)],
-        ["Damage dealt", PS.fmt(R.dealt) + " · " + PS.fmt(R.dealt / seconds) + " a second"],
+        ["Damage dealt", PS.fmt(R.dealt) + " · " + PS.fmt(R.dealt / seconds) + " a second (what came off pests, as the meter counts)"],
         ["Coins", PS.fmt(R.coins)],
         ["On the ground", R.drops.length],
         ["Your shots · pest shots", R.shots.length + " · " + R.ebullets.length],
