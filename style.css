@@ -10371,3 +10371,26 @@ html.chaos-oldfilm body {
     animation: none;
   }
 }
+
+/* the battle admin panel's Abuse tab: the same tiles, smaller */
+.abuse__tiles--small {
+  grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+  gap: 6px;
+}
+
+.abuse__tiles--small .abuse__tile {
+  padding: 6px 4px 5px;
+  border-radius: 12px;
+}
+
+.abuse__tiles--small .abuse__emoji {
+  font-size: 22px;
+}
+
+.abuse__tiles--small .abuse__tile b {
+  font-size: 12px;
+}
+
+.devbox .abuse__packs {
+  margin-top: 10px;
+}

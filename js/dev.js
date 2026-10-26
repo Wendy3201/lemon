@@ -29,7 +29,7 @@
   var TABS = [["cheats", "Cheats"], ["upgrades", "Upgrades"], ["run", "Run"]];
   var ADMIN_TABS = [
     ["cheats", "Cheats"], ["upgrades", "Upgrades"], ["player", "Player"],
-    ["spawn", "Spawn"], ["run", "Run"], ["stats", "Stats"]
+    ["spawn", "Spawn"], ["run", "Run"], ["stats", "Stats"], ["abuse", "Abuse"]
   ];
 
   var KIND_NAMES = {
@@ -63,8 +63,11 @@
   // set while running something the other player pressed: their number boxes and pickers
   var inputs = null;
 
-  /* buttons that only change this panel, never the battle */
+  /* buttons that only change this panel, never the battle (the Abuse tab's go to the
+     server from this game, whoever runs the battle) */
+  var ABUSE_ACTS = ["ab-pick", "ab-pack", "ab-clear", "ab-ready", "ab-try", "ab-fire", "ab-stop"];
   var PANEL_ONLY = { close: 1, tab: 1, tier: 1, "pick-kind": 1, "spawn-elite": 1, "spawn-near": 1 };
+  ABUSE_ACTS.forEach(function (name) { PANEL_ONLY[name] = 1; });
   /* the cheat switches: the other player's game sends them over whole */
   var SWITCHES = { toggle: 1, mult: 1, "reset-cheats": 1 };
   /* never from the other player's game: starting over would end the battle for both */
@@ -81,9 +84,11 @@
 
   function tabs() {
     var R = run();
+    // Admin abuse needs an admin account on the server too
+    var admin = ADMIN_TABS.filter(function (t) { return t[0] !== "abuse" || (PS.cloud.isAdmin() && PS.ui && PS.ui.battleAbuse); });
     // the other player's game does not have the numbers the Stats tab reads out
-    if (R && R.mirror) return ADMIN_TABS.filter(function (t) { return t[0] !== "stats"; });
-    return PS.dev.admin ? ADMIN_TABS : TABS;
+    if (R && R.mirror) return admin.filter(function (t) { return t[0] !== "stats"; });
+    return PS.dev.admin ? admin : TABS;
   }
 
   /** A number box or picker's value, from this panel or from what the other player's game sent. */
@@ -435,7 +440,10 @@
     if (!el || !R) return;
     var list = tabs();
     if (!list.some(function (t) { return t[0] === tab; })) tab = "cheats";
-    var views = { cheats: cheatsTab, upgrades: upgradesTab, run: runTab, player: playerTab, spawn: spawnTab, stats: statsTab };
+    var views = {
+      cheats: cheatsTab, upgrades: upgradesTab, run: runTab, player: playerTab, spawn: spawnTab, stats: statsTab,
+      abuse: function () { return PS.ui.battleAbuse.html(); }
+    };
     var body = views[tab](R);
     var scroll = el.querySelector(".devbox__body");
     var top = scroll ? scroll.scrollTop : 0;
@@ -892,6 +900,11 @@
   };
 
   /** What a button says about itself, for sending to the room maker's game. */
+  // the Abuse tab: events for every open game, fired from the middle of a battle (ui.js does them)
+  ABUSE_ACTS.forEach(function (name) {
+    ACTIONS[name] = function (R, node) { return PS.ui.battleAbuse.press(name, node, B.devPanel.say); };
+  });
+
   function attrsOf(node) {
     var out = {};
     ["value", "key", "id"].forEach(function (k) {

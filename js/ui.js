@@ -4624,6 +4624,119 @@
     return menuEvents().filter(function (k) { return abuse.events.indexOf(k) !== -1; });
   }
 
+  /* The same events from the battle's own admin panel (dev.js, its Abuse tab), so
+     an admin can fire them mid-battle. It shares the ticks with the menu's tab. */
+  function battleAbuseHtml() {
+    if (!PS.dev.admin || !PS.cloud.isAdmin() || PS.cloud.offline()) return '<p class="hint">Admin abuse needs an admin account and the internet.</p>';
+    var picked = pickedEvents();
+    var sure = abuse.confirm === "battle-fire";
+    function chip(act, value, text, on) {
+      return '<button class="abuse__chip' + (on ? " is-on" : "") + '" type="button" data-dev="' + act + '" data-value="' + value + '" aria-pressed="' + Boolean(on) + '">' + text + "</button>";
+    }
+    return (
+      '<p class="hint">Events play in every open game (yours at once), in battles and menus alike. The battle stays paused while this panel is open.</p>' +
+      '<label class="devabuse__msg">Message (optional)<input id="ab-msg" type="text" maxlength="100" value="' + esc(abuse.message) + '" placeholder="Shown with the events" /></label>' +
+      '<div class="abuse__packs">' + PACKS.map(function (p) {
+        return '<button class="abuse__pack" type="button" data-dev="ab-pack" data-value="' + p[0] + '">' + p[1] + "</button>";
+      }).join("") + "</div>" +
+      EVENT_GROUPS.map(function (g) {
+        return '<p class="devbox__label">' + g[1] + "</p>" +
+          '<div class="abuse__tiles abuse__tiles--small">' + menuEvents(g[0]).map(function (k) {
+            var e = EVENTS[k];
+            var on = abuse.events.indexOf(k) !== -1;
+            return '<button class="abuse__tile abuse__tile--' + e.group + (on ? " is-on" : "") + '" type="button" data-dev="ab-pick" data-value="' + k + '" aria-pressed="' + on + '">' +
+              '<span class="abuse__emoji" aria-hidden="true">' + e.icon + "</span><b>" + esc(e.name) + "</b></button>";
+          }).join("") + "</div>";
+      }).join("") +
+      '<div class="abuse__go">' +
+        '<div class="abuse__ready"><span class="abuse__readylabel">Countdown first</span><div class="abuse__chips">' + READY_CHOICES.map(function (r) {
+          return chip("ab-ready", r[0], r[1], abuse.ready === r[0]);
+        }).join("") + "</div></div>" +
+        '<label class="abuse__secs">Seconds<input id="ab-seconds" type="number" min="1" max="120" step="1" value="' + esc(String(abuse.seconds)) + '" placeholder="auto" /></label>' +
+      "</div>" +
+      '<div class="abuse__go">' +
+        '<button class="btn btn--sm" type="button" data-dev="ab-try"' + (picked.length ? "" : " disabled") + ">▶ Try it here</button>" +
+        '<button class="btn btn--sm ' + (sure ? "btn--danger" : "btn--primary") + '" type="button" data-dev="ab-fire"' + (picked.length ? "" : " disabled") + ">" +
+          (sure ? "Sure? 🔥 Fire for everyone" : "🔥 Fire for everyone") + "</button>" +
+        '<button class="btn btn--sm" type="button" data-dev="ab-stop">⏹ Stop for everyone</button>' +
+        '<button class="btn btn--sm" type="button" data-dev="ab-clear"' + (abuse.events.length ? "" : " disabled") + ">Untick all</button>" +
+      "</div>"
+    );
+  }
+
+  /** A press on the battle panel's Abuse tab. Returns a line for the panel to show;
+   *  `say` puts up a later one (when the server has answered). */
+  function battleAbuse(name, node, say) {
+    var box = document.querySelector("#ab-msg");
+    if (box) abuse.message = box.value;
+    var secs = document.querySelector("#ab-seconds");
+    if (secs) abuse.seconds = secs.value;
+    var value = node && node.getAttribute ? node.getAttribute("data-value") : null;
+    if (name !== "ab-fire") abuse.confirm = "";
+    if (name === "ab-pick") {
+      var at = abuse.events.indexOf(value);
+      if (at === -1) abuse.events.push(value);
+      else abuse.events.splice(at, 1);
+      return "";
+    }
+    if (name === "ab-pack") {
+      var pack = PACKS.filter(function (p) { return p[0] === value; })[0];
+      if (pack) abuse.events = pack[2].slice();
+      return "";
+    }
+    if (name === "ab-clear") {
+      abuse.events = [];
+      return "";
+    }
+    if (name === "ab-ready") {
+      abuse.ready = Number(value) || 0;
+      return "";
+    }
+    var events = pickedEvents();
+    var message = abuse.message.trim();
+    var seconds = Math.max(0, Math.min(120, Math.floor(Number(abuse.seconds) || 0)));
+    if (name === "ab-stop") {
+      stopEvent();
+      PS.cloud.fireEvent(["stop"], "", 0).then(function (res) {
+        say(res.error || "Stopped for everyone.");
+        if (!res.error) checkEvent();
+      });
+      return "Stopping...";
+    }
+    if (!events.length) return "Tick some events first.";
+    if (name === "ab-try") {
+      // only here: back to the battle, so it plays over it
+      PS.B.devPanel.close();
+      countIn(events, message, seconds, null, abuse.ready);
+      return "";
+    }
+    if (name === "ab-fire") {
+      if (abuse.confirm !== "battle-fire") {
+        abuse.confirm = "battle-fire";
+        setTimeout(function () {
+          if (abuse.confirm === "battle-fire") {
+            abuse.confirm = "";
+            PS.B.devPanel.refresh();
+          }
+        }, 4000);
+        return "Press it again to send it to everyone.";
+      }
+      abuse.confirm = "";
+      var names = events.map(function (k) { return EVENTS[k].name; }).join(" + ");
+      PS.cloud.fireEvent(events, message, seconds, abuse.ready).then(function (res) {
+        if (res.error) {
+          say(res.error);
+          return;
+        }
+        say("Fired " + names + " for everyone.");
+        PS.B.devPanel.close(); // back to the battle to watch it play
+        checkEvent();
+      });
+      return "Sending...";
+    }
+    return "";
+  }
+
   function devAbuse() {
     if (!PS.dev.admin || !PS.cloud.isAdmin()) return "";
     if (!abuse.item) abuse.item = firstItem("weapon");
@@ -6281,6 +6394,8 @@
 
   PS.ui = {
     startTogether: function (mp) { startTogether(mp); },
+    // the battle's admin panel (dev.js): its Abuse tab
+    battleAbuse: { html: function () { return battleAbuseHtml(); }, press: function (name, node, say) { return battleAbuse(name, node, say); } },
     // for the trade window (trade.js), so items look the same everywhere
     tile: tile,
     price: price,

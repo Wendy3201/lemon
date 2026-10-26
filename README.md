@@ -448,7 +448,9 @@ ticked (Supabase → Table Editor → players). `setup.sql` ticks `test`,
 - **Give** sends any weapon or piece of gear at any rarity, or gold, or gems,
   with an optional message. It arrives the next time the player's game checks
   in (within a minute while they play) and pops up as a gift.
-- **Admin abuse** (its own tab in the admin menu, for admin accounts):
+- **Admin abuse** (its own tab in the admin menu, for admin accounts; in a
+  battle, the DEV button's panel has an **Abuse** tab with the same events,
+  packs, countdown, Try it here, Fire for everyone and Stop):
   mischief for the players. Each button that sends something asks "Sure?"
   first, and none of it can be called back. One **Message** box at the top
   goes with the events, the gift or the rush.
