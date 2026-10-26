@@ -50,6 +50,7 @@
       book: 0, // how many collection steps have been claimed
       traded: [], // ids of the trades already put into this save, so none is done twice
       boost: null, // admin menu: { power, label, stats: { atk: 5000, ... } } set by hand, over what gear gives
+      lowered: LOWER_ID, // the last one-time lowering of gear past ??? this save has had (a new save needs none)
       stats: {
         kills: 0, runs: 0, wins: 0, forges: 0, chests: 0, upgrades: 0, talents: 0,
         bestLevel: 0, bestPower: 0, maxRarity: 0, grade: 0, time: 0, earned: 0, eggs: 0, bestCombo: 0, duels: 0, duelsPlayed: 0,
@@ -184,6 +185,7 @@
     save.items.forEach(function (item) { save.found[item.id] = 1; });
     save.book = Math.floor(num(raw.book, 0, 0, PS.BOOK.length));
     save.boost = cleanBoost(raw.boost);
+    save.lowered = typeof raw.lowered === "string" ? raw.lowered.slice(0, 40) : "";
     save.traded = (Array.isArray(raw.traded) ? raw.traded : []).filter(function (id) {
       return typeof id === "number" && isFinite(id);
     }).slice(-TRADES_KEPT);
@@ -251,6 +253,40 @@
     PS.emit("change");
   }
 
+  /* One-time lowering: gear past ??? (Celestial, Cosmic, Infinity) goes back to
+     ???. Every save that has not had this LOWER_ID yet gets it once, the next
+     time it is loaded (so offline players too, when they next play), and the
+     player is told how many pieces it changed. Slot levels stay as they are:
+     the levels past 80 only count again once the gear is forged back up. To
+     do it again some day, change LOWER_ID to anything new. */
+  var LOWER_ID = "2026-10-26";
+  var loweredNow = 0; // pieces the lowering took back, until the screens have said so
+  var loweredKey = ""; // whose save that was (a save can be loaded twice on the way in)
+
+  function lowerPastSecret() {
+    if (S.lowered === LOWER_ID) return;
+    var n = 0;
+    S.items.forEach(function (item) {
+      if (item.r > PS.SECRET_RARITY) {
+        item.r = PS.SECRET_RARITY;
+        n++;
+      }
+    });
+    S.lowered = LOWER_ID;
+    if (n) {
+      loweredNow = n;
+      loweredKey = KEY;
+    }
+    PS.store.set(KEY, S);
+  }
+
+  /** How many pieces of gear the one-time lowering just took back to ??? (0 once said). */
+  function takeLowered() {
+    var n = loweredKey === KEY ? loweredNow : 0;
+    if (n) loweredNow = 0;
+    return n;
+  }
+
   /* One-time wipe. Every browser that has not seen this WIPE_ID yet starts from
      a fresh save the first time it loads the game, then remembers that it has
      been wiped. To wipe everyone again, change WIPE_ID to anything new. */
@@ -275,6 +311,7 @@
     } else {
       S = sanitise(PS.store.get(KEY, null));
     }
+    lowerPastSecret();
     refreshRecords();
     return S;
   }
@@ -559,14 +596,19 @@
 
   /* --------------------------------------------------------------- forge */
   /* Three items of the same slot and rarity: the one you choose is kept and
-     rises one rarity, the other two are used up. */
+     rises one rarity, the other two are used up. To forge an S or SS-grade
+     item, the two used up must be of that same grade too. */
+
+  /** Can `item` be used up to forge `main`? */
+  function fitsForge(main, item) {
+    var grade = defOf(main).grade;
+    return item.u !== main.u && item.r === main.r && defOf(item).slot === defOf(main).slot && !isEquipped(item) &&
+      (grade === "A" || defOf(item).grade === grade);
+  }
 
   function forgeMaterials(main) {
     if (!main || main.r >= PS.MAX_RARITY) return [];
-    var slot = defOf(main).slot;
-    var list = S.items.filter(function (item) {
-      return item.u !== main.u && item.r === main.r && defOf(item).slot === slot && !isEquipped(item);
-    });
+    var list = S.items.filter(function (item) { return fitsForge(main, item); });
     // offer ordinary gear first, so nobody melts down an S-grade by accident
     return list.sort(function (a, b) {
       return GRADE_RANK[defOf(a).grade] - GRADE_RANK[defOf(b).grade] || a.u - b.u;
@@ -580,8 +622,9 @@
   /* ---- quick forge: every forge that can be made, in one go.
      Works low rarity to high, so an item made Uncommon can go on into an Uncommon
      forge in the same pass. In each group of the same slot and rarity, the worn
-     item is the one that rises (otherwise the best one), and the cheapest ones are
-     used up. With `keep`, Epic or rarer and S / SS-grade items are never used up. */
+     item is the one that rises (otherwise the best one that can be forged), and the
+     cheapest ones are used up; an S or SS-grade item only rises on two of its own
+     grade. With `keep`, Epic or rarer and S / SS-grade items are never used up. */
 
   function quickPlan(keep) {
     var items = S.items.map(function (item) {
@@ -598,11 +641,21 @@
         for (;;) {
           var group = items.filter(function (it) { return !it.gone && it.r === r && it.slot === slot.key; });
           if (group.length < 3) return;
-          var main = group.filter(function (it) { return it.eq; })[0] ||
-            group.slice().sort(function (a, b) { return worth(b) - worth(a); })[0];
-          var pool = group.filter(function (it) { return it !== main && !it.eq && !(keep && valuable(it)); })
-            .sort(function (a, b) { return worth(a) - worth(b); });
-          if (pool.length < 2) return;
+          // the worn item first, then the best: the first that has two to use up
+          var mains = group.slice().sort(function (a, b) { return (b.eq ? 1 : 0) - (a.eq ? 1 : 0) || worth(b) - worth(a); });
+          var main = null;
+          var pool = null;
+          for (var m = 0; m < mains.length && !main; m++) {
+            var maybe = mains[m];
+            var mats = group.filter(function (it) {
+              return it !== maybe && !it.eq && !(keep && valuable(it)) && (maybe.rank === 0 || it.rank === maybe.rank);
+            }).sort(function (a, b) { return worth(a) - worth(b); });
+            if (mats.length >= 2) {
+              main = maybe;
+              pool = mats;
+            }
+          }
+          if (!main) return;
           steps.push({ main: main.u, mats: [pool[0].u, pool[1].u], from: r });
           [pool[0], pool[1]].forEach(function (it) {
             it.gone = true;
@@ -1613,6 +1666,7 @@
     upgrade: upgrade,
     // forge
     forgeMaterials: forgeMaterials,
+    takeLowered: takeLowered,
     canForge: canForge,
     forgeAvailable: forgeAvailable,
     forge: forge,

@@ -518,10 +518,13 @@
       note = "Pick the item you want to make better.";
     } else if (maxed) {
       list = [];
-      note = "This one is already ???. There is nothing above that.";
+      note = "This one is already " + PS.RARITY[PS.MAX_RARITY].name + ". There is nothing above that.";
     } else {
       list = options;
-      note = options.length >= 2 ? "Now pick two to melt down. They must be the same slot and rarity." : "You need two more " + PS.RARITY[main.r].name + " " + PS.SLOT[st.def(main).slot].plural.toLowerCase() + " to forge this.";
+      var graded = st.def(main).grade !== "A" ? st.def(main).grade + "-grade " : "";
+      note = options.length >= 2
+        ? "Now pick two to melt down. They must be the same slot and rarity" + (graded ? ", and " + graded + "too" : "") + "."
+        : "You need two more " + PS.RARITY[main.r].name + " " + graded + PS.SLOT[st.def(main).slot].plural.toLowerCase() + " to forge this.";
     }
 
     return (
@@ -1529,7 +1532,7 @@
             '<li>Rarities, from the bottom: <span class="rlist">' + rarities + "</span>. Rarer gear is stronger and unlocks more of its perks.</li>" +
             "<li>Battles drop gear up to " + rarityName(PS.MAX_DROP_RARITY) + " (past chapter 100, up to " + rarityName(5) + ", then " + rarityName(6) + " from 151 and " + rarityName(7) + " from 201). Anything rarer comes from the <b>Forge</b>: put in three items of the same slot and rarity, and the one you keep goes up a rarity. Past " + rarityName(7) + " are " + rarityName(8) + ", " + rarityName(9) + " and " + rarityName(10) + ", which take slot levels past 80. <b>Quick forge</b> does every forge it can at once.</li>" +
             "<li>Spend gold to <b>level up</b> each slot. An item's rarity caps how high its slot's level counts.</li>" +
-            "<li>Some items are <b>S</b> or <b>SS grade</b>: stronger at every rarity.</li>" +
+            "<li>Some items are <b>S</b> or <b>SS grade</b>: stronger at every rarity. Forging one takes two more of the same grade.</li>" +
             "<li>The <b>Collection</b> button on the Equipment screen keeps every different item you have ever owned. Find more of them for gems: the first reward comes at " + PS.BOOK[0].at + " items.</li>" +
             "<li><b>Power</b> sums up how strong you are. Each chapter shows a recommended Power; below it, the chapter will be tough.</li>" +
           "</ul>") +
@@ -2544,6 +2547,20 @@
     );
   }
 
+  /** The one-time lowering of gear past ??? (state.js) has just happened to this save. */
+  function loweredModal(modal) {
+    var n = modal.n || 0;
+    return (
+      '<div class="notice">' +
+        '<h2 id="modal-title">Some gear was set back to ' + rarityName(PS.SECRET_RARITY) + "</h2>" +
+        "<p>" + fmt(n) + " piece" + (n === 1 ? "" : "s") + " of " + rarityName(8) + ", " + rarityName(9) + " or " + rarityName(10) +
+          " gear " + (n === 1 ? "is" : "are") + " now " + rarityName(PS.SECRET_RARITY) + ". This happened to everyone's gear past " + rarityName(PS.SECRET_RARITY) + ".</p>" +
+        "<p>Your slot levels are kept: forge the gear back up and the levels past 80 count again. Forging S or SS-grade gear now takes two more of the same grade.</p>" +
+        '<div class="modal__actions"><button class="btn btn--primary" type="button" data-act="close" data-key="m-ok" autofocus>OK</button></div>' +
+      "</div>"
+    );
+  }
+
   function noticeModal() {
     return (
       '<div class="notice">' +
@@ -2579,7 +2596,7 @@
             '<p class="quick__label">You will end up with</p>' +
             '<div class="quick__made">' + plan.made.slice(0, 8).map(function (it) { return tile(it, { plain: true, cls: "tile--mini" }); }).join("") +
               (plan.made.length > 8 ? '<span class="count">+' + (plan.made.length - 8) + " more</span>" : "") + "</div>"
-          : '<p class="quick__sum">Nothing to forge yet. A forge needs three items of the same slot and rarity. The one you are wearing can be the one that goes up, but is never used up.</p>' +
+          : '<p class="quick__sum">Nothing to forge yet. A forge needs three items of the same slot and rarity (an S or SS-grade one needs two more of its own grade). The one you are wearing can be the one that goes up, but is never used up.</p>' +
             (modal.keep ? '<p class="hint">Some forges may be waiting on gear that is being kept safe. Untick the box to include it.</p>' : "")) +
         '<label class="quick__keep"><input type="checkbox" id="quick-keep"' + (modal.keep ? " checked" : "") + " /> Keep Epic and above, and S / SS-grade, safe (never used up)</label>" +
         (risky
@@ -2603,6 +2620,7 @@
     else if (modal.type === "secret") html = modal.open ? devMenu(modal) : secretModal(modal);
     else if (modal.type === "quick") html = quickModal(modal);
     else if (modal.type === "notice") html = noticeModal();
+    else if (modal.type === "lowered") html = loweredModal(modal);
     else if (modal.type === "womp") html = wompModal();
     else if (modal.type === "hatch") html = hatchModal(modal);
     else if (modal.type === "chestinfo") html = chestInfoModal(modal);
@@ -3197,7 +3215,9 @@
     render();
     chat.lastId = null; // so the next look only notes where the chat is up to
     setTimeout(checkMentions, 400);
+    var lowered = st.takeLowered();
     if (st.takeWipeNotice()) openModal({ type: "notice" });
+    else if (lowered) openModal({ type: "lowered", n: lowered });
     else if (welcome && who) toast("Welcome, " + who.name + "!");
     PS.cloud.sync();
     watch();

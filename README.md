@@ -165,7 +165,14 @@ S or SS item the first time you beat it.
 gear. Each level is +3.5% of the item's main stat.
 
 **The Forge** takes three items of the same slot and the same rarity. The one
-you pick first is kept and rises one rarity; the other two are used up.
+you pick first is kept and rises one rarity; the other two are used up. To
+forge an **S or SS-grade** item, the two used up must be of that same grade
+(two S for an S, two SS for an SS); plain gear can still use any.
+
+On 2026-10-26 everyone's gear past ??? (Celestial, Cosmic, Infinity) was set
+back to ??? once: each save gets it the next time it loads, and the player is
+told how many pieces changed. Slot levels were kept. It is `LOWER_ID` in
+`js/state.js`; change it to do it again.
 
 **Selling.** Open an item you are not wearing and press **Sell** (it asks once
 more). Only valuable gear sells, and the two prices add up:
