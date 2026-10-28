@@ -416,7 +416,8 @@
       facts([
         ["Chapter", R.ch.n + " · " + PS.esc(R.ch.name) + (R.mode === "swarm" ? " (swarm)" : "")],
         ["Phase", R.phase],
-        ["Time", PS.clock(R.t) + (R.mode === "swarm" ? "" : " of " + PS.clock(R.dur))],
+        ["Time", PS.clock(R.t) + (R.mode === "swarm" ? "" : " (the swarm is at full strength by " + PS.clock(R.dur) + ")")],
+        ["To the boss", R.mode === "swarm" || R.duel ? "none in this battle" : PS.fmt(Math.min(R.kills, B.goalNow(R))) + " of " + PS.fmt(B.goalNow(R)) + " pests" + (B.goalNow(R) < R.goal ? " (down from " + PS.fmt(R.goal) + ": the boss is impatient)" : "") + " · " + Math.round(B.progress(R) * 100) + "% of the way"],
         ["Pests alive · elites", alive + " · " + elites],
         ["Squashed", PS.fmt(R.kills)],
         ["Damage dealt", PS.fmt(R.dealt) + " · " + PS.fmt(R.dealt / seconds) + " a second (what came off pests, as the meter counts)"],
@@ -860,7 +861,7 @@
       R.coins += R.coinValue * n;
       return "+" + PS.fmt(n) + " coins";
     },
-    boss: function (R) { R.t = R.dur; },
+    boss: function (R) { if (R.phase === "swarm" && R.mode !== "swarm") B.startBoss(); },
     time: function (R, node) {
       if (R.phase !== "swarm") return "The clock only moves before the boss";
       var n = Number(node.getAttribute("data-value"));

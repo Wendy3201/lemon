@@ -164,11 +164,11 @@
     // the admin's "Stop spawning" keeps the field clear of these too
     if (B.anyCheat("noSpawn")) return;
 
-    // a new shrine now and then, but not in the closing seconds of a chapter
+    // a new shrine now and then, but not just before the boss
     if (!R.shrine && R.phase === "swarm") {
       if (R.shrineIn === undefined) R.shrineIn = SHRINE.first * ((R.twist && R.twist.shrine) || 1);
       R.shrineIn -= dt;
-      if (R.shrineIn <= 0 && (R.mode === "swarm" || R.t < R.dur - 25)) spawnShrine(R);
+      if (R.shrineIn <= 0 && (R.mode === "swarm" || B.progress(R) < 0.92)) spawnShrine(R);
     }
 
     // crates: every so often, fewer while the boss is out
@@ -188,8 +188,8 @@
           spawnGolden(R);
         }
       } else {
-        if (!R.goldenAt) R.goldenAt = [R.dur * 0.4, R.dur * 0.8];
-        if (R.goldenAt.length && R.t >= R.goldenAt[0]) {
+        if (!R.goldenAt) R.goldenAt = [0.4, 0.8]; // shares of the way to the boss
+        if (R.goldenAt.length && B.progress(R) >= R.goldenAt[0]) {
           R.goldenAt.shift();
           spawnGolden(R);
         }

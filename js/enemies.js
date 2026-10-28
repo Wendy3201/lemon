@@ -256,6 +256,9 @@
     }
   }
 
+  // how much faster pests come to a lemon that has squashed nearly all of them
+  var REFILL = 2.5;
+
   B.director = function (dt) {
     var R = B.run;
     // the battle can be decided earlier in the same tick (the lemon's own
@@ -268,9 +271,9 @@
       return;
     }
     if (noSpawn) {
-      // the admin's "stop spawning": only the boss still turns up on time
+      // the admin's "stop spawning": with nothing to squash, the boss turns up at the chapter's length
       R.spawnIn = Math.max(R.spawnIn, 0.5);
-      if (R.mode !== "swarm" && R.phase === "swarm" && R.t >= R.dur) startBoss();
+      if (R.mode !== "swarm" && R.phase === "swarm" && (R.kills >= R.goal || R.t >= R.dur)) startBoss();
       return;
     }
     if (R.mode === "swarm") return swarmDirector(dt);
@@ -283,8 +286,8 @@
       return;
     }
 
-    // the swarm thickens the whole way through the chapter
-    var u = Math.min(1, R.t / R.dur);
+    // the swarm thickens the whole way to the boss: with every pest squashed, and with time
+    var u = B.progress(R);
     var more = R.mpMul ? R.mpMul.pests : 1; // playing together: a thicker swarm
     if (R.spawnIn <= 0) {
       if (R.enemies.length < (80 + 60 * u + R.ch.n * 2) * more) {
@@ -293,9 +296,13 @@
         while (pack--) atRing(pickKind(u), angle + PS.rand(-0.5, 0.5));
       }
       R.spawnIn = PS.lerp(0.8, 0.28, Math.pow(u, 0.8)) / more;
+      // a lemon that clears the field fast gets the next pests sooner (up to REFILL times as
+      // fast with almost none left), after the opening seconds
+      var thin = PS.clamp(1 - R.enemies.length / ((24 + 36 * u) * more), 0, 1);
+      R.spawnIn /= 1 + (REFILL - 1) * thin * Math.min(1, R.t / 15);
     }
 
-    if (R.hordes.length && R.t >= R.hordes[0]) {
+    if (R.hordes.length && u >= R.hordes[0]) {
       R.hordes.shift();
       var count = Math.round((12 + Math.min(12, R.ch.n)) * (R.mpMul ? R.mpMul.horde : 1));
       var start = Math.random() * TAU;
@@ -303,13 +310,18 @@
       B.toast("A swarm closes in!");
     }
 
-    if (R.elites.length && R.t >= R.elites[0]) {
+    if (R.elites.length && u >= R.elites[0]) {
       R.elites.shift();
       var elite = makeElite(R.ch.n >= 5 && Math.random() < 0.5 ? "charger" : "brute");
       B.toast(elite.trait ? "A " + TRAITS[elite.trait].name.toLowerCase() + " elite is hunting you" : "An elite pest is hunting you");
     }
 
-    if (R.t >= R.dur) startBoss();
+    // past the chapter's length the goal starts to shrink (B.goalNow), and says so once
+    if (!R.impatient && R.t >= R.dur && R.kills < R.goal) {
+      R.impatient = true;
+      B.toast("The boss is getting impatient! Fewer pests to go...", 4);
+    }
+    if (R.kills >= B.goalNow(R)) startBoss();
   };
 
   B.startBoss = startBoss; // the admin panel can call the boss in early

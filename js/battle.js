@@ -182,13 +182,14 @@
     R = B.run = {
       ch: ch, zone: PS.ZONES[ch.zone], weaponId: stats.weapon, weapon: B.WEAPONS[stats.weapon],
       src: stats.weapon, dmgBy: {}, mode: mode === "swarm" ? "swarm" : "normal",
-      t: 0, dur: ch.duration, phase: "swarm", over: 0, done: false,
+      t: 0, dur: ch.duration, goal: ch.kills, phase: "swarm", over: 0, done: false,
       p: p,
       enemies: [], shots: [], zones: [], ebullets: [], drops: [], sparks: [], texts: [], fx: [], timers: [], splats: [],
       kills: 0, combo: 0, comboT: 0, bestCombo: 0, coins: 0, dealt: 0, coinValue: Math.max(1, Math.round(ch.gold * 0.005)),
       spawnIn: 0.6,
-      elites: [ch.duration * 0.35, ch.duration * 0.7],
-      hordes: [ch.duration * 0.25, ch.duration * 0.5, ch.duration * 0.75],
+      // when elites and hordes come, as a share of the way to the boss (see B.progress)
+      elites: [0.35, 0.7],
+      hordes: [0.25, 0.5, 0.75],
       boss: null, reachedBoss: false,
       paused: false, choices: null, pending: p.fx.startUp || 0,
       shake: 0, procs: 0, leeched: 0, hurtWindow: 0, windowT: 0, toast: "", toastT: 0,
@@ -222,9 +223,30 @@
     R.pestMul = tw.pest || null;
     if (tw.elites) {
       R.elites = [];
-      for (var t = tw.elites; t < R.dur - 5; t += tw.elites) R.elites.push(t);
+      for (var t = tw.elites; t < R.dur - 5; t += tw.elites) R.elites.push(t / R.dur);
     }
   }
+
+  /** How far through the chapter a battle is, from 0 to 1: the share of the pests to squash
+   *  before the boss, or the share of the chapter's length gone by, whichever is further on
+   *  (so the swarm still thickens for a lemon that cannot squash much). Endless and duels: 0. */
+  B.progress = function (run) {
+    run = run || R;
+    if (!run || run.mode !== "normal" || run.duel || !run.goal) return 0;
+    return Math.min(1, Math.max(run.kills / run.goal, run.t / run.dur));
+  };
+
+  /** The pests still to squash before the boss, as the goal stands now: once a chapter has
+   *  gone on past its length, the boss grows impatient and the goal shrinks, to nothing by half
+   *  a length later, so a lemon that can stay alive but squashes little still meets it. */
+  B.IMPATIENT = 0.5;
+  B.goalNow = function (run) {
+    run = run || R;
+    if (!run || !run.goal) return 0;
+    if (run.mirror) return run.goal; // the host's game has worked it out already
+    var over = run.t - run.dur;
+    return over > 0 ? Math.ceil(run.goal * Math.max(0, 1 - over / (run.dur * B.IMPATIENT))) : run.goal;
+  };
 
   /** Tear the run down once the results have been read. */
   B.stop = function () {
@@ -957,7 +979,7 @@
       // the other player's game banks its own share
       mpSend("end", {
         won: R.phase === "won", time: R.t, kills: R.kills, level: R.ally.level, coins: R.coins,
-        boss: R.reachedBoss, combo: R.bestCombo, chapter: R.ch.n
+        boss: R.reachedBoss, combo: R.bestCombo, chapter: R.ch.n, progress: B.progress(), goal: R.goal
       }, true);
     }
     if (R.mode === "swarm") {
@@ -976,6 +998,8 @@
         won: R.phase === "won",
         time: R.t,
         kills: R.kills,
+        goal: R.goal,
+        progress: B.progress(),
         level: R.p.level,
         coins: R.coins,
         boss: R.reachedBoss,
@@ -1891,7 +1915,10 @@
     R.ally = a;
     R.partner = a;
     if (mp.kind === "duel") setupDuel(mp);
-    else R.mpMul = { pests: 1.6, boss: 1.8, horde: 1.5 };
+    else {
+      R.mpMul = { pests: 1.6, boss: 1.8, horde: 1.5 };
+      R.goal = Math.round(R.goal * R.mpMul.pests);
+    }
   }
 
   /* A lemon that is down waits for the other to come and stand by it. */
@@ -2137,7 +2164,7 @@
     }
     var i;
     var snap = {
-      t: r2(R.t), ph: R.phase, k: R.kills, co: R.coins, cb: R.combo, cbt: r2(R.comboT),
+      t: r2(R.t), ph: R.phase, k: R.kills, gl: B.goalNow(R), co: R.coins, cb: R.combo, cbt: r2(R.comboT),
       me: lemonState(g), pa: lemonState(R.players[0]), ack: g.ack,
       to: R.gToastUntil > R.t ? R.gToast : R.toast, toT: r1(R.gToastUntil > R.t ? R.gToastUntil - R.t : R.toastT),
       wt: R.choices ? R.players[0].name + " is picking an upgrade..." : "",
@@ -2323,7 +2350,8 @@
     R = B.run = {
       mirror: true, ch: ch, zone: PS.ZONES[ch.zone], weaponId: me.weaponId, weapon: me.weapon, src: me.weaponId, dmgBy: {},
       mode: info.kind === "duel" ? "duel" : "normal",
-      t: 0, dur: info.kind === "duel" ? Infinity : ch.duration, phase: "swarm", over: 0, done: false,
+      t: 0, dur: info.kind === "duel" ? Infinity : ch.duration, goal: info.kind === "duel" ? 0 : Math.round(ch.kills * 1.6),
+      phase: "swarm", over: 0, done: false,
       p: me, partner: pa, players: [me, pa], ally: null,
       enemies: [], shots: [], zones: [], ebullets: [], drops: [], sparks: [], texts: [], fx: [], timers: [], splats: [],
       kills: 0, combo: 0, comboT: 0, bestCombo: 0, coins: 0, dealt: 0,
@@ -2503,6 +2531,7 @@
     R.t = s.t;
     R.phase = s.ph;
     R.kills = s.k;
+    if (s.gl) R.goal = s.gl;
     R.coins = s.co;
     R.combo = s.cb;
     R.comboT = s.cbt;
@@ -2742,6 +2771,8 @@
       won: Boolean(m.won),
       time: m.time !== undefined ? m.time : R.t,
       kills: m.kills !== undefined ? m.kills : R.kills,
+      goal: m.goal || R.goal,
+      progress: typeof m.progress === "number" ? m.progress : undefined, // a host from before kill goals sends none
       level: m.level || R.p.level,
       coins: m.coins !== undefined ? m.coins : R.coins,
       boss: m.boss !== undefined ? m.boss : R.reachedBoss,

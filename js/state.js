@@ -47,6 +47,7 @@
       daily: { last: "", streak: 0 }, // the day of the last daily claim, and which day of 7 it was
       endless: { best: 0, ch: 0, kills: 0 }, // the longest endless swarm survived
       challenge: { won: "", count: 0 }, // the day the daily challenge was last won, and how many in all
+      camp: { day: "", picked: 0 }, // the day lemons were last picked up in the camp, and how many that day
       found: {}, // every item id ever owned, for the collection book
       book: 0, // how many collection steps have been claimed
       traded: [], // ids of the trades already put into this save, so none is done twice
@@ -186,6 +187,9 @@
     var challenge = raw.challenge || {};
     save.challenge.won = typeof challenge.won === "string" ? challenge.won : "";
     save.challenge.count = Math.floor(num(challenge.count, 0, 0, 1e6));
+    var camp = raw.camp || {};
+    save.camp.day = typeof camp.day === "string" ? camp.day : "";
+    save.camp.picked = Math.floor(num(camp.picked, 0, 0, PS.CAMP.perDay));
 
     // older saves never kept this list: whatever they own now counts as found
     if (raw.found && typeof raw.found === "object") {
@@ -1017,14 +1021,15 @@
   }
 
   /** Bank the result of a battle and return what was won, for the results
-   *  screen. result: { chapter, won, time, kills, level, coins, boss }. */
+   *  screen. result: { chapter, won, time, kills, goal, progress, level, coins, boss }.
+   *  progress: how far through the chapter (0 to 1); without it, the time over the chapter's length. */
   function finishRun(result) {
     var ch = PS.chapter(result.chapter);
     var stats = calc();
     // noProgress: a win alongside a friend in a chapter this player has not
     // reached yet pays, but does not open chapters
     var first = result.won && S.best < ch.n && !result.noProgress;
-    var progress = result.won ? 1 : PS.clamp(result.time / ch.duration, 0, 1);
+    var progress = result.won ? 1 : PS.clamp(typeof result.progress === "number" ? result.progress : result.time / ch.duration, 0, 1);
 
     var base = result.won ? ch.gold * (first ? 3 : 1) : ch.gold * 0.6 * progress;
     var paid = withRush(Math.round((base + (result.coins || 0)) * (1 + stats.gold)), result.won ? (first ? PS.BAL.gemsFirst(ch.n) : PS.BAL.gemsRepeat) : 0);
@@ -1090,7 +1095,7 @@
     return {
       chapter: ch.n, won: Boolean(result.won), first: first, gold: gold, gems: gems, items: items,
       unlocked: unlocked, progress: progress, time: result.time || 0, kills: result.kills || 0,
-      level: result.level || 1, finished: result.won && ch.n === PS.BAL.CHAPTERS && first,
+      goal: result.goal || ch.kills, boss: Boolean(result.boss), level: result.level || 1, finished: result.won && ch.n === PS.BAL.CHAPTERS && first,
       twist: result.twist || null, challenge: challenge, rush: paid.rush
     };
   }
@@ -1323,6 +1328,30 @@
     var item = add(roll.id, roll.r);
     commit();
     return { gold: gold, gems: PS.GIFT.gems, items: [item] };
+  }
+
+  /* ---------------------------------------------------------- the camp */
+
+  /** How many more fallen lemons can be picked up today. */
+  function campLeft() {
+    return S.camp.day === today() ? Math.max(0, PS.CAMP.perDay - S.camp.picked) : PS.CAMP.perDay;
+  }
+
+  /** Pick up a fallen lemon in the camp: a little gold (more for a golden one), up to
+   *  PS.CAMP.perDay a day. Returns the gold, or 0 once today's are all picked. */
+  function campLemon(golden) {
+    var day = today();
+    if (S.camp.day !== day) {
+      S.camp.day = day;
+      S.camp.picked = 0;
+    }
+    if (S.camp.picked >= PS.CAMP.perDay) return 0;
+    var gold = Math.max(5, Math.round(PS.BAL.gold(frontier()) * PS.CAMP.goldShare * (golden ? PS.CAMP.goldenX : 1)));
+    S.camp.picked++;
+    S.gold += gold;
+    S.stats.earned += gold;
+    commit();
+    return gold;
   }
 
   /** The local calendar day as "2026-10-17"; `offset` days from today. */
@@ -1803,6 +1832,8 @@
     craftShards: craftShards,
     giftWait: giftWait,
     claimGift: claimGift,
+    campLeft: campLeft,
+    campLemon: campLemon,
     deals: deals,
     buyDeal: buyDeal,
     goldPack: goldPack,

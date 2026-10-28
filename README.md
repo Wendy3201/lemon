@@ -53,7 +53,15 @@ The same guide is in the game: **Settings → How to play**, or the **New here? 
 - Squashed pests drop **gems**. Gems fill the bar across the top; every level
   you pick **one of three upgrades** (click a card, or press 1, 2 or 3). `R`
   rerolls the cards, once per battle unless your gear gives you more.
-- Survive until the timer runs out and the **boss** arrives. Beat the boss to
+- Squash enough pests and the **boss** arrives: 200 in chapter 1, 100 more
+  each chapter, and 1,200 from chapter 11 on (`PS.BAL.killGoal` in
+  `js/data.js`). The plate at the top counts them (☠ 312 / 1,200, with a bar
+  along its foot). The swarm thickens the closer you get, and a lemon that
+  clears the field fast gets the next pests sooner, so a strong lemon meets
+  the boss early. The swarm also thickens with time, up to the chapter's
+  length (3 minutes in chapter 1, 5 from chapter 5), so standing about does
+  not keep it thin; past that length the boss grows impatient and the goal
+  shrinks, to nothing half a length later. Beat the boss to
   clear the chapter and open the next one. Each boss fights like the creature
   it is named after, and there are nine: the hornet (charges), the queen
   (rings of shots and grunts), the slug (lobbed slime and puddles), the mould
@@ -65,7 +73,8 @@ The same guide is in the game: **Settings → How to play**, or the **New here? 
   lone boss's health), and both must fall. `PS.TWIN_BOSS` in `js/data.js` sets
   the chapter and the health share.
 - `Esc` or `P` pauses. Losing still pays some gold, and gear too if you got
-  halfway.
+  halfway (by pests squashed, or by time, whichever is further). Endless
+  swarm has no boss and keeps its clock.
 - The **damage meter** in the top-left ranks what is doing the damage (your
   weapon, each upgrade's ability, burning, death blasts, thorns) with each
   one's share of the total. The chart button, or `Tab`, shows or hides it.
@@ -110,6 +119,24 @@ The same guide is in the game: **Settings → How to play**, or the **New here? 
 The menus sit in front of a little orchard (`js/scenery.js`): drifting
 clouds, hills, swaying lemon trees and falling petals by day, the moon, stars
 and fireflies at night. It stays still when Animations is set to Off.
+
+**Discord.** The blue button by the game's name, at the top left, opens a
+window with the Discord invite (`PS.DISCORD` in `js/data.js`) as text and a
+**Copy** button. It never opens Discord itself, since many players are on a
+school or work computer where it is blocked: they copy the invite and join
+from their own computer or phone.
+
+**The camp** (`js/camp.js`): your lemon, holding the weapon it wears, strolls
+along the top of the tab bar with the pets on your team trailing behind. It
+wanders, stops, looks about and hops, and dozes off when the menus are left
+alone for a while. Tap it and it jumps and says something: often a nudge
+about what is waiting (a quest to claim, the free gift, an ascension, keys to
+use), sometimes what is next in your chapter, sometimes a joke; poke it too
+often and it complains. Tap a pet for hearts. Every 25 to 55 seconds a lemon
+drops from the trees: tap it within 25 seconds for 2% of a clear of your
+furthest chapter in gold (a golden one, 1 in 12 or so, pays 5 times that), up
+to 20 a day. `PS.CAMP` in `js/data.js` sets all of that. With Animations off
+they stand still and the lemons simply appear.
 
 | Tab | What it is for |
 | --- | --- |
@@ -338,12 +365,13 @@ lemon/
 │   ├── weapons.js    how each weapon attacks and looks
 │   ├── enemies.js    pests, bosses, and who turns up when
 │   ├── upgrades.js   the level-up cards and the abilities they add
-│   ├── hud.js        health bar, timer, level-up cards, pause screen
+│   ├── hud.js        health bar, pest count, level-up cards, pause screen
 │   ├── dev.js        the DEV / admin panel inside a battle (cheats, upgrades, spawning, stats)
 │   ├── net.js        rooms on the server and the direct link between two games
 │   ├── multi.js      the "Play with a friend" window, and starting a battle for two
 │   ├── trade.js      the Trade window (the server holds both offers)
 │   ├── invite.js     invites to a trade or a room, and the pop-up to join
+│   ├── camp.js       your lemon and pets on the tab bar, and the lemons that fall
 │   └── ui.js         the menus: Battle, Equipment, Forge, Shop, Talents, Quests
 ├── supabase/setup.sql   the leaderboard table and its rules, run once in Supabase
 ├── assets/icons/lemon.svg
@@ -415,7 +443,7 @@ Most tweaks are one line in `js/data.js`.
 - **Collection rewards:** `PS.BOOK` in `js/data.js`.
 - **Admin access** is hidden on purpose. The admin password and the way in are only kept as scrambled check values (`LOCK` in `js/core.js`, `CODE` in `js/ui.js`), so reading the files does not give them away. To change the password, open the game, run `PS.dev.mix(PS.dev.mix("your new password"))` in the browser console and put what it prints into `LOCK`.
 - **The admin menu in the lobby** has twelve sections down the left. *Overview* (every computed stat), *Gear* (give items, set each slot's level), *Owned* (change an item's rarity, wear it, remove it, clean out the bag), *Pets* (give any pet at any level, fill the team, open the slots), *Money*, *Shop* (open chests without paying, set the pity counters, set the gift timer), *Progress* (chapters and talents), *Quests* (complete or claim any quest, set the counters they read), *Chapters* (every chapter with Play and Clear to here), *Battle* (start any chapter or swarm mode with cheats and a built-up lemon), *Settings* and *Save*. Every change it makes is remembered: the **Undo** button at the top takes back the last one, and the Save section lists the last thirty so you can go back to any of them. The Save section also keeps named **snapshots** of the save in this browser and can download the save as a file or load one.
-- **The DEV / admin panel in a battle** opens from the DEV button or the ` key. As admin it has six tabs: *Cheats* (godmode, one-hit kills, freeze the pests, stop spawning, vacuum, and multipliers for damage, attack speed, move speed, XP and game speed), *Upgrades* (search, filter by tier, take or max any card), *Player* (health, stat boosts, auto-levelling, swap weapon, build presets), *Spawn* (any pest, elites, the boss, a training dummy for reading damage per second, status effects on every pest, pickups), *Run* (skip the clock, set the boss's health, restart on any chapter) and *Stats* (a read-out of the whole run). The switches themselves are listed in `PS.dev` in `js/core.js`, so adding one there adds it to the lobby and the battle panel together.
+- **The DEV / admin panel in a battle** opens from the DEV button or the ` key. As admin it has six tabs: *Cheats* (godmode, one-hit kills, freeze the pests, stop spawning, vacuum, and multipliers for damage, attack speed, move speed, XP and game speed), *Upgrades* (search, filter by tier, take or max any card), *Player* (health, stat boosts, auto-levelling, swap weapon, build presets), *Spawn* (any pest, elites, the boss, a training dummy for reading damage per second, status effects on every pest, pickups), *Run* (skip the clock, which thickens the swarm and makes the boss impatient; set the boss's health; restart on any chapter) and *Stats* (a read-out of the whole run). The switches themselves are listed in `PS.dev` in `js/core.js`, so adding one there adds it to the lobby and the battle panel together.
 - **The admin password** only works for the admin accounts (see Moderation below); for anyone else the hidden way in does nothing. It unlocks developer tools for that tab: a **DEV button in every
   battle** (godmode, one-hit kills, game speed, take or max any upgrade, level
   up, skip to the boss) and the tabbed admin menu in the lobby.

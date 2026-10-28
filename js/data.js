@@ -808,7 +808,14 @@
     },
     gemsFirst: function (chapter) { return 100 + 10 * chapter; },
     gemsRepeat: 5,
+    // How long the swarm takes to reach full strength by the clock alone (a battle also moves
+    // on with every pest squashed), and what the boss's health is set from.
     duration: function (chapter) { return 180 + Math.min(chapter - 1, 4) * 30; },
+    // The pests to squash before the boss arrives: 200 in chapter 1, 100 more a chapter, and
+    // 1,200 from chapter 11 on (about what a lemon of the recommended Power squashes in a
+    // chapter's length, so for them the boss comes about when it always did, and sooner for a
+    // stronger one). Past the chapter's length the boss grows impatient: see B.goalNow.
+    killGoal: function (chapter) { return Math.min(1200, 200 + 100 * (chapter - 1)); },
     // slot levels past 80 (Celestial gear and up) cost 35% more each
     levelCost: function (level) { return Math.round(30 * Math.pow(1.09, Math.min(level, 80) - 1) * Math.pow(1.35, Math.max(0, level - 80))); },
     levelMult: function (level) { return Math.pow(PS.BAL.LEVEL_GROWTH, level - 1); },
@@ -1093,6 +1100,7 @@
       featured: FEATURED[c - 1],
       milestone: MILESTONES[c] || null,
       duration: PS.BAL.duration(c),
+      kills: PS.BAL.killGoal(c),
       hpScale: PS.BAL.hpScale(c),
       dmgScale: PS.BAL.dmgScale(c),
       bossScale: PS.BAL.bossScale(c),
@@ -1304,6 +1312,17 @@
   PS.ENCHANT_KEY = { gems: 60, bulk: { count: 10, discount: 0.9 } };
 
   PS.GIFT = { every: 4 * 60 * 60 * 1000, gems: 10, goldShare: 0.25 };
+
+  /* The game's Discord server. The Discord button in the top bar shows this to read and copy;
+     it is never opened as a link, as many players are on a school or work computer where
+     Discord is blocked, and join from their own computer or phone instead. */
+  PS.DISCORD = "https://discord.gg/ZDETucQ8U";
+
+  /* The camp (js/camp.js): a lemon drops from the trees every `every` seconds (between the two)
+     while you are in the menus, and lies there `life` seconds. Tapped, it pays `goldShare` of a
+     clear of your furthest chapter, `golden` of them are golden and pay `goldenX` times that, and
+     `perDay` can be picked up a day. */
+  PS.CAMP = { every: [25, 55], life: 25, goldShare: 0.02, golden: 0.08, goldenX: 5, perDay: 20 };
   /* Daily rewards: one claim per calendar day. Claiming on the day after the
      last claim moves the streak on; missing a day starts it again at day 1.
      After day 7 it goes round again. `gold` is a share of what a battle at

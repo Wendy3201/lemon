@@ -19,23 +19,32 @@
   var MARKUP =
     '<div class="hud">' +
       '<div class="hud__xp"><i></i></div>' +
+      // three groups: the lemon (level and health) on the left, the clock in the middle,
+      // the counters and buttons on the right
       '<div class="hud__top">' +
-        '<button class="hud__btn" type="button" data-hud="pause" aria-label="Pause">' + PS.icon("pause") + "</button>" +
-        '<button class="hud__btn" type="button" data-hud="meter" aria-label="Damage meter" aria-pressed="true" title="Damage meter (Tab)">' + PS.icon("chart") + "</button>" +
-        '<button class="hud__btn hud__btn--dev" type="button" data-hud="dev" aria-label="Dev menu" title="Dev menu (`)" hidden>DEV</button>' +
-        '<div class="hud__hp" role="img" aria-label="Health"><i class="hud__hp-fill"></i><i class="hud__hp-shield"></i><span></span></div>' +
-        '<span class="hud__pill hud__lvl"></span>' +
-        '<span class="hud__gap"></span>' +
-        '<span class="hud__pill hud__time"></span>' +
-        '<span class="hud__pill hud__kills"></span>' +
-        '<span class="hud__pill hud__coins"></span>' +
+        '<div class="hud__me">' +
+          '<span class="hud__lvl" role="img" aria-label="Level"><small>Lv</small><b></b></span>' +
+          '<div class="hud__hp" role="img" aria-label="Health"><span class="hud__hp-track">' +
+            '<i class="hud__hp-lag"></i><i class="hud__hp-fill"></i><i class="hud__hp-shield"></i>' +
+            '<span class="hud__heart" aria-hidden="true">' + PS.icon("hp") + '</span><span class="hud__hp-text"></span>' +
+          "</span></div>" +
+        "</div>" +
+        // the plate: pests squashed of the ones before the boss (with a bar along its foot), or a clock
+        '<span class="hud__time"><span class="hud__goal-ico" aria-hidden="true">' + PS.icon("skull") + "</span><b></b><small></small></span>" +
+        '<div class="hud__side">' +
+          '<span class="hud__pill hud__kills"></span>' +
+          '<span class="hud__pill hud__coins"></span>' +
+          '<button class="hud__btn hud__btn--dev" type="button" data-hud="dev" aria-label="Dev menu" title="Dev menu (`)" hidden>DEV</button>' +
+          '<button class="hud__btn" type="button" data-hud="meter" aria-label="Damage meter" aria-pressed="true" title="Damage meter (Tab)">' + PS.icon("chart") + "</button>" +
+          '<button class="hud__btn" type="button" data-hud="pause" aria-label="Pause" title="Pause (Esc)">' + PS.icon("pause") + "</button>" +
+        "</div>" +
       '</div>' +
       '<div class="hud__meter" aria-label="Damage by source" hidden></div>' +
       // playing together: the other lemon's health, a duel's score, and a word while someone waits
       '<div class="hud__mate" hidden><b></b><div class="hud__mate-hp"><i></i></div><small></small></div>' +
       '<div class="hud__score" hidden></div>' +
       '<div class="hud__wait" role="status" hidden></div>' +
-      '<div class="hud__boss" hidden><span></span><div><i></i></div></div>' +
+      '<div class="hud__boss" hidden><p>' + PS.icon("skull") + '<span></span></p><div class="hud__boss-bar"><i class="hud__boss-lag"></i><i class="hud__boss-fill"></i></div></div>' +
       '<div class="hud__toast" role="status" aria-live="polite"></div>' +
       '<div class="hud__combo" hidden aria-hidden="true"><b></b><span>combo</span></div>' +
       '<div class="hud__buffs" aria-live="polite"></div>' +
@@ -55,6 +64,7 @@
       '<div class="panel pausebox">' +
         '<h2>Paused</h2>' +
         '<p class="pausebox__where"></p>' +
+        '<div class="pausebox__stats"></div>' +
         '<div class="pausebox__build"></div>' +
         '<div class="pausebox__chat" hidden></div>' +
         '<div class="pausebox__actions">' +
@@ -232,16 +242,22 @@
       el.meter = root.querySelector(".hud__meter");
       el.meterBtn = root.querySelector('[data-hud="meter"]');
       el.xp = root.querySelector(".hud__xp i");
+      el.me = root.querySelector(".hud__me");
       el.hpFill = root.querySelector(".hud__hp-fill");
+      el.hpLag = root.querySelector(".hud__hp-lag");
       el.hpShield = root.querySelector(".hud__hp-shield");
-      el.hpText = root.querySelector(".hud__hp span");
+      el.hpText = root.querySelector(".hud__hp-text");
       el.lvl = root.querySelector(".hud__lvl");
+      el.lvlNum = el.lvl.querySelector("b");
       el.time = root.querySelector(".hud__time");
+      el.timeText = el.time.querySelector("b");
+      el.timeGoal = el.time.querySelector("small");
       el.kills = root.querySelector(".hud__kills");
       el.coins = root.querySelector(".hud__coins");
       el.boss = root.querySelector(".hud__boss");
       el.bossName = root.querySelector(".hud__boss span");
-      el.bossFill = root.querySelector(".hud__boss i");
+      el.bossFill = root.querySelector(".hud__boss-fill");
+      el.bossLag = root.querySelector(".hud__boss-lag");
       el.toast = root.querySelector(".hud__toast");
       el.combo = root.querySelector(".hud__combo");
       el.buffs = root.querySelector(".hud__buffs");
@@ -253,6 +269,7 @@
       el.reroll = root.querySelector(".choose__reroll");
       el.pause = root.querySelector('[data-panel="pause"]');
       el.pauseWhere = root.querySelector(".pausebox__where");
+      el.pauseStats = root.querySelector(".pausebox__stats");
       el.pauseBuild = root.querySelector(".pausebox__build");
       el.pauseChat = root.querySelector(".pausebox__chat");
       el.quit = root.querySelector('[data-hud="quit"]');
@@ -291,18 +308,51 @@
       var p = R.p;
       var hp = Math.max(0, p.hp) / p.maxHp;
       setWidth("hp", el.hpFill, hp);
+      setWidth("hpLag", el.hpLag, hp); // follows a moment later, so a hit shows what it took
       setWidth("shield", el.hpShield, p.barrierMax ? p.barrier / p.maxHp : 0);
       if (shown.low !== hp < 0.3) {
         shown.low = hp < 0.3;
         el.hpFill.classList.toggle("is-low", shown.low);
+        el.me.classList.toggle("is-low", shown.low);
       }
       // health rounds up (1 hp left is not 0), but never past the rounded maximum
       var maxShown = Math.round(p.maxHp);
       setText("hpText", el.hpText, PS.fmt(Math.min(maxShown, Math.ceil(Math.max(0, p.hp)))) + " / " + PS.fmt(maxShown));
       setWidth("xp", el.xp, p.xp / p.need);
-      setText("lvl", el.lvl, "Lv " + p.level);
-      setText("time", el.time, R.duel ? "Round " + R.duel.round + " · " + PS.clock(Math.ceil(Math.max(0, B.DUEL.round - R.duel.roundT)))
-        : R.mode === "swarm" ? PS.clock(R.t) : R.phase === "swarm" ? PS.clock(Math.ceil(R.dur - R.t)) : "BOSS");
+      if (shown.lvl !== p.level) {
+        // the badge gives a little hop on a level up (not when the battle starts)
+        var up = shown.lvl !== undefined && p.level > shown.lvl;
+        shown.lvl = p.level;
+        el.lvlNum.textContent = p.level;
+        el.lvl.setAttribute("aria-label", "Level " + p.level);
+        if (up) {
+          el.lvl.classList.remove("is-up");
+          void el.lvl.offsetWidth;
+          el.lvl.classList.add("is-up");
+        }
+      }
+      // a chapter counts the pests squashed toward the boss; endless and duels keep a clock
+      var counting = !R.duel && R.mode !== "swarm" && R.phase === "swarm" && R.goal > 0;
+      var goal = Math.max(1, B.goalNow(R)); // shrinks once the boss grows impatient
+      if (shown.counting !== counting) {
+        shown.counting = counting;
+        el.hud.classList.toggle("is-counting", counting);
+        el.time.setAttribute("aria-label", counting ? "Pests squashed before the boss" : "Time");
+      }
+      setText("time", el.timeText, R.duel ? "Round " + R.duel.round + " · " + PS.clock(Math.ceil(Math.max(0, B.DUEL.round - R.duel.roundT)))
+        : R.mode === "swarm" ? PS.clock(R.t) : counting ? PS.fmt(Math.min(R.kills, goal)) : R.phase === "swarm" ? "" : "BOSS");
+      setText("timeGoal", el.timeGoal, counting ? " / " + PS.fmt(goal) : "");
+      var prog = counting ? Math.floor((Math.min(R.kills, goal) / goal) * 200) / 200 : 0;
+      if (shown.prog !== prog) {
+        shown.prog = prog;
+        el.time.style.setProperty("--prog", prog);
+      }
+      // the plate turns red for the boss, and warm with the last few pests before it
+      var clockMood = R.duel || R.mode === "swarm" ? "" : R.phase !== "swarm" ? "boss" : R.impatient || goal - R.kills <= Math.max(10, goal * 0.05) ? "soon" : "";
+      if (shown.clockMood !== clockMood) {
+        shown.clockMood = clockMood;
+        el.time.setAttribute("data-mood", clockMood);
+      }
       B.hud.together(R);
       setText("kills", el.killsText, PS.fmt(R.kills));
       setText("coins", el.coinsText, PS.fmt(R.coins));
@@ -370,6 +420,7 @@
           if (!b.dead) hpLeft += Math.max(0, b.hp);
         });
         setWidth("bossHp", el.bossFill, hpAll ? hpLeft / hpAll : 0);
+        setWidth("bossLag", el.bossLag, hpAll ? hpLeft / hpAll : 0);
       }
 
       var toast = R.toastT > 0 ? R.toast : "";
@@ -442,14 +493,20 @@
       el.cards.innerHTML = R.choices.map(function (choice, index) {
         var tier = B.tierInfo(choice.tier);
         var progress = choice.max === 1 || choice.max === Infinity ? "" : choice.level === 1 ? "New" : "Level " + (choice.level - 1) + " → " + choice.level;
+        // one pip a level: the ones it has, and the one this card adds
+        var pips = "";
+        if (choice.max > 1 && choice.max <= 10) {
+          for (var k = 1; k <= choice.max; k++) pips += "<i" + (k < choice.level ? ' class="is-had"' : k === choice.level ? ' class="is-new"' : "") + "></i>";
+          pips = '<span class="upcard__pips" aria-hidden="true">' + pips + "</span>";
+        }
         return (
-          '<button class="upcard' + (choice.tier === "awaken" ? " upcard--awaken" : "") + '" type="button" data-pick="' + index + '" style="--tier:' + tier.color + '">' +
+          '<button class="upcard' + (choice.tier === "awaken" ? " upcard--awaken" : choice.tier === 3 ? " upcard--legend" : "") + '" type="button" data-pick="' + index + '" style="--tier:' + tier.color + '">' +
             '<span class="upcard__key" aria-hidden="true">' + (index + 1) + "</span>" +
             '<span class="upcard__icon">' + PS.icon(choice.icon) + "</span>" +
             '<span class="upcard__tier">' + tier.name + "</span>" +
             '<strong class="upcard__name">' + PS.esc(choice.name) + "</strong>" +
             '<span class="upcard__text">' + PS.esc(choice.text) + "</span>" +
-            '<span class="upcard__level">' + progress + "</span>" +
+            '<span class="upcard__level">' + pips + progress + "</span>" +
           "</button>"
         );
       }).join("");
@@ -464,7 +521,15 @@
       if (!R.paused) return;
       quitArmed = false;
       el.quit.textContent = "Give up";
-      el.pauseWhere.textContent = (R.twist ? "Daily challenge: " + R.twist.name + " · " : "") + "Chapter " + R.ch.n + " · " + R.ch.name + " · " + PS.clock(R.t);
+      el.pauseWhere.textContent = (R.twist ? "Daily challenge: " + R.twist.name + " · " : "") + "Chapter " + R.ch.n + " · " + R.ch.name;
+      el.pauseStats.innerHTML = [
+        ["clock", "Time", PS.clock(R.t)],
+        ["xp", "Level", R.p.level],
+        ["skull", "Squashed", PS.fmt(R.kills)],
+        ["coin", "Coins", PS.fmt(R.coins)]
+      ].map(function (s) {
+        return '<span class="pausebox__stat">' + PS.icon(s[0]) + "<small>" + s[1] + "</small><b>" + s[2] + "</b></span>";
+      }).join("");
       var build = buildMarkup(R, true);
       el.pauseBuild.innerHTML = build || '<p class="pausebox__empty">No upgrades yet. Grab gems to level up.</p>';
     },

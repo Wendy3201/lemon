@@ -346,7 +346,7 @@
             : "") +
 
           '<dl class="facts">' +
-            "<div><dt>Length</dt><dd>" + PS.clock(ch.duration) + (PS.chapterBosses(ch.n).length > 1 ? " then two bosses: " + esc(PS.chapterBosses(ch.n).map(function (c) { return c.bossName; }).join(" & ")) : " then the boss") + "</dd></div>" +
+            "<div><dt>Boss</dt><dd>After " + fmt(ch.kills) + " pests: " + (PS.chapterBosses(ch.n).length > 1 ? "two bosses, " + esc(PS.chapterBosses(ch.n).map(function (c) { return c.bossName; }).join(" & ")) : esc(ch.bossName)) + "</dd></div>" +
             "<div><dt>" + (first ? "First clear" : "Reward") + "</dt><dd>" + price("gold", ch.gold * (first ? 3 : 1)) + (first ? price("gems", PS.BAL.gemsFirst(ch.n)) : "") + "</dd></div>" +
             "<div><dt>Gear drops</dt><dd>" + (first ? (ch.milestone ? "6" : "5") : "3") + ' × <span class="rlist">' + lootPreview(ch.n) + (first && ch.milestone ? '<span class="rname g-' + ch.milestone[0] + '">' + ch.milestone[0] + "-grade</span>" : "") + "</span></dd></div>" +
             "<div><dt>Best</dt><dd>" + (record && record.n ? PS.clock(record.time) + " · cleared " + record.n + (record.n === 1 ? " time" : " times") : "Not cleared yet") + "</dd></div>" +
@@ -2359,7 +2359,7 @@
       var state = n <= S.best ? "cleared" : n === S.best + 1 ? "open" : "locked";
       rows +=
         '<li class="dev__row dev__row--chapter is-' + state + '"><b class="dev__no">' + n + "</b>" +
-        '<span class="dev__name">' + esc(ch.name) + "<small>" + esc(PS.ZONES[ch.zone].name) + " · " + esc(ch.bossName) + " · " + PS.clock(ch.duration) + " · Power " + fmt(ch.rec) + "</small></span>" +
+        '<span class="dev__name">' + esc(ch.name) + "<small>" + esc(PS.ZONES[ch.zone].name) + " · " + esc(ch.bossName) + " · " + fmt(ch.kills) + " pests · Power " + fmt(ch.rec) + "</small></span>" +
         "<span>" + state + (rec ? " · best " + PS.clock(rec.time) + " · " + rec.n + "×" : "") + "</span>" +
         '<span class="dev__acts">' +
           devButton("dev-play", "Play", ' data-n="' + n + '"') +
@@ -2404,7 +2404,7 @@
         '<p class="hint">A normal battle: a win here is saved like any other.</p>',
         [
           ["Zone", esc(PS.ZONES[ch.zone].name)],
-          ["Length", PS.clock(ch.duration)],
+          ["Boss after", fmt(ch.kills) + " pests (the swarm is at full strength by " + PS.clock(ch.duration) + " anyway)"],
           ["Boss", esc(ch.bossName)],
           ["Recommended", fmt(ch.rec)],
           ["Gold", fmt(ch.gold)],
@@ -2887,12 +2887,57 @@
     );
   }
 
+  /** The Discord invite, to read and copy (never opened from here: see PS.DISCORD). */
+  function discordModal(modal) {
+    return (
+      '<div class="discord">' +
+        '<div class="discord__logo" aria-hidden="true">' + PS.icon("discord") + "</div>" +
+        '<h2 id="modal-title">Join us on Discord</h2>' +
+        '<p class="hint">Chat with other players, share builds, and hear about updates first. Copy the invite and open it on your own computer or phone.</p>' +
+        '<div class="discord__invite">' +
+          '<input id="discord-link" type="text" readonly value="' + esc(PS.DISCORD) + '" aria-label="Discord invite" data-act="discord-select" spellcheck="false">' +
+          '<button class="btn btn--primary" type="button" data-act="discord-copy" data-key="discord-copy">' + PS.icon(modal.copied ? "check" : "copy") + (modal.copied ? "Copied!" : "Copy") + "</button>" +
+        "</div>" +
+        '<div class="modal__actions"><button class="btn" type="button" data-act="close">Close</button></div>' +
+      "</div>"
+    );
+  }
+
+  /* Copy the invite: the clipboard if the browser allows it, else the old way with the text
+     selected, else leave it selected for Ctrl+C. */
+  function copyDiscord() {
+    var box = $("#discord-link");
+    function done() {
+      if (!view.modal || view.modal.type !== "discord") return;
+      view.modal.copied = true;
+      renderModal();
+      toast("Discord invite copied");
+    }
+    function oldWay() {
+      if (box) {
+        box.focus();
+        box.select();
+      }
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (err) { ok = false; }
+      if (ok) done();
+      else toast("Copy was blocked: the invite is selected, press Ctrl+C");
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(PS.DISCORD).then(done, oldWay);
+      else oldWay();
+    } catch (err) {
+      oldWay();
+    }
+  }
+
   function renderModal() {
     var modal = view.modal;
     var html = null;
     if (modal.type === "item") html = itemModal(modal.u, modal);
     else if (modal.type === "loot") html = lootModal(modal);
     else if (modal.type === "settings") html = settingsModal(modal);
+    else if (modal.type === "discord") html = discordModal(modal);
     else if (modal.type === "secret") html = modal.open ? devMenu(modal) : secretModal(modal);
     else if (modal.type === "quick") html = quickModal(modal);
     else if (modal.type === "notice") html = noticeModal();
@@ -5279,10 +5324,10 @@
     if (result.duel) return showDuelResults(result);
     if (result.swarm) return showSwarmResults(result);
     var ch = PS.chapter(result.chapter);
-    var title = result.won ? (result.finished ? "The grove is saved!" : "Chapter cleared!") : result.progress >= 1 ? "So close…" : "Overrun!";
+    var title = result.won ? (result.finished ? "The grove is saved!" : "Chapter cleared!") : result.boss ? "So close…" : "Overrun!";
     var sub = result.won
       ? result.first ? "First clear bonus: triple gold, gems and extra gear." : "Nicely done."
-      : result.progress >= 1 ? esc(ch.bossName) + " got the better of you." : "You lasted " + PS.clock(result.time) + " of " + PS.clock(ch.duration) + ".";
+      : result.boss ? esc(ch.bossName) + " got the better of you." : "You squashed " + fmt(Math.min(result.kills, result.goal)) + " of the " + fmt(result.goal) + " pests before the boss.";
 
     var twist = null;
     PS.CHALLENGE.twists.forEach(function (tw) { if (tw.id === result.twist) twist = tw; });
@@ -5352,6 +5397,9 @@
     },
     close: function () { closeModal(); },
     settings: function () { openModal({ type: "settings", armed: false }); },
+    discord: function () { openModal({ type: "discord", copied: false }); },
+    "discord-copy": function () { copyDiscord(); },
+    "discord-select": function (node) { node.select(); },
     "rename-open": function () {
       var who = PS.cloud.me();
       view.rename = { value: who ? who.name : "", busy: false, error: "" };
@@ -6491,7 +6539,8 @@
     upgrade: "upgrade", "upgrade-max": "upgrade", talent: "talent", quest: "coin", deal: "coin", gold: "coin", "book-claim": "coin", challenge: "start",
     gift: null, daily: null, chest: null, craft: null, ascend: null, egg: null, "pet-slot": null, sell: null, "forge-go": null, "quick-go": null, sound: null, cycle: null,
     // the casino plays its own: a card dealt, the wheel let go, a win or a loss
-    "bj-deal": null, "bj-hit": null, "bj-double": null, "bw-spin": null
+    "bj-deal": null, "bj-hit": null, "bj-double": null, "bw-spin": null,
+    "discord-select": null // clicking into the invite's text box
   };
 
   function upgraded(slot, text) {
@@ -6742,7 +6791,9 @@
 
       applyBlur();
       PS.scenery.mount(); // the orchard behind the menus
+      if (PS.camp) PS.camp.mount(); // your lemon and pets, strolling on the tab bar
       $("#open-settings").innerHTML = PS.icon("gear");
+      $("#open-discord").innerHTML = PS.icon("discord");
       var tabs = el.tabbar.querySelectorAll("[data-tab]");
       for (var i = 0; i < tabs.length; i++) {
         var name = tabs[i].getAttribute("data-tab");

@@ -2073,29 +2073,54 @@ button.tile:hover:not(:disabled) {
 .hud {
   position: absolute;
   inset: 0;
+  z-index: 0; /* its own layer, so nothing in it shows through the cards and the pause box */
   pointer-events: none;
   font-weight: 800;
+  --hud-glass: rgba(24, 20, 14, 0.66);
+  --hud-line: rgba(255, 240, 200, 0.16);
+  --hud-pad: clamp(8px, 2vw, 16px);
 }
 
+/* experience: a glowing strip along the whole top edge */
 .hud__xp {
-  height: 7px;
-  background: rgba(20, 18, 14, 0.55);
+  height: 8px;
+  background: rgba(14, 12, 9, 0.72);
+  box-shadow: inset 0 -1px 0 rgba(255, 240, 200, 0.1);
 }
 
 .hud__xp i {
   display: block;
   height: 100%;
   width: 0;
-  background: linear-gradient(90deg, var(--rind), var(--lemon-bright));
-  box-shadow: 0 0 10px rgba(255, 230, 109, 0.7);
+  border-radius: 0 99px 99px 0;
+  background: linear-gradient(180deg, #fff3a6, var(--lemon) 55%, var(--rind));
+  box-shadow: 0 0 12px rgba(255, 230, 109, 0.75);
   transition: width 0.15s ease;
 }
 
+/* three groups: the lemon on the left, the clock in the middle, counters and buttons on the right */
 .hud__top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 10px var(--hud-pad) 0;
+}
+
+.hud__me,
+.hud__side {
   display: flex;
   align-items: center;
+  min-width: 0;
+}
+
+.hud__me {
+  justify-self: start;
+}
+
+.hud__side {
+  justify-self: end;
   gap: 8px;
-  padding: 10px clamp(8px, 2vw, 16px) 0;
 }
 
 .hud__btn {
@@ -2105,125 +2130,358 @@ button.tile:hover:not(:disabled) {
   width: 40px;
   height: 40px;
   flex: none;
-  border: 1px solid rgba(255, 252, 242, 0.25);
+  border: 1px solid var(--hud-line);
   border-radius: 50%;
-  background: rgba(20, 18, 14, 0.6);
+  background: var(--hud-glass);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.07);
   color: #fffcf2;
   font-family: var(--font-display);
   font-size: 15px;
   letter-spacing: 1px;
   cursor: pointer;
+  transition: background-color 0.25s ease, border-color 0.25s ease, transform 0.3s var(--soft-ease, ease);
 }
 
 .hud__btn:hover {
-  background: rgba(20, 18, 14, 0.85);
+  background: rgba(20, 18, 14, 0.88);
   border-color: var(--lemon);
+  transform: scale(1.06);
 }
 
-.hud__hp {
+/* the level: a lemon-yellow badge on the end of the health bar */
+.hud__lvl {
   position: relative;
-  width: clamp(120px, 26vw, 240px);
-  height: 22px;
+  z-index: 1;
+  flex: none;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  width: 46px;
+  height: 46px;
+  border: 2px solid #fff3a6;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #fff6b8, var(--lemon) 46%, var(--rind));
+  box-shadow: 0 0 0 3px rgba(24, 20, 14, 0.72), 0 6px 14px -6px rgba(0, 0, 0, 0.85), inset 0 -3px 0 rgba(150, 100, 10, 0.35);
+  color: #3b2a05;
+  line-height: 1;
+}
+
+.hud__lvl small {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.hud__lvl b {
+  margin-top: -1px;
+  font-family: var(--font-display);
+  font-size: 19px;
+}
+
+.hud__lvl.is-up {
+  animation: hud-hop 0.6s var(--soft-ease, ease) both;
+}
+
+@keyframes hud-hop {
+  35% {
+    transform: scale(1.3) rotate(-8deg);
+    box-shadow: 0 0 0 3px rgba(24, 20, 14, 0.72), 0 0 26px 8px rgba(255, 230, 109, 0.85);
+  }
+}
+
+/* health: a chunky bar tucked under the badge; a pale strip shows what a hit just took */
+.hud__hp {
+  flex: 0 1 auto;
+  width: clamp(130px, 26vw, 270px);
+  min-width: 64px;
+  height: 30px;
+  margin-left: -14px;
+  padding: 3px 3px 3px 16px;
+  border: 1px solid var(--hud-line);
+  border-radius: 0 99px 99px 0;
+  background: var(--hud-glass);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.6);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hud__hp-track {
+  position: relative;
+  display: block;
+  height: 100%;
   border-radius: 99px;
-  background: rgba(20, 18, 14, 0.6);
-  border: 1px solid rgba(255, 252, 242, 0.25);
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
   overflow: hidden;
 }
 
-.hud__hp i {
+.hud__hp-track i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 99px;
+}
+
+.hud__hp-fill {
+  background: linear-gradient(180deg, #c8ec92, #8cc35a 48%, #5b9634);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.35), inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+  transition: width 0.12s linear;
+}
+
+.hud__hp-fill.is-low {
+  background: linear-gradient(180deg, #ffab86, #e5604a 48%, #b53a2c);
+}
+
+.hud__hp-lag {
+  background: #fff0c4;
+  opacity: 0.85;
+  transition: width 0.45s ease 0.3s;
+}
+
+.hud__hp-track .hud__hp-shield {
+  top: auto;
+  height: 5px;
+  background: linear-gradient(90deg, #bfe6ff, #6ec1ff);
+  box-shadow: 0 0 6px rgba(110, 193, 255, 0.9);
+}
+
+.hud__heart {
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  translate: 0 -50%;
+  display: grid;
+  color: #fffcf2;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+
+.hud__heart .ico {
+  width: 14px;
+  height: 14px;
+}
+
+.hud__hp-text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-left: 14px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+}
+
+/* low on health: the bar's frame glows red */
+.hud__me.is-low .hud__hp {
+  border-color: rgba(255, 120, 100, 0.8);
+  animation: hud-warn 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes hud-warn {
+  to {
+    box-shadow: 0 0 18px 2px rgba(229, 72, 77, 0.65);
+  }
+}
+
+/* the counters on the right */
+.hud__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px 0 8px;
+  border: 1px solid var(--hud-line);
+  border-radius: 99px;
+  background: var(--hud-glass);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.6);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hud__pill .ico {
+  width: 18px;
+  height: 18px;
+}
+
+.hud__kills .ico {
+  color: #f3e6cf;
+}
+
+.hud__coins .ico {
+  color: var(--lemon);
+  filter: drop-shadow(0 0 4px rgba(247, 217, 76, 0.5));
+}
+
+/* the clock: a plate in the middle; warm in the last ten seconds, red for the boss */
+.hud__time {
+  justify-self: center;
+  min-width: 92px;
+  padding: 2px 16px 3px;
+  border: 1px solid rgba(255, 230, 140, 0.35);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(44, 36, 22, 0.88), rgba(20, 17, 12, 0.88));
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: var(--lemon-bright);
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  text-shadow: 0 0 12px rgba(255, 214, 90, 0.35);
+  white-space: nowrap;
+  transition: color 0.3s ease, border-color 0.3s ease;
+}
+
+/* in a chapter the plate counts pests to the boss, with a bar filling along its foot;
+   the kills pill on the right would only say the same thing */
+.hud__time {
+  position: relative;
+  overflow: hidden;
+}
+
+.hud__goal-ico,
+.hud__time small {
+  display: none;
+}
+
+.hud.is-counting .hud__goal-ico {
+  display: inline-grid;
+  vertical-align: -2px;
+  margin-right: 6px;
+  color: #f3e6cf;
+}
+
+.hud.is-counting .hud__goal-ico .ico {
+  width: 18px;
+  height: 18px;
+}
+
+.hud.is-counting .hud__time small {
+  display: inline;
+  color: rgba(255, 240, 200, 0.6);
+  font-size: 0.68em;
+}
+
+.hud.is-counting .hud__time::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: calc(var(--prog, 0) * 100%);
+  background: linear-gradient(90deg, var(--rind), var(--lemon-bright));
+  box-shadow: 0 0 8px rgba(255, 214, 90, 0.8);
+  transition: width 0.2s ease;
+}
+
+.hud.is-counting .hud__kills {
+  display: none;
+}
+
+.hud__time[data-mood="soon"] {
+  border-color: rgba(255, 170, 80, 0.7);
+  color: #ffb84a;
+}
+
+.hud__time[data-mood="boss"] {
+  border-color: rgba(255, 120, 100, 0.75);
+  background: linear-gradient(180deg, rgba(90, 24, 20, 0.9), rgba(40, 12, 10, 0.9));
+  color: #ffd0c8;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 14px rgba(255, 90, 80, 0.8);
+  animation: hud-warn 1s ease-in-out infinite alternate;
+}
+
+/* the boss: its name with a skull, and a big segmented bar */
+.hud__boss {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  width: min(64%, 520px);
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.hud__boss p {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  color: #ffe6e0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.2;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9), 0 0 12px rgba(229, 72, 77, 0.6);
+}
+
+.hud__boss p .ico {
+  width: 18px;
+  height: 18px;
+  color: #ff8a80;
+}
+
+.hud__boss-bar {
+  position: relative;
+  height: 16px;
+  border: 1px solid rgba(255, 138, 128, 0.5);
+  border-radius: 99px;
+  background: rgba(20, 12, 10, 0.82);
+  box-shadow: 0 0 18px -4px rgba(229, 72, 77, 0.6), 0 6px 14px -8px rgba(0, 0, 0, 0.85), inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.hud__boss-bar i {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
 }
 
-.hud__hp-fill {
-  background: linear-gradient(180deg, #a9cf7b, #7ea352);
+.hud__boss-fill {
+  background: linear-gradient(180deg, #ff9f90, #e5484d 50%, #a3222a);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.3);
   transition: width 0.12s linear;
 }
 
-.hud__hp-fill.is-low {
-  background: linear-gradient(180deg, #f08a5c, #d9573a);
+.hud__boss-lag {
+  background: #ffe3a8;
+  opacity: 0.85;
+  transition: width 0.5s ease 0.3s;
 }
 
-.hud__hp-shield {
-  top: auto !important;
-  height: 5px;
-  background: #9ad7ff;
-}
-
-.hud__hp span {
+/* a mark every tenth of its health */
+.hud__boss-bar::after {
+  content: "";
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: 12.5px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-.hud__pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 11px;
-  border-radius: 99px;
-  background: rgba(20, 18, 14, 0.6);
-  border: 1px solid rgba(255, 252, 242, 0.18);
-  font-size: 14px;
-  white-space: nowrap;
-}
-
-.hud__time {
-  font-family: var(--font-display);
-  font-size: 17px;
-  color: var(--lemon-bright);
-  min-width: 62px;
-  justify-content: center;
-}
-
-.hud__gap {
-  flex: 1;
-}
-
-.hud__boss {
-  position: absolute;
-  top: 58px;
-  left: 50%;
-  width: min(76%, 520px);
-  transform: translateX(-50%);
-  text-align: center;
-}
-
-.hud__boss span {
-  font-family: var(--font-display);
-  font-size: 18px;
-  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.8);
-}
-
-.hud__boss div {
-  height: 12px;
-  border-radius: 99px;
-  background: rgba(20, 18, 14, 0.65);
-  border: 1px solid rgba(255, 252, 242, 0.3);
-  overflow: hidden;
-}
-
-.hud__boss i {
-  display: block;
-  height: 100%;
-  background: linear-gradient(180deg, #f0686c, #c9353a);
-  transition: width 0.12s linear;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(0, 0, 0, 0.35) calc(10% - 1px) 10%);
+  pointer-events: none;
 }
 
 .hud__toast {
   position: absolute;
-  top: 112px;
+  top: 126px;
   left: 50%;
-  transform: translate(-50%, -8px);
-  padding: 6px 18px;
+  transform: translate(-50%, -8px) scale(0.96);
+  padding: 7px 20px;
+  border: 1px solid rgba(255, 230, 140, 0.55);
   border-radius: 99px;
-  background: rgba(20, 18, 14, 0.75);
-  border: 1px solid var(--rind);
+  background: linear-gradient(180deg, rgba(48, 39, 22, 0.88), rgba(22, 18, 12, 0.88));
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 0 22px -6px rgba(255, 214, 90, 0.55), 0 8px 18px -10px rgba(0, 0, 0, 0.8);
   color: var(--lemon-bright);
   font-family: var(--font-display);
   font-size: clamp(15px, 2.4vw, 18px);
@@ -2232,22 +2490,87 @@ button.tile:hover:not(:disabled) {
   width: max-content;
   max-width: calc(100% - 24px);
   opacity: 0;
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  transition: opacity 0.25s ease, transform 0.35s var(--soft-ease, ease);
 }
 
 .hud__toast.is-on {
   opacity: 1;
-  transform: translate(-50%, 0);
+  transform: translate(-50%, 0) scale(1);
 }
 
 .hud__build {
   position: absolute;
-  left: clamp(8px, 2vw, 16px);
-  right: clamp(8px, 2vw, 16px);
+  left: var(--hud-pad);
+  right: var(--hud-pad);
   bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 6px;
+}
+
+/* a phone: smaller badge and clock, and the bar shrinks before anything falls off */
+@media (max-width: 640px) {
+  .hud__top {
+    gap: 6px;
+  }
+
+  .hud__side {
+    gap: 6px;
+  }
+
+  .hud__lvl {
+    width: 40px;
+    height: 40px;
+  }
+
+  .hud__lvl b {
+    font-size: 16px;
+  }
+
+  .hud__hp {
+    width: clamp(90px, 30vw, 170px);
+    height: 26px;
+  }
+
+  .hud__hp-text {
+    font-size: 11.5px;
+  }
+
+  .hud__btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .hud__pill {
+    height: 30px;
+    padding: 0 9px 0 6px;
+    font-size: 13px;
+  }
+
+  .hud__time {
+    min-width: 0;
+    padding: 1px 10px 2px;
+    font-size: 19px;
+  }
+
+  /* no room for "/ 1,200" on a phone: the bar along the foot shows how far */
+  .hud.is-counting .hud__time small {
+    display: none;
+  }
+
+  .hud.is-counting .hud__goal-ico .ico {
+    width: 15px;
+    height: 15px;
+  }
+
+  .hud__boss {
+    top: 58px;
+    width: calc(100% - 24px);
+  }
+
+  .hud__boss p {
+    font-size: 15px;
+  }
 }
 
 /* one upgrade taken this battle: its icon, and how many times */
@@ -3041,12 +3364,15 @@ button.tile:hover:not(:disabled) {
 .hud__meter {
   position: absolute;
   left: clamp(8px, 2vw, 16px);
-  top: 58px;
+  top: 72px;
   width: 214px;
   padding: 7px 8px 6px;
-  border-radius: 12px;
-  background: rgba(20, 18, 14, 0.55);
-  border: 1px solid rgba(255, 252, 242, 0.14);
+  border-radius: 14px;
+  background: rgba(24, 20, 14, 0.6);
+  border: 1px solid rgba(255, 240, 200, 0.14);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 16px -10px rgba(0, 0, 0, 0.8);
   font-size: 12px;
   line-height: 1.2;
   pointer-events: none;
@@ -5182,23 +5508,16 @@ body::before {
 
 /* ------------------------------------------------------ the battle HUD */
 
-.hud__btn,
-.hud__pill,
-.hud__hp,
-.hud__boss div,
-.hud__toast {
-  border-color: rgba(255, 252, 242, 0.14);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.6);
+.hud__build .chip {
+  padding: 6px;
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--tier, #9aa1a9) 34%, rgba(24, 20, 14, 0.82)), rgba(24, 20, 14, 0.82) 72%);
+  box-shadow: 0 4px 10px -5px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.hud__btn {
-  transition: background-color 0.25s ease, border-color 0.25s ease, transform 0.3s var(--soft-ease);
-}
-
-.hud__btn:hover {
-  transform: scale(1.06);
+.hud__build .chip .ico {
+  width: 18px;
+  height: 18px;
 }
 
 .chip {
@@ -5216,23 +5535,170 @@ body::before {
   -webkit-backdrop-filter: blur(6px);
 }
 
+/* level-up cards: a glow of their tier's colour at the top, a tier ribbon, and a pip for each level */
+.choose__title {
+  text-shadow: 0 0 24px rgba(255, 214, 90, 0.55), 0 3px 0 rgba(120, 80, 0, 0.55);
+  animation: deal 0.35s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+
 .upcard {
+  overflow: hidden;
   padding-top: 22px;
   border-top: 0;
   border-radius: 26px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--tier) 11%, #fff9e6), #fff9e6 55%);
-  box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  background:
+    radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--tier) 30%, transparent), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--tier) 10%, #fff9e6), #fff9e6 60%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tier) 35%, transparent), 0 14px 34px -14px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.8);
   transition: transform 0.35s var(--soft-ease), box-shadow 0.35s var(--soft-ease);
 }
 
 .upcard:hover,
 .upcard:focus-visible {
   transform: translateY(-6px);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tier) 55%, transparent), 0 0 30px -4px color-mix(in srgb, var(--tier) 60%, transparent), 0 22px 40px -16px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tier) 65%, transparent), 0 0 34px -4px color-mix(in srgb, var(--tier) 65%, transparent), 0 22px 40px -16px rgba(0, 0, 0, 0.8);
 }
 
 .upcard__key {
   border-radius: 9px;
+}
+
+.upcard__icon {
+  width: 64px;
+  height: 64px;
+  background: radial-gradient(circle at 35% 30%, #fffcf2, color-mix(in srgb, var(--tier) 22%, #fffcf2));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tier) 16%, transparent), 0 8px 18px -8px color-mix(in srgb, var(--tier) 80%, transparent);
+  transition: transform 0.35s var(--soft-ease);
+}
+
+.upcard:hover .upcard__icon,
+.upcard:focus-visible .upcard__icon {
+  transform: scale(1.08) rotate(-4deg);
+}
+
+.upcard__tier {
+  margin-top: 6px;
+  padding: 2px 10px;
+  border-radius: 99px;
+  background: var(--tier);
+  color: #fff;
+  font-weight: 800;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+}
+
+.upcard__level {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.upcard__pips {
+  display: flex;
+  gap: 4px;
+}
+
+.upcard__pips i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(41, 38, 31, 0.13);
+}
+
+.upcard__pips .is-had {
+  background: color-mix(in srgb, var(--tier) 70%, #29261f);
+}
+
+.upcard__pips .is-new {
+  background: var(--tier);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tier) 30%, transparent);
+  animation: pip-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes pip-pulse {
+  to {
+    transform: scale(1.3);
+  }
+}
+
+/* a legendary card has a slow shine across it */
+.upcard--legend::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%);
+  background-size: 250% 100%;
+  animation: card-shine 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes card-shine {
+  from {
+    background-position: 130% 0;
+  }
+
+  to {
+    background-position: -130% 0;
+  }
+}
+
+/* the pause box: how the battle is going, in four tiles */
+.pausebox__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 2px 0 16px;
+}
+
+.pausebox__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 9px 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-2);
+}
+
+.pausebox__stat .ico {
+  width: 18px;
+  height: 18px;
+  color: var(--rind);
+}
+
+.pausebox__stat small {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pausebox__stat b {
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1.1;
+}
+
+@media (max-width: 640px) {
+  .pausebox__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .upcard__level {
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud__lvl.is-up,
+  .hud__me.is-low .hud__hp,
+  .hud__time[data-mood="boss"],
+  .upcard__pips .is-new,
+  .upcard--legend::after {
+    animation: none;
+  }
 }
 
 /* the battle's own admin panel */
@@ -5623,7 +6089,7 @@ body::before {
 
 .hud__combo {
   position: absolute;
-  top: 60px;
+  top: 66px;
   right: clamp(10px, 2vw, 18px);
   display: flex;
   flex-direction: column;
@@ -8013,7 +8479,7 @@ body::before {
 
 .hud__score {
   position: absolute;
-  top: 58px;
+  top: 64px;
   left: 50%;
   transform: translateX(-50%);
   padding: 5px 16px;
@@ -10980,4 +11446,519 @@ button.enchant__space:disabled {
 
 .chest--rune .chest__art {
   filter: drop-shadow(0 0 12px rgba(140, 100, 255, 0.55));
+}
+
+/* =========================================================================
+   THE CAMP (js/camp.js)
+   Your lemon and pets strolling along the top of the tab bar, a speech
+   bubble, hearts, and lemons that drop from the trees to be tapped.
+   ========================================================================= */
+
+.tabbar {
+  position: relative;
+}
+
+.camp {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: calc(100% - 3px);
+  height: 64px;
+  pointer-events: none;
+}
+
+.camp__me,
+.camp__pet,
+.camp__drop {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.camp__me {
+  width: 54px;
+  height: 54px;
+  margin-left: -27px;
+}
+
+.camp__pet {
+  width: 36px;
+  height: 36px;
+  margin-left: -18px;
+}
+
+/* a soft shadow underneath, so they stand on the bar */
+.camp__me::before,
+.camp__pet::before {
+  content: "";
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: -2px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(41, 38, 31, 0.2);
+}
+
+/* room under each page, so its last buttons scroll clear of the camp */
+.screen {
+  padding-bottom: 72px;
+}
+
+/* the body turns to face where it is going (--face is 1 or -1); hops and the walk move it with
+   translate and rotate, so they never undo the turn */
+.camp__body {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  scale: var(--face, 1) 1;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 3px 2px rgba(41, 38, 31, 0.28));
+}
+
+.camp__body > .art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.camp__weapon {
+  position: absolute;
+  right: -12px;
+  bottom: 5px;
+  width: 28px;
+  height: 28px;
+  rotate: 18deg;
+}
+
+.camp__weapon .art {
+  width: 100%;
+  height: 100%;
+}
+
+.camp__me:focus-visible,
+.camp__pet:focus-visible,
+.camp__drop:focus-visible {
+  outline: 2px solid var(--rind);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+.is-walking .camp__body {
+  animation: camp-walk 0.42s ease-in-out infinite;
+}
+
+@keyframes camp-walk {
+  0%,
+  100% {
+    translate: 0 0;
+    rotate: -4deg;
+  }
+
+  50% {
+    translate: 0 -4px;
+    rotate: 4deg;
+  }
+}
+
+.is-hop .camp__body {
+  animation: camp-hop 0.5s var(--soft-ease, ease) both;
+}
+
+@keyframes camp-hop {
+  40% {
+    translate: 0 -12px;
+  }
+}
+
+.is-jump .camp__body {
+  animation: camp-jump 0.6s var(--soft-ease, ease) both;
+}
+
+@keyframes camp-jump {
+  15% {
+    translate: 0 2px;
+    scale: calc(var(--face, 1) * 1.12) 0.86;
+  }
+
+  45% {
+    translate: 0 -26px;
+    scale: calc(var(--face, 1) * 0.92) 1.1;
+  }
+
+  80% {
+    translate: 0 0;
+    scale: calc(var(--face, 1) * 1.08) 0.92;
+  }
+}
+
+.is-spin .camp__body {
+  animation: camp-spin 0.7s var(--soft-ease, ease) both;
+}
+
+@keyframes camp-spin {
+  50% {
+    translate: 0 -18px;
+    rotate: 360deg;
+  }
+
+  100% {
+    rotate: 720deg;
+  }
+}
+
+/* asleep: leaning over, with z's drifting up */
+.camp__me.is-asleep .camp__body {
+  rotate: -14deg;
+  translate: 0 2px;
+}
+
+.camp__zzz {
+  position: absolute;
+  left: 60%;
+  bottom: 100%;
+  display: none;
+  color: var(--ink-soft);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.camp__zzz i,
+.camp__zzz b {
+  font-style: normal;
+}
+
+.camp__zzz i {
+  font-size: 15px;
+}
+
+.camp__zzz b {
+  font-size: 18px;
+}
+
+.camp__me.is-asleep .camp__zzz {
+  display: block;
+  animation: camp-zzz 2.4s ease-in-out infinite;
+}
+
+@keyframes camp-zzz {
+  0% {
+    opacity: 0;
+    translate: 0 6px;
+  }
+
+  30%,
+  70% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    translate: 10px -14px;
+  }
+}
+
+/* what the lemon says */
+.camp__say {
+  --tail: 50%;
+  position: absolute;
+  left: 0;
+  bottom: 62px;
+  max-width: min(260px, 80vw);
+  margin: 0;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 10px 22px -12px rgba(41, 38, 31, 0.55);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.3;
+  opacity: 0;
+  pointer-events: none;
+  translate: 0 6px;
+  transition: opacity 0.25s ease, translate 0.3s var(--soft-ease, ease);
+}
+
+.camp__say::after {
+  content: "";
+  position: absolute;
+  left: var(--tail);
+  bottom: -6px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  rotate: 45deg;
+}
+
+.camp__say.is-on {
+  opacity: 1;
+  translate: 0 0;
+}
+
+/* hearts from a petted pet, and "+120 gold" from a picked-up lemon */
+.camp__heart,
+.camp__float {
+  position: absolute;
+  bottom: 30px;
+  pointer-events: none;
+  animation: camp-rise 1.4s ease-out both;
+}
+
+.camp__heart {
+  color: #ff6f91;
+  font-size: 15px;
+  margin-left: -6px;
+}
+
+.camp__float {
+  translate: -50% 0;
+  white-space: nowrap;
+  color: var(--sun-deep, #b8860b);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 800;
+  text-shadow: 0 1px 0 var(--surface), 0 0 6px var(--surface);
+}
+
+.camp__float.is-golden {
+  color: #d4880f;
+  font-size: 18px;
+}
+
+@keyframes camp-rise {
+  0% {
+    opacity: 0;
+    transform: translate(0, 6px) scale(0.6);
+  }
+
+  20% {
+    opacity: 1;
+    transform: translate(0, -6px) scale(1.1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx, 0), -46px) scale(1);
+  }
+}
+
+/* a lemon fallen from the trees: it drops in, bounces, and glints to be noticed */
+.camp__drop {
+  width: 32px;
+  height: 32px;
+  margin-left: -16px;
+  filter: drop-shadow(0 2px 1px rgba(41, 38, 31, 0.3));
+  animation: camp-glint 1.6s ease-in-out 1.1s infinite;
+}
+
+.camp__drop .art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.camp__drop.is-falling {
+  animation: camp-fall 1s cubic-bezier(0.5, 0, 0.6, 1) both, camp-glint 1.6s ease-in-out 1.1s infinite;
+}
+
+@keyframes camp-fall {
+  0% {
+    translate: 0 -260px;
+    rotate: -120deg;
+  }
+
+  60% {
+    translate: 0 0;
+    rotate: 0deg;
+  }
+
+  75% {
+    translate: 0 -12px;
+  }
+
+  90% {
+    translate: 0 0;
+  }
+
+  95% {
+    translate: 0 -3px;
+  }
+}
+
+@keyframes camp-glint {
+  50% {
+    filter: drop-shadow(0 2px 1px rgba(41, 38, 31, 0.3)) drop-shadow(0 0 6px rgba(255, 230, 109, 0.95));
+  }
+}
+
+.camp__drop.is-golden {
+  width: 36px;
+  height: 36px;
+  margin-left: -18px;
+  filter: drop-shadow(0 0 6px rgba(255, 200, 40, 0.9)) saturate(1.5) hue-rotate(-12deg);
+}
+
+.camp__drop.is-taken {
+  animation: camp-taken 0.4s ease-in both;
+  pointer-events: none;
+}
+
+@keyframes camp-taken {
+  to {
+    opacity: 0;
+    translate: 0 -30px;
+    scale: 1.4;
+  }
+}
+
+.camp__drop.is-gone {
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .camp {
+    left: 12px;
+    right: 12px;
+  }
+
+  .camp__me {
+    width: 46px;
+    height: 46px;
+    margin-left: -23px;
+  }
+
+  .camp__pet {
+    width: 30px;
+    height: 30px;
+    margin-left: -15px;
+  }
+
+  .camp__say {
+    bottom: 52px;
+  }
+}
+
+/* ---------------------------------------------------- the Discord button */
+
+.discord-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #5865f2;
+  box-shadow: 0 6px 14px -8px rgba(88, 101, 242, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.25s var(--soft-ease, ease), background-color 0.2s ease;
+}
+
+.discord-btn .ico {
+  width: 22px;
+  height: 22px;
+}
+
+.discord-btn:hover {
+  background: #4752c4;
+  transform: scale(1.08) rotate(-6deg);
+}
+
+.discord-btn:focus-visible {
+  outline: 3px solid color-mix(in srgb, #5865f2 50%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .discord-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .discord-btn .ico {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* the window with the invite to copy */
+.discord {
+  text-align: center;
+}
+
+.discord__logo {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  margin: 4px auto 10px;
+  border-radius: 24px;
+  background: #5865f2;
+  box-shadow: 0 12px 24px -12px rgba(88, 101, 242, 0.9);
+  color: #fff;
+}
+
+.discord__logo .ico {
+  width: 42px;
+  height: 42px;
+}
+
+.discord__invite {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0 6px;
+}
+
+.discord__invite input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  text-align: center;
+}
+
+.discord__invite input:focus {
+  outline: 2px solid #5865f2;
+  outline-offset: 1px;
+}
+
+.discord__invite .btn {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* a phone: the invite on its own line, so all of it shows */
+@media (max-width: 480px) {
+  .discord__invite {
+    flex-direction: column;
+  }
+
+  .discord__invite input {
+    font-size: 13px;
+  }
 }
