@@ -194,8 +194,10 @@
       paused: false, choices: null, pending: p.fx.startUp || 0,
       shake: 0, procs: 0, leeched: 0, hurtWindow: 0, windowT: 0, toast: "", toastT: 0,
       twist: null, hurtMul: 1, pestMul: null,
-      mp: null, players: null, ally: null, partner: null, duel: null, mpMul: null, uid: 0
+      mp: null, players: null, ally: null, partner: null, duel: null, mpMul: null, uid: 0,
+      pestHp: 1, power: stats.realPower || stats.power
     };
+    if (!mp && R.mode === "normal") R.pestHp = B.surplus(stats, ch);
     PS.CHALLENGE.twists.forEach(function (tw) { if (tw.id === twistId) applyTwist(tw); });
     if (mp) startTogether(mp);
     keys = Object.create(null);
@@ -226,6 +228,19 @@
       for (var t = tw.elites; t < R.dur - 5; t += tw.elites) R.elites.push(t / R.dur);
     }
   }
+
+  /* A lemon far stronger than the chapter squashes its pests faster: ordinary pests (and elites,
+     which are built from them) have their health times `ratio ^ -K`, where ratio is the lemon's
+     real Power over the chapter's recommended Power, never under FLOOR. At 2.5 times the Power,
+     a pest has about half its health, at 7 times about a fifth. The boss does not change, and
+     neither do endless, duels and playing together (there, two Powers share one battle).
+     Measured as the time a pest lasts after its first hit: it was 4.5 s at the recommended
+     Power, 2.5 to 3 s at 2.5 times it, and 1 s at 7 times; now about 1.4 s and 0.2 s. */
+  B.OVERPOWER = { k: 0.8, floor: 0.12 };
+  B.surplus = function (stats, ch) {
+    var ratio = (stats.realPower || stats.power) / ch.rec;
+    return ratio > 1 ? Math.max(B.OVERPOWER.floor, Math.pow(ratio, -B.OVERPOWER.k)) : 1;
+  };
 
   /** How far through the chapter a battle is, from 0 to 1: the share of the pests to squash
    *  before the boss, or the share of the chapter's length gone by, whichever is further on
@@ -1140,6 +1155,13 @@
     if (e.shockT > 0) dmg *= 1 + e.shockAmp;
     if (fx.chillAmp && e.chillT > 0) dmg *= 1 + fx.chillAmp;
     if (p.bossDmg && (e.boss || e.elite)) dmg *= 1 + p.bossDmg;
+    // the weapon's own hits do more to a pest the more it misses in a crowd (see B.CROWD in weapons.js)
+    if (!e.boss && R.src === R.weaponId) {
+      var crowd = R.crowd || (R.crowd = {});
+      var kc = crowd[R.weaponId];
+      if (kc === undefined) kc = crowd[R.weaponId] = B.crowdBonus(R.weaponId, R.ch.n);
+      dmg *= kc;
+    }
     // a boss tires: the longer the fight drags on, the more each hit hurts it,
     // so a weak build gets a long fight rather than an endless one
     if (e.boss) dmg *= 1 + (e.age / 25) * (e.age / 25);

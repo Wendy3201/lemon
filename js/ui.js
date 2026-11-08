@@ -299,6 +299,11 @@
     );
   }
 
+  /** A Power ratio for reading: 2.5, 12.3, 1.2K. */
+  function timesOver(ratio) {
+    return ratio < 10 ? String(Math.round(ratio * 10) / 10) : fmt(ratio);
+  }
+
   SCREENS.battle = function () {
     var S = st.get();
     var ch = PS.chapter(S.chapter);
@@ -341,6 +346,9 @@
           "</div>" +
 
           '<p class="verdict verdict--' + verdict[0] + '">' + verdict[1] + " · recommended power " + fmt(ch.rec) + "</p>" +
+          (PS.B.surplus(stats, ch) < 0.9
+            ? '<p class="hint hint--strong">You are ' + timesOver(ratio) + " times as strong as this chapter asks, so its pests have only " + Math.round(PS.B.surplus(stats, ch) * 100) + "% of their usual health.</p>"
+            : "") +
           (stats.realPower && stats.realPower !== stats.power
             ? '<p class="hint">Your Power is set by hand in the admin menu. Your gear really gives ' + fmt(stats.realPower) + ", and that is what fights.</p>"
             : "") +

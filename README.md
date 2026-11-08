@@ -72,6 +72,33 @@ The same guide is in the game: **Settings → How to play**, or the **New here? 
   arrive together (the chapter's own and the one before it, each with 65% of a
   lone boss's health), and both must fall. `PS.TWIN_BOSS` in `js/data.js` sets
   the chapter and the health share.
+- **Power to spare makes pests weaker.** Ordinary pests (and the elites built
+  from them) have their health times (your Power over the chapter's
+  recommended Power) to the power of -0.8, down to 12% at the least. At 2.5
+  times the Power a pest has about half its usual health, at 7 times about a
+  fifth, at the recommended Power or under it no change. It goes by the Power
+  your gear really gives, not one set by hand in the admin menu. Bosses,
+  Endless, duels and playing together keep their balance. The chapter screen
+  says when it applies, and the battle's admin panel (Stats) shows it. It was
+  added because at 1B Power on a 400M chapter an ordinary pest still took 2.5
+  to 3 seconds of being shot to die (now about 1 second); the numbers are
+  `B.OVERPOWER` in `js/battle.js`.
+- **Weapons are made even against a crowd.** Power only sees a weapon's stat,
+  not how it fights, but the pests of the later chapters soak up hundreds of
+  hits, so how many pests a weapon hits at once decides how fast they fall.
+  Measured at 1B Power against chapter 109, over a minute, the best weapon
+  (the Eclipse) squashed 153 pests and a dozen weapons of the same Power fewer
+  than ten (the median weapon: 39). "Equip best" picks by Power, so it could
+  hand you one of those. So a weapon's own hits on ordinary pests (and
+  elites; never a boss, and not an upgrade's, a pet's or burning) are
+  multiplied by its entry in `B.CROWD` (`js/weapons.js`): 1 for the strongest
+  weapons, about 2 to 8 for most, 20 for the scattergun style and 45 for the
+  daggers. It grows in from chapter 20 (nothing before it) to chapter 80
+  (full), as the early chapters were already fairly even. The numbers were fitted
+  with simulated battles (a minute at 1B on chapter 109) so every weapon does
+  about as much to a crowd as the strong ones; after it, a minute squashes
+  from 70 to 125 pests with nearly any weapon (the median is 101), down from 0
+  to 150. The 12 attack styles share an entry across their 7 elements.
 - `Esc` or `P` pauses. Losing still pays some gold, and gear too if you got
   halfway (by pests squashed, or by time, whichever is further). Endless
   swarm has no boss and keeps its clock.

@@ -1227,6 +1227,43 @@
     };
   });
 
+  /* ---------------------------------------------------- the crowd bonus */
+  /* The pests of the later chapters soak up hundreds of hits, so what a weapon does to a crowd
+     decides how fast they fall: a sweep that catches twenty pests at once is worth twenty times a
+     bolt that catches one, and Power cannot see the difference (measured at 1B Power against
+     chapter 109, over a minute: the best weapon squashed 153 pests, and a dozen weapons of the
+     same Power squashed fewer than ten). So a weapon that hits few pests at once does more to
+     each ordinary pest it hits: its hits against pests (never against a boss) are multiplied by
+     its entry here, which grows in from chapter 20 to chapter 80 (earlier chapters are
+     fairly even already). `styles` is for the twelve attack styles of the armory, `weapons` for
+     the hand-made ones, and anything else is 1. The numbers were fitted with simulated battles
+     (see the README) so that every weapon squashes about as many pests as the strong ones. */
+  B.CROWD = {
+    from: 20, full: 80,
+    styles: {
+      bolt: 7.9, spread: 20, burst: 6.8, homing: 6, slash: 4.75, thrust: 3.7, slam: 5, lob: 2.7,
+      chain: 4.7, boomerang: 6, zone: 2.8, beam: 6.7
+    },
+    weapons: {
+      sling: 7.6, blade: 4, bow: 5.5, staff: 1, spear: 4.5, daggers: 45, hammer: 1.5, rang: 2.1,
+      storm: 1.4, frost: 3.2, ember: 3.1, fangs: 9.7, solstice: 1.7, eclipse: 1, whip: 6.4,
+      cannon: 13.6, mace: 5.1, flask: 2.5, comet: 1.6, hive: 3, thornlash: 4.5, nova: 3.5, geyser: 1.55
+    }
+  };
+
+  /** What this weapon's hits against ordinary pests are multiplied by in this chapter. */
+  B.crowdBonus = function (id, chapter) {
+    var c = B.CROWD;
+    var k = c.weapons[id];
+    if (k === undefined) {
+      var made = PS.ARMORY_BY_ID && PS.ARMORY_BY_ID[id];
+      k = made ? c.styles[made.arch] : 1;
+    }
+    if (!(k > 1)) return 1;
+    var ramp = PS.clamp((chapter - c.from) / (c.full - c.from), 0, 1);
+    return Math.pow(k, ramp);
+  };
+
   /* ------------------------------------------------------- held + flying */
 
   Object.keys(W).forEach(function (id) {

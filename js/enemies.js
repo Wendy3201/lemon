@@ -59,7 +59,7 @@
     var age = R.phase === "boss" ? 0 : R.t;
     e.r = def.r;
     e.fill = def.fill;
-    e.hp = e.maxHp = def.hp * R.ch.hpScale * (1 + age / 90);
+    e.hp = e.maxHp = def.hp * R.ch.hpScale * (R.pestHp || 1) * (1 + age / 90);
     e.speed = def.speed * PS.rand(0.92, 1.08);
     e.hurt = def.hurt * R.ch.dmgScale * (1 + age / 400);
     e.xp = def.xp;

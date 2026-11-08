@@ -419,6 +419,7 @@
         ["Time", PS.clock(R.t) + (R.mode === "swarm" ? "" : " (the swarm is at full strength by " + PS.clock(R.dur) + ")")],
         ["To the boss", R.mode === "swarm" || R.duel ? "none in this battle" : PS.fmt(Math.min(R.kills, B.goalNow(R))) + " of " + PS.fmt(B.goalNow(R)) + " pests" + (B.goalNow(R) < R.goal ? " (down from " + PS.fmt(R.goal) + ": the boss is impatient)" : "") + " · " + Math.round(B.progress(R) * 100) + "% of the way"],
         ["Pests alive · elites", alive + " · " + elites],
+        ["Pests' health", R.mode === "swarm" || R.duel || R.mp ? "not changed in this battle" : "×" + (R.pestHp || 1).toFixed(2) + (R.pestHp < 1 ? " (your Power is " + (R.power / R.ch.rec < 10 ? (R.power / R.ch.rec).toFixed(1) : PS.fmt(R.power / R.ch.rec)) + " times the chapter's)" : "")],
         ["Squashed", PS.fmt(R.kills)],
         ["Damage dealt", PS.fmt(R.dealt) + " · " + PS.fmt(R.dealt / seconds) + " a second (what came off pests, as the meter counts)"],
         ["Coins", PS.fmt(R.coins)],
